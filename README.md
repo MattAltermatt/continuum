@@ -1,5 +1,7 @@
 # Continuum
 
+[![CI](https://github.com/MattAltermatt/continuum/actions/workflows/ci.yml/badge.svg)](https://github.com/MattAltermatt/continuum/actions/workflows/ci.yml)
+
 An idle survival game about queuing work against a clock you cannot beat.
 
 You never click to chop wood. You queue it — and then decide what deserves the
