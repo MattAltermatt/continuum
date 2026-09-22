@@ -1,0 +1,51 @@
+# Continuum
+
+An idle survival game about queuing work against a clock you cannot beat.
+
+You never click to chop wood. You queue it — and then decide what deserves the
+next stretch of a short, accelerating life. Health decays faster every minute
+you survive, so every run ends the same way. What carries forward is the skill
+you built, the automation you earned, and the handful of seconds you bought by
+building the right thing early.
+
+Death is the loop, not the failure.
+
+> 🚧 **Early.** The engine design is settled and written down; the game is
+> being built small-first, starting with how a single action feels to queue.
+
+## Run it
+
+```sh
+npm install
+npm run dev
+```
+
+Then open the URL Vite prints (usually <http://localhost:5173>).
+
+```sh
+npm test          # engine + component tests
+npm run typecheck # tsc --noEmit
+npm run build     # production build into ./dist
+```
+
+## Documents
+
+- **[`VISION.md`](./VISION.md)** — what the game is, the principles it holds to,
+  and what it deliberately is not.
+- **[`MECHANICS.md`](./MECHANICS.md)** — the engine specification: the tick, the
+  queue, incremental cost consumption, dual-mastery XP, the decay curve, death
+  and rebirth, and the automation model. This is the document that settles
+  arguments about intent.
+- **[`CLAUDE.md`](./CLAUDE.md)** — conventions, layout, testing contract and
+  gotchas for anyone (or anything) writing code here.
+- **[Issues](https://github.com/MattAltermatt/continuum/issues)** — everything
+  queued, every open question, and every decision on record. There is no
+  roadmap file; the issues *are* the plan.
+
+## Built with
+
+TypeScript · React · Vite · Vitest
+
+## License
+
+MIT — see [`LICENSE`](./LICENSE).
