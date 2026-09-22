@@ -1,0 +1,52 @@
+:root {
+  --bg: #0d0f12;
+  --fg: #e6e3dc;
+  --dim: #6f7680;
+  --accent: #c8a45c;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.6 ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  height: 100%;
+  padding: 1rem;
+  text-align: center;
+}
+
+.shell__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.shell__line {
+  margin: 0;
+}
+
+.shell__line--dim {
+  color: var(--dim);
+}
