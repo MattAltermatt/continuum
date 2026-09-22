@@ -41,6 +41,22 @@ npm run test:watch  # vitest, watch mode
 Cite standing decisions by number (`decision #12`) — the issue number is the
 only stable identifier a decision gets.
 
+## Decisions in force
+
+Cited from code and prose by number. The issue is authoritative; this table is
+only an index so a number can be looked up without a search.
+
+| # | Decision |
+|---|---|
+| [1](https://github.com/MattAltermatt/continuum/issues/1) | TypeScript + React + Vite + Vitest |
+| [2](https://github.com/MattAltermatt/continuum/issues/2) | Planning lives in GitHub Issues, not in the repo |
+| [3](https://github.com/MattAltermatt/continuum/issues/3) | All tuning lives in `balance.ts` and is sacrosanct |
+| [4](https://github.com/MattAltermatt/continuum/issues/4) | The engine never imports from the UI |
+| [31](https://github.com/MattAltermatt/continuum/issues/31) | Mockups are committed artifacts, never scratch |
+
+A decision is a **closed and locked** issue. Amending one means reopening it,
+which leaves a trail; editing a heading in a file does not.
+
 ## Source layout
 
 ```text
