@@ -18,10 +18,17 @@ Project-local notes for Claude Code sessions. Read this first.
 npm install
 npm run dev         # dev server — Claude starts this, never asks the user to
 npm run build       # typecheck + production build
-npm run typecheck   # tsc --noEmit
+npm run typecheck   # BOTH programs: the ship build, and src/engine/ with no DOM
+npm run lint        # oxlint; silent on a clean tree, so any output is real
 npm test            # vitest, one shot
 npm run test:watch  # vitest, watch mode
+npm run test:hooks  # the guards in .claude/hooks/ have their own suite
+npm run preview     # serve the built ./dist, to check a production build
 ```
+
+`npm run typecheck` runs `tsc` twice on purpose. The second pass compiles
+`src/engine/` under `tsconfig.engine.json`, which has no DOM library and no
+ambient types — see **The guard layer** below.
 
 ## Where planning lives
 
@@ -68,6 +75,10 @@ src/
   balance.ts  every tuning number, in one place
 ```
 
+This is the layout the code is built toward, not a description of what is on
+disk today — `data/` and `state/` appear with the work that needs them. The
+boundaries are the contract; the directories are just where it gets enforced.
+
 **The engine never imports from `ui/`.** The simulation must be runnable and
 testable headless; if a test needs to render a component to check a rule, the
 rule is in the wrong layer.
@@ -83,10 +94,91 @@ Two layers, both without booting a renderer where possible:
 
 **Definition of Done for any phase:**
 
-- ✅ `npm run typecheck` green
+- ✅ `npm run typecheck` green — both programs
+- ✅ `npm run lint` green
 - ✅ `npm test` green, with tests for every rule touched
+- ✅ `npm run test:hooks` green
 - ✅ Verified in Chrome — the change actually visible doing the thing
 - ✅ Console clean, including cosmetic 404s
+
+CI runs everything on that list except the Chrome pass, on every push to `main`
+and every pull request. The Chrome pass is a person looking at the game and is
+deliberately not automated. `/slice-ship` walks the whole list in order.
+
+📌 **This list is canonical.** `.claude/skills/slice-ship`, `.github/workflows/ci.yml`
+and `.claude/agents/engine-reviewer.md` each execute it, and each will drift from
+it. When a gate is added or removed, change it here first and then update those
+three — and if one of them disagrees with this list, this list is right.
+
+## The guard layer
+
+Two invariants in this file are load-bearing enough to be enforced by machinery
+rather than by memory: the engine/UI wall (`decision #4`) and every-number-in-
+`balance.ts` (`decision #3`). Each has more than one guard, because each guard is
+blind to what the others see.
+
+| Guard | Catches | Blind to |
+|---|---|---|
+| `tsconfig.engine.json` | an **ambient** reach — `document`, `setTimeout`, `performance.now()` — that no import statement shows | a type-clean import of something outside the engine; `data/` and `balance.ts`, which it only reaches transitively |
+| `src/purity.test.ts` | exactly that: a legal import of a file that is not part of the layer, across all three layers below the wall, plus host globals in their *tests* | `Date.now()` and `Math.random()` — see below |
+| `.claude/hooks/tuning-literals.sh` | a number typed outside `balance.ts` | a number **changed inside** `balance.ts` |
+| `tuning-guard` agent | that change, before merge | — |
+
+`.claude/hooks/` also carries `branch-guard.sh` (source edited on `main`) and
+`gates-on-stop.sh`, which runs typecheck and the suite **once per turn** on
+`Stop` rather than on every edit — `PostToolUse` cannot tell a break from a
+half-finished rename, and a guard that is loudest during ordinary multi-file work
+is a guard that gets commented out.
+
+⚠️ **`Date.now()` and `Math.random()` pass every guard.** `lib: ES2022` provides
+both, so neither config rejects them and neither is an import. They are also the
+two reaches an idle engine actually wants — the decay curve is a function of
+elapsed time. Take the clock and the seed as **parameters**; `src/state/` supplies
+them. Nothing will stop you doing otherwise.
+
+🚨 **Widening a guard is a change to the wall, not part of a feature.** An entry
+added to the allowlist in `src/purity.test.ts`, or a widened `include` in
+`tsconfig.engine.json`, must be called out on its own and justified. An exemption
+is invisible forever once it lands.
+
+**The guards have their own test suite** — `npm run test:hooks`, 26 checks, every
+hook with at least one case that **must fire** and several that must stay quiet.
+A guard nobody has watched fail is decoration; one that has silently stopped
+firing is worse than none, because it is a wall everyone still believes in. The
+must-fire cases run against stub toolchains, because an earlier version of this
+suite asserted only silence — and stubbing a hook body to `exit 0` left every
+check passing. CI runs it.
+
+## The permissions allowlist
+
+`.claude/settings.json` allowlists reads and the project's own scripts. Two rules
+about editing it, both learned by finding the escape rather than by reasoning:
+
+🚨 **A trailing `:*` on a command that takes flags is usually an escape.** Verified
+on this repo's own first draft: `npm test --prefix <dir>` runs a *different*
+package's test script; `rg --pre <script>` executes that script; `npx vitest
+--config <file>` executes that module; `sed -n -i ''` truncates a file; `git
+branch -v -D <branch>` deletes an unmerged branch; `git checkout -b tmp -f`
+discards the working tree. Each of those matched an entry that looked read-only or
+harmless. npm scripts are therefore listed by **exact** name, and `git checkout -b`
+is pinned to `feature/`.
+
+**Test the entry, do not reason about it.** Every one of the above was found by
+running it in a scratch repo, and two entries that *looked* identically dangerous
+— `git branch --list` and `git branch --show-current` — turned out to be safe,
+because git refuses to combine a listing mode with a delete. Reasoning would have
+removed the wrong ones.
+
+Knowingly accepted: `git diff --output=<path>` overwrites that path with diff
+text. Recoverable, never typed by accident, and `git diff` is too central to gate.
+
+## Reviewers
+
+`.claude/agents/` holds three, dispatched fresh with no implementation bias:
+`engine-reviewer` (the invariants, opus), `tuning-guard` (numeric changes to
+`balance.ts`), `vacuous-test-hunter` (tests that pass without testing anything).
+Code review before merge is not optional and is not scaled down for small
+changes.
 
 ## Balance
 
@@ -124,6 +216,13 @@ unsubscribed event) ship without asking.
 
 ## Gotchas
 
+- **A component test needs `// @vitest-environment jsdom` as its first line.**
+  `vite.config.ts` sets `environment: 'node'` globally, because the engine is
+  the larger half and pays for jsdom otherwise. Components opt in per file with
+  the docblock; `src/ui/App.test.tsx` is the working example. Without it the
+  test fails on a missing `document` rather than on anything to do with the
+  component. `src/test-setup.ts` guards the `jest-dom` matcher import on
+  `typeof document` for the same reason.
 - **Vite HMR does not reflect structural module rewrites.** After changing the
   module graph (new exports, restructured loops), HMR will claim success while
   the browser holds old references. Restart the dev server. Diagnostic: read a

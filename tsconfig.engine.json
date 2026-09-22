@@ -1,0 +1,34 @@
+{
+  // Half the purity wall: src/engine/ compiled with no DOM library and no
+  // ambient types at all. `decision #4` and CLAUDE.md say the engine imports
+  // nothing upward -- not from src/ui/, not from src/state/, not from the DOM --
+  // and this is what makes an *ambient* reach fail, the kind no import statement
+  // shows. `performance.now()`, `process.env`, `setTimeout`, `document` and
+  // `requestAnimationFrame` all stop resolving here while remaining perfectly
+  // legal under the root config.
+  //
+  // The other half is src/purity.test.ts, which catches the case this cannot: a
+  // type-clean import of something outside src/engine/ that happens not to touch
+  // the DOM. A pure string helper in src/ui/, or any typed npm package, compiles
+  // fine here and is still a breach.
+  //
+  // "types": [] is load bearing. Without it tsc auto-includes every package in
+  // node_modules/@types, which is harmless today and would not stay that way.
+  //
+  // Test files are excluded on purpose. Vitest's own type surface can reference
+  // DOM and node types, and a vitest bump that landed one in a non-skipped
+  // position would fail this config with an error that READS as a purity breach
+  // against clean code. The root tsconfig typechecks them anyway, and
+  // purity.test.ts scans them for ambient reaches directly.
+  //
+  // It EXTENDS the root config rather than copying it, so a strictness flag added
+  // to tsconfig.json can never leave the engine compiling under weaker rules than
+  // the ship build.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["src/engine"],
+  "exclude": ["src/engine/**/*.test.ts"]
+}

@@ -1,4 +1,4 @@
-import { balance } from '../balance';
+import { ticksPerSecond } from '../engine/time';
 
 /**
  * Placeholder shell. Deliberately empty of game UI.
@@ -7,13 +7,11 @@ import { balance } from '../balance';
  * feels to interact with, so nothing is built speculatively ahead of that.
  */
 export function App() {
-  const ticksPerSecond = 1000 / balance.time.tickIntervalMs;
-
   return (
     <main className="shell">
       <h1 className="shell__title">Continuum</h1>
       <p className="shell__line">
-        Scaffold running. The simulation ticks {ticksPerSecond} times per second.
+        Scaffold running. The simulation ticks {ticksPerSecond()} times per second.
       </p>
       <p className="shell__line shell__line--dim">
         Nothing is built here yet.

@@ -1,0 +1,64 @@
+# The four gates from CLAUDE.md's Definition of Done that a machine can judge.
+#
+# The fifth -- "verified in Chrome, the change actually visible doing the thing"
+# -- is deliberately absent. It is a human looking at the game, and a workflow
+# that claimed to cover it would make the other four feel like the whole bar.
+#
+# One job, not four. `npm ci` dominates the runtime; splitting the gates into
+# parallel jobs would pay for a dependency install three extra times to save
+# seconds. Vitest needs no CI configuration: it detects GITHUB_ACTIONS and emits
+# workflow annotations on the failing lines by itself.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch cancels the first. The gates are a pass/fail
+# on the tip, not a history worth preserving.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Pinned from .nvmrc, which tracks the version actually developed against
+      # rather than the current LTS line (26 is not LTS; 24 is). A CI that runs a
+      # major nobody runs locally reports failures the developer cannot reproduce
+      # and misses the ones they can. Only jq and perl are assumed beyond node,
+      # and ubuntu-latest ships both.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Ordered cheapest-first so a failure reports the smallest useful thing.
+      # typecheck runs both programs: the ship build, and src/engine/ compiled
+      # with no DOM library -- the half of the purity wall that catches an
+      # ambient reach no import statement shows. See tsconfig.engine.json.
+      - name: Typecheck (ship build + engine purity)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # The hooks in .claude/hooks/ are a guard layer with its own test suite.
+      # An untested guard is decoration, and one that has silently stopped firing
+      # is worse than none -- it is a wall everyone believes in.
+      - name: Test the hooks themselves
+        run: npm run test:hooks
+
+      - name: Build
+        run: npm run build

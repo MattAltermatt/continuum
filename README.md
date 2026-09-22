@@ -23,10 +23,17 @@ npm run dev
 Then open the URL Vite prints (usually <http://localhost:5173>).
 
 ```sh
-npm test          # engine + component tests
-npm run typecheck # tsc --noEmit
-npm run build     # production build into ./dist
+npm test           # engine + component tests, one shot
+npm run test:watch # the same, in watch mode
+npm run typecheck  # the ship build, and the engine with no DOM available to it
+npm run lint       # oxlint
+npm run build      # typecheck + production build into ./dist
 ```
+
+The engine is compiled a second time with no DOM library present, so a reach for
+`document` or `setTimeout` inside the simulation fails to build. That, a purity
+test and a set of edit-time hooks are what keep the simulation headless rather
+than merely intended to be.
 
 ## Documents
 
@@ -41,6 +48,10 @@ npm run build     # production build into ./dist
 - **[Issues](https://github.com/MattAltermatt/continuum/issues)** — everything
   queued, every open question, and every decision on record. There is no
   roadmap file; the issues *are* the plan.
+- **[`docs/specs/`](./docs/specs/)** — dated design reasoning: what was
+  considered and what was rejected, for the decisions big enough to argue about.
+- **[`docs/mockups/`](./docs/mockups/)** — dated, committed mockups. A design
+  that only ever existed in a scratch directory cannot be pointed back at.
 
 ## Built with
 
