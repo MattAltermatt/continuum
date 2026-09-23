@@ -1,11 +1,12 @@
 import { balance } from '../balance';
-import { SKILLS } from '../data/skills';
+import { skillOf } from '../data/roster';
+import type { Content } from '../data/types';
 import type { DeathSummary } from '../engine/rebirth';
 import { ticksToMinutes, ticksToSeconds } from '../engine/time';
 import { Fragment } from 'react';
 import { clock, floored } from './format';
 import { ARROW, MINUS } from './glyphs';
-import { SKILL_ICONS } from './icons';
+import { ICONS } from './icons';
 
 /** The card is the ledger, to two decimals. Display precision, not tuning. */
 const CARD_DECIMALS = 2;
@@ -17,7 +18,7 @@ const CARD_DECIMALS = 2;
  * is the difference of the two shown values, so from + gain = to on the card.
  */
 
-export function DeathCard({ summary, onBegin }: { summary: DeathSummary; onBegin: () => void }) {
+export function DeathCard({ summary, content, onBegin }: { summary: DeathSummary; content: Pick<Content, 'roster'>; onBegin: () => void }) {
   const title = `Life ${summary.life} ends`;
   const at = clock(ticksToSeconds(summary.runTicks));
   const minutes = floored(ticksToMinutes(summary.runTicks), CARD_DECIMALS);
@@ -31,12 +32,13 @@ export function DeathCard({ summary, onBegin }: { summary: DeathSummary; onBegin
       {summary.coreGains.length > 0 && (
         <div className="card__gains">
           {summary.coreGains.map((g) => {
-            const Icon = SKILL_ICONS[g.skill];
+            const skill = skillOf(content, g.skill);
+            const Icon = ICONS[skill.icon];
             // One grid for every gain row, as the mockup has it, so the bars line up.
             return (
               <Fragment key={g.skill}>
                 <Icon aria-hidden="true" size={14} />
-                <b>{SKILLS[g.skill].name}</b>
+                <b>{skill.name}</b>
                 <div className="bar" aria-hidden="true"><div className="bar__fill" style={{ width: `${g.progress * 100}%` }} /></div>
                 <span className="card__lv">core {g.from} {ARROW} <b>{g.to}</b></span>
               </Fragment>

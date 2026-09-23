@@ -2,7 +2,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { balance } from '../balance';
-import { scrub } from '../data/scrub';
+import { saltRoad } from '../data/salt-road';
 import { LOG_LINES, useGame } from './useGame';
 
 describe('useGame', () => {
@@ -10,7 +10,7 @@ describe('useGame', () => {
   afterEach(() => vi.useRealTimers());
 
   it('starts live with an empty queue, so nothing ticks until work is queued (decision #41), and a lifeBegins line', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     expect(result.current.state.paused).toBe('none');
     expect(result.current.state.queue).toHaveLength(0);
     expect(result.current.log[0]).toEqual({ seq: 0, at: 0, event: { type: 'lifeBegins', life: 1 } });
@@ -19,7 +19,7 @@ describe('useGame', () => {
   });
 
   it('setHealth (dev handle) lets verification reach death: the next working tick dies and logs it', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
     act(() => result.current.dispatch({ type: 'setHealth', health: 0.001 }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
@@ -28,7 +28,7 @@ describe('useGame', () => {
   });
 
   it('keeps at most LOG_LINES, newest first, and seq stays unique past the cap (a length-based seq would repeat)', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'hall' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'mine' }));
     // The hall and Mine alternate on every stone: two lines per stone. Twelve minutes, health
@@ -45,7 +45,7 @@ describe('useGame', () => {
     expect(log.every((l, i) => i === 0 || l.seq < log[i - 1]!.seq)).toBe(true);
   });
   it('gives every log line a distinct seq that does not change when newer lines are prepended', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
     const before = result.current.log.map((l) => [l.seq, l.event.type]);
@@ -58,7 +58,7 @@ describe('useGame', () => {
   });
 
   it('queues, resumes, and ticks on the balance interval', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
     act(() => result.current.dispatch({ type: 'resume' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 3));
@@ -66,7 +66,7 @@ describe('useGame', () => {
   });
 
   it('front puts the entry first; remove drops by action id', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'mine', front: true }));
     expect(result.current.state.queue.map((e) => e.actionId)).toEqual(['mine', 'forage']);
@@ -75,7 +75,7 @@ describe('useGame', () => {
   });
 
   it('resume after a pause starts the clock again', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
     act(() => result.current.dispatch({ type: 'pause' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 3));
@@ -85,7 +85,7 @@ describe('useGame', () => {
     expect(result.current.state.runTicks).toBe(3);
   });
   it('pause stops the clock', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
     act(() => result.current.dispatch({ type: 'resume' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
@@ -95,13 +95,13 @@ describe('useGame', () => {
   });
 
   it('logs a wait the tick it is found, newest first, and does not log repeat completions', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     act(() => result.current.dispatch({ type: 'resume' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
     expect(result.current.log[0]!.event).toEqual({ type: 'stalled', actionId: 'cabin', item: 'stone' });
-    const forageTicks = Math.floor(scrub.actions.forage!.expCost / balance.skills.baseTickExp) + 1;
+    const forageTicks = Math.floor(saltRoad.actions.forage!.expCost / balance.skills.baseTickExp) + 1;
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * forageTicks));
     expect(result.current.state.inventory.berries).toBeGreaterThan(0);
     expect(result.current.log.some((l) => l.event.type === 'completed')).toBe(false);
@@ -120,13 +120,13 @@ describe('useGame', () => {
   }
 
   it('alive, the view is the state itself and there is no card', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     expect(result.current.view).toBe(result.current.state);
     expect(result.current.card).toBeNull();
   });
 
   it('a death keeps the dead state; the card and the reborn view are derived from it', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     die(result, 50);
     const { state, view, card, log } = result.current;
     expect(state.dead).toBe(true);
@@ -143,7 +143,7 @@ describe('useGame', () => {
   });
 
   it('while dead, orders, pause/resume and setHealth change nothing, and no time passes', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     die(result, 5);
     const before = result.current.state;
     expect(before.dead).toBe(true);
@@ -157,7 +157,7 @@ describe('useGame', () => {
   });
 
   it('begin starts the next life live, clears the card, logs it, and the next queue ticks', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     die(result, 5);
     act(() => result.current.dispatch({ type: 'begin' }));
     const { state, card, log } = result.current;
@@ -172,7 +172,7 @@ describe('useGame', () => {
   });
 
   it('begin while alive does nothing', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     const before = result.current.state;
     act(() => result.current.dispatch({ type: 'begin' }));
     expect(result.current.state).toBe(before);
@@ -180,7 +180,7 @@ describe('useGame', () => {
   });
 
   it('two deaths: the second card starts where the first one ended', () => {
-    const { result } = renderHook(() => useGame(scrub));
+    const { result } = renderHook(() => useGame(saltRoad));
     die(result, 30);
     const first = result.current.card!;
     act(() => result.current.dispatch({ type: 'begin' }));

@@ -71,6 +71,9 @@ which leaves a trail; editing a heading in a file does not.
 src/
   engine/     pure simulation — no React, no DOM, no imports from ui/
   data/       content definitions (actions, items, skills) — data, not logic
+              — a book is a value of the Book type in types.ts;
+              src/data/validate.ts is the only check on it, and
+              books.test.ts runs it over every shipped book
   ui/         React components
   state/      reducer + context wiring engine to UI
   balance.ts  every tuning number, in one place
@@ -246,8 +249,10 @@ unsubscribed event) ship without asking.
   under `src/engine/`.
 - **Ten additions of `0.1` are `0.9999…`.** A test that counts ticks to a
   completion uses `floor(expCost / baseTickExp) + 1`, not `ceil`.
-- **The layout has a 1280px minimum and does not reflow.** Desktop target, a
-  two-dimensional game grid; accepted (audit 2026-09-22).
+- **The layout has a 1280px minimum; only the skills band reflows.** Its cells
+  are a fixed 360px and wrap by window width (mockup 2026-09-23-wrapping-band).
+  Nothing else reflows: desktop target, accepted (audit 2026-09-22); a phone
+  layout is #62.
 - **`step()` returns the same object when nothing happened.** React skips
   the render on an idle tick, and `useGame` only logs a state that is new. A
   change that spreads the state on every tick breaks both silently.

@@ -16,8 +16,6 @@ export const balance = {
     tickIntervalMs: 100,
     /** Ticks in one minute of real time. */
     ticksPerMinute: 600,
-    /** Ticks of unbroken survival that award one skill point. 15 minutes. */
-    ticksPerSkillPoint: 9_000,
   },
 
   health: {

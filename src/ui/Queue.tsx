@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SKILLS } from '../data/skills';
+import { skillOf } from '../data/roster';
 import type { ActionId, Content } from '../data/types';
 import { consumedOf } from '../engine/costs';
 import { fullItem, missingInput } from '../engine/queue';
@@ -8,13 +8,13 @@ import { ticksPerSecond } from '../engine/time';
 import type { GameState, QueueEntry } from '../engine/types';
 import { duration, fraction } from './format';
 import { WARN } from './glyphs';
-import { SKILL_ICONS } from './icons';
+import { ICONS } from './icons';
 
 /** The current completion's remaining time at the current rate (spec 8.1: a countdown, shown while the rate holds). */
 function remainingSeconds(state: GameState, content: Content, e: QueueEntry): number {
   const a = content.actions[e.actionId];
   if (!a) return 0;
-  return Math.max(0, a.expCost - e.progress) / (tickExp(state.skills[a.verb]) * ticksPerSecond());
+  return Math.max(0, a.expCost - e.progress) / (tickExp(state.skills[a.verb]!) * ticksPerSecond());
 }
 
 /**
@@ -61,16 +61,17 @@ export function Queue({ state, content, working, live, dead = false, onRemove }:
       <header className="chunk__head"><span>queue · {state.queue.length}</span><span>{sum}</span></header>
       {state.queue.map((e, i) => {
         const a = content.actions[e.actionId]!;
-        const Icon = SKILL_ICONS[a.verb];
+        const skill = skillOf(content, a.verb);
+        const Icon = ICONS[skill.icon];
         const isWorking = i === working;
         const missing = missingInput(state, content, e);
         const full = fullItem(state, content, e);
         const pct = Math.min(100, (e.progress / a.expCost) * 100);
-        const name = `${SKILLS[a.verb].name} ${a.noun}`;
+        const name = `${skill.name} ${a.noun}`;
         return (
           <div key={e.actionId} className={`item entry${isWorking ? ' entry--on' : ''}${isWorking && live ? ' working' : ''}${missing || full ? ' entry--waiting' : ''}`}>
             <Icon aria-hidden="true" />
-            <span><b>{SKILLS[a.verb].name}</b> {a.noun}{isWorking && live && <span className="visually-hidden">running</span>}</span>
+            <span><b>{skill.name}</b> {a.noun}{isWorking && live && <span className="visually-hidden">running</span>}</span>
             <button type="button" className="entry__x" aria-disabled={dead ? 'true' : undefined} aria-label={armedLive === e.actionId ? `press again to remove ${name}` : `remove ${name}`} onClick={() => press(e)}>{armedLive === e.actionId ? '?' : '×'}</button>
             <div className="entry__bar">
               <div className="bar" aria-hidden="true"><div className={`bar__fill${missing || full ? ' bar__fill--wait' : ' bar__fill--run'}`} style={{ width: `${pct}%` }} /></div>

@@ -3,6 +3,11 @@ import type { Content } from '../data/types';
 import { add, count, has, room, take } from './inventory';
 
 const content: Content = {
+  roster: [
+    { id: 'forage', name: 'Forage', icon: 'sprout' },
+    { id: 'mine', name: 'Mine', icon: 'pickaxe' },
+    { id: 'build', name: 'Build', icon: 'house' },
+  ],
   actions: {},
   items: {
     stone: { id: 'stone', name: 'stone', kind: 'material', cap: 5 },

@@ -3,16 +3,17 @@
  * and the engine can both import it: the dependency runs engine -> data ->
  * balance, never the other way (src/purity.test.ts).
  */
-export type SkillId =
-  | 'forage' | 'chop' | 'mine' | 'fish' | 'shoot'
-  | 'craft' | 'build' | 'cook'
-  | 'fight' | 'travel' | 'talk' | 'search';
+import type { IconName } from './icons';
 
-export const SKILL_IDS: readonly SkillId[] = [
-  'forage', 'chop', 'mine', 'fish', 'shoot',
-  'craft', 'build', 'cook',
-  'fight', 'travel', 'talk', 'search',
-];
+/** A skill id is book data: whatever the book's roster declares (spec 2026-09-23 section 2). */
+export type SkillId = string;
+
+/** One skill a book declares. The roster is the skills that have rows (spec 2026-09-23 section 2). */
+export interface SkillDefinition {
+  readonly id: SkillId;
+  readonly name: string;
+  readonly icon: IconName;
+}
 
 export type ItemId = string;
 export type ActionId = string;
@@ -39,8 +40,6 @@ export interface ActionDefinition {
   readonly healthDecayMultiplier?: number;
   /** One authored sentence the log prints when a one-time completes (spec 9). */
   readonly beat?: string;
-  /** Stable identity for meta-progression; falls back to `id`. */
-  readonly templateKey?: string;
 }
 
 export interface ItemDefinition {
@@ -54,14 +53,28 @@ export interface ItemDefinition {
 }
 
 export interface Content {
+  /** In display order: the band shows the whole roster from life 1, in this order. */
+  readonly roster: readonly SkillDefinition[];
   readonly actions: Readonly<Record<ActionId, ActionDefinition>>;
   readonly items: Readonly<Record<ItemId, ItemDefinition>>;
 }
 
-/** The running head (spec section 8.6). */
+/** The running head (spec section 8.6). The book's name comes from the book. */
 export interface ChapterHead {
-  readonly book: string;
   readonly numeral: string;
   readonly chapter: string;
   readonly story: string;
+}
+
+/** A chapter: its head and its rows in display order, which is also queue order. */
+export interface Chapter {
+  readonly head: ChapterHead;
+  readonly order: readonly ActionId[];
+}
+
+/** A book: content plus what the shelf and the chapter panel need. The format a generator emits. */
+export interface Book extends Content {
+  readonly id: string;
+  readonly name: string;
+  readonly chapters: readonly Chapter[];
 }

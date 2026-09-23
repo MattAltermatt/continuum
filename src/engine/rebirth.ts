@@ -3,8 +3,8 @@
  * What resets, what persists, and what the life bought. Pure.
  */
 import { balance } from '../balance';
-import { SKILL_IDS, type SkillId } from '../data/types';
-import { newState } from './queue';
+import type { SkillId } from '../data/types';
+import { blankRun } from './queue';
 import { expToNextLevel, newSkill } from './skills';
 import { ticksToMinutes } from './time';
 import type { GameState, SkillState } from './types';
@@ -38,11 +38,12 @@ function maxHealthFor(rebirthBonus: number): number {
 
 export function deathSummary(dead: GameState): DeathSummary {
   const gain = rebirthGain(dead.runTicks);
-  const coreGains = SKILL_IDS
-    .filter((id) => dead.skills[id].core.level > dead.lifeStartCore[id])
+  const ids = Object.keys(dead.skills);
+  const coreGains = ids
+    .filter((id) => dead.skills[id]!.core.level > (dead.lifeStartCore[id] ?? 0))
     .map((id) => {
-      const core = dead.skills[id].core;
-      return { skill: id, from: dead.lifeStartCore[id], to: core.level, progress: core.exp / expToNextLevel(balance.skills.coreMastery.baseExp, core.level) };
+      const core = dead.skills[id]!.core;
+      return { skill: id, from: dead.lifeStartCore[id] ?? 0, to: core.level, progress: core.exp / expToNextLevel(balance.skills.coreMastery.baseExp, core.level) };
     });
   // From and to are computed the same way (Revision 1, accepted risk 1).
   return { life: dead.life, runTicks: dead.runTicks, gain, maxHealthFrom: maxHealthFor(dead.rebirthBonus), maxHealthTo: maxHealthFor(dead.rebirthBonus + gain), coreGains };
@@ -57,17 +58,8 @@ export function rebirth(dead: GameState): GameState {
   if (!dead.dead) return dead;
   const rebirthBonus = dead.rebirthBonus + rebirthGain(dead.runTicks);
   const maxHealth = maxHealthFor(rebirthBonus);
-  const skills = Object.fromEntries(SKILL_IDS.map((id) => [id, { core: dead.skills[id].core, run: newSkill().run }])) as Record<SkillId, SkillState>;
-  const lifeStartCore = Object.fromEntries(SKILL_IDS.map((id) => [id, skills[id].core.level])) as Record<SkillId, number>;
-  return {
-    ...newState(),
-    paused: 'system',
-    life: dead.life + 1,
-    rebirthBonus,
-    maxHealth,
-    health: maxHealth,
-    skills,
-    completionCounts: dead.completionCounts,
-    lifeStartCore,
-  };
+  const ids = Object.keys(dead.skills);
+  const skills: Record<SkillId, SkillState> = Object.fromEntries(ids.map((id) => [id, { core: dead.skills[id]!.core, run: newSkill().run }]));
+  const lifeStartCore: Record<SkillId, number> = Object.fromEntries(ids.map((id) => [id, skills[id]!.core.level]));
+  return { ...blankRun(skills, lifeStartCore), paused: 'system', life: dead.life + 1, rebirthBonus, maxHealth, health: maxHealth, completionCounts: dead.completionCounts };
 }

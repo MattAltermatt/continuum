@@ -1,30 +1,31 @@
 /**
- * Chapter 1 of the first book, as much of it as v0.1 needs: three rows that
- * feed each other, and the hall, a big sink no first life finishes (spec
- * section 2). Every tuning number comes from balance.content.scrub; a yield of one per
- * completion and a cap of one on a structure are counts, not tuning. The text is
- * placeholder content; the chapter brainstorm replaces it.
+ * Book one, as much of it as v0.2 needs: one chapter, three rows that feed
+ * each other, and the hall, a big sink no first life finishes (spec 2026-09-22
+ * section 2). Every tuning number comes from balance.content.scrub; a yield of
+ * one per completion and a cap of one on a structure are counts, not tuning.
+ * The text is placeholder content; the chapter brainstorm replaces it.
+ *
+ * The roster is the skills that have rows (spec 2026-09-23 section 2): three
+ * today. Display order, which is also the order a player who presses + down
+ * the page queues them in: the cabin ahead of the hall, so the hall does not
+ * take the cabin's stone.
  */
 import { balance } from '../balance';
-import type { ActionId, ChapterHead, Content } from './types';
+import type { Book } from './types';
 
 const n = balance.content.scrub;
 
-/**
- * Display order, which is also the order a player who presses + down the page
- * queues them in: the cabin ahead of the hall, so the hall does not take the
- * cabin's stone. A completed one-time row stays in place, marked built.
- */
-export const SCRUB_ORDER: readonly ActionId[] = ['forage', 'mine', 'cabin', 'hall'];
-
-export const SCRUB_HEAD: ChapterHead = {
-  book: 'The Salt Road',
-  numeral: 'I',
-  chapter: 'The Scrub',
-  story: 'Dry country. The pass is watched.',
-};
-
-export const scrub: Content = {
+export const saltRoad: Book = {
+  id: 'salt-road',
+  name: 'The Salt Road',
+  roster: [
+    { id: 'forage', name: 'Forage', icon: 'sprout' },
+    { id: 'mine', name: 'Mine', icon: 'pickaxe' },
+    { id: 'build', name: 'Build', icon: 'house' },
+  ],
+  chapters: [
+    { head: { numeral: 'I', chapter: 'The Scrub', story: 'Dry country. The pass is watched.' }, order: ['forage', 'mine', 'cabin', 'hall'] },
+  ],
   items: {
     berries: { id: 'berries', name: 'berries', kind: 'food', cap: n.berries.cap, healPerUnit: n.berries.healPerUnit },
     stone: { id: 'stone', name: 'stone', kind: 'material', cap: n.stone.cap },

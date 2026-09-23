@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { balance } from '../balance';
-import { SKILLS } from '../data/skills';
+import { skillOf } from '../data/roster';
 import type { ActionDefinition, ActionId, Content, ItemId } from '../data/types';
 import { consumedOf } from '../engine/costs';
 import { count, room } from '../engine/inventory';
@@ -9,7 +9,7 @@ import { ticksPerSecond } from '../engine/time';
 import type { GameState } from '../engine/types';
 import { duration } from './format';
 import { PLAY, STOP, WARN } from './glyphs';
-import { SKILL_ICONS } from './icons';
+import { ICONS } from './icons';
 
 /**
  * How long the click instruction holds before fading (spec 8.4: "a few
@@ -42,17 +42,18 @@ export function owedShortfalls(action: ActionDefinition, content: Content, state
   return out;
 }
 
-function makerOf(content: Content, item: ItemId): string {
+function makerOf(content: Content, item: ItemId): string | null {
   const producer = Object.values(content.actions).find((a) => a.producedItem === item);
-  return producer ? SKILLS[producer.verb].name : SKILLS.craft.name;
+  return producer ? skillOf(content, producer.verb).name : null;
 }
 
 export function ActionRow({ action, content, state, running, onNow, onQueue }: {
   action: ActionDefinition; content: Content; state: GameState; running: boolean;
   onNow: (id: ActionId) => void; onQueue: (id: ActionId) => void;
 }) {
-  const Icon = SKILL_ICONS[action.verb];
-  const perSecond = tickExp(state.skills[action.verb]) * ticksPerSecond();
+  const skill = skillOf(content, action.verb);
+  const Icon = ICONS[skill.icon];
+  const perSecond = tickExp(state.skills[action.verb]!) * ticksPerSecond();
   const shortfalls = owedShortfalls(action, content, state);
   // A snapshot taken at the click, so an input landing during the hold does not blank it.
   const [instruction, setInstruction] = useState<readonly Shortfall[] | null>(null);
@@ -64,13 +65,13 @@ export function ActionRow({ action, content, state, running, onNow, onQueue }: {
   // A completed one-time row stays where it was, marked built, so no row below it moves up.
   const built = action.isOneTime && state.completedOneTime.includes(action.id);
   const inert = running || built || state.dead;
-  const rowName = `${SKILLS[action.verb].name} ${action.noun}`;
+  const rowName = `${skill.name} ${action.noun}`;
   const press = (fn: (id: ActionId) => void) => () => {
     if (built || state.dead) return;
     fn(action.id);
     if (shortfalls.length > 0) setInstruction(shortfalls);
   };
-  const done = state.completionCounts[action.templateKey ?? action.id] ?? 0;
+  const done = state.completionCounts[action.id] ?? 0;
   const needed = action.isOneTime ? balance.automation.unlockOneTime : balance.automation.unlockRepeatable;
   const output = action.producedItem
     ? (action.itemCosts.length === 0 ? `+${action.producedAmount ?? 1} ${action.producedItem}` : action.producedItem)
@@ -80,14 +81,14 @@ export function ActionRow({ action, content, state, running, onNow, onQueue }: {
     <div className={`item row${running ? ' row--on working' : ''}${built ? ' row--built' : ''}`} data-action={action.id}>
       <div className="row__c1">
         <Icon aria-hidden="true" />
-        <span><b>{SKILLS[action.verb].name}</b>{' '}{action.noun}{running && <span className="visually-hidden">running</span>}</span>
+        <span><b>{skill.name}</b>{' '}{action.noun}{running && <span className="visually-hidden">running</span>}</span>
       </div>
       <div className="row__c2">
         {built ? (
           <div className="row__say row__built">built</div>
         ) : instruction !== null ? (
           <div className="row__say">{instruction.map((c) => (
-            <div key={c.item}>missing {c.owed - c.have} {c.item} · <b>{makerOf(content, c.item)} {c.atCap ? 'more as it builds' : 'some!'}</b></div>
+            <div key={c.item}>missing {c.owed - c.have} {c.item} · <b>{makerOf(content, c.item) ?? c.item} {c.atCap ? 'more as it builds' : 'some!'}</b></div>
           ))}</div>
         ) : (
           <>

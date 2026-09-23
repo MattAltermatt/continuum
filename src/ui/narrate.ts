@@ -1,5 +1,5 @@
 /** The one place engine events become words. Spec 8.6, 9. */
-import { SKILLS } from '../data/skills';
+import { skillOf } from '../data/roster';
 import type { ActionId, Content } from '../data/types';
 import { ticksToSeconds } from '../engine/time';
 import type { LogEvent } from '../state/useGame';
@@ -9,7 +9,7 @@ export interface Narration { readonly kind: 'story' | 'note'; readonly text: str
 
 function rowName(content: Content, id: ActionId): string {
   const a = content.actions[id];
-  return a ? `${SKILLS[a.verb].name} ${a.noun}` : id;
+  return a ? `${skillOf(content, a.verb).name} ${a.noun}` : id;
 }
 
 export function narrate(e: LogEvent, content: Content): Narration {
@@ -23,7 +23,7 @@ export function narrate(e: LogEvent, content: Content): Narration {
       const beat = content.actions[e.actionId]?.beat;
       return e.oneTime && beat ? { kind: 'story', text: beat } : { kind: 'note', text: `${rowName(content, e.actionId)} is done` };
     }
-    case 'coreLevel': return { kind: 'note', text: `${SKILLS[e.skill].name} reaches Lv ${e.level}` };
+    case 'coreLevel': return { kind: 'note', text: `${skillOf(content, e.skill).name} reaches Lv ${e.level}` };
     case 'died': return { kind: 'note', text: `Dead at ${clock(ticksToSeconds(e.runTicks))}` };
   }
 }

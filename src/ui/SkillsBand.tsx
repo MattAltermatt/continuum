@@ -1,13 +1,14 @@
-import { SKILL_IDS } from '../data/types';
-import type { SkillId } from '../data/types';
+import type { Content, SkillId } from '../data/types';
 import type { SkillState } from '../engine/types';
 import { SkillCell } from './SkillCell';
 
-/** Twelve cells, four across, three rows, always the same order (spec 8.2). */
-export function SkillsBand({ skills, runningSkill }: { skills: Readonly<Record<SkillId, SkillState>>; runningSkill: SkillId | null }) {
+/** The book's whole roster, in roster order, from life 1 (spec 2026-09-23 section 2). */
+export function SkillsBand({ content, skills, runningSkill }: {
+  content: Pick<Content, 'roster'>; skills: Readonly<Record<SkillId, SkillState>>; runningSkill: SkillId | null;
+}) {
   return (
     <section className="skills" aria-label="skills">
-      {SKILL_IDS.map((id) => <SkillCell key={id} id={id} state={skills[id]} running={id === runningSkill} />)}
+      {content.roster.map((s) => <SkillCell key={s.id} skill={s} state={skills[s.id]!} running={s.id === runningSkill} />)}
     </section>
   );
 }

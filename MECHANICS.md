@@ -44,17 +44,6 @@ time axis for everything that escalates within a run — most importantly health
 decay. It is not a score and it is not persistent; it is the answer to "how long
 has this life lasted."
 
-### Skill points
-
-```
-TICKS_PER_SKILL_POINT = 9,000     // 15 minutes of unbroken survival
-```
-
-One skill point is awarded each time a *single run* crosses a 15-minute
-boundary. Points persist across death. This is the one reward that scales with
-run *length* rather than run *output*, and it is deliberately the slowest clock
-in the game.
-
 ---
 
 ## 2. Actions and the queue
@@ -69,7 +58,6 @@ interface ActionDefinition {
   id: string
   name: string
   description: string
-  category: ActionCategory          // grouping for presentation
   requiredSkill: SkillId            // which skill earns XP while this runs
   expCost: number                   // total XP of effort to complete once
   producedItem?: ItemId
@@ -78,18 +66,13 @@ interface ActionDefinition {
   isOneTime: boolean
   capacityBonusOnComplete: number   // +N to every inventory slot's max
   healthDecayMultiplier?: number    // permanent per-run decay modifier
-  templateKey?: string              // stable identity for meta-progression
   healPerUnit?: number              // food: HP restored per unit eaten
-  requires?: Record<string, number> // gating: templateKey → completions needed
+  requires?: Record<string, number> // gating: action id → completions needed
 }
 ```
 
-Two fields carry more weight than their size suggests:
+One field carries more weight than its size suggests:
 
-- **`templateKey`** is the action's *stable* identity. Automation unlocks,
-  player priority settings and lifetime completion counts are all keyed by it,
-  never by `id`. This is what lets meta-progression survive death and survive
-  content being restructured underneath it. Falls back to `id` when absent.
 - **`healthDecayMultiplier`** is how construction pays off. Completing a shelter
   does not grant health; it *slows the clock* for the rest of the run.
 
@@ -161,7 +144,7 @@ In order:
 2. Apply `capacityBonusOnComplete` to **every** inventory slot's maximum.
 3. If one-time, record it so it cannot be queued again this run.
 4. Multiply the run's `healthDecayMultiplier` by the action's, if set.
-5. Increment `actionCompletionCounts[templateKey]` — a **lifetime** counter that
+5. Increment `actionCompletionCounts[id]` — a **lifetime** counter that
    survives death and drives automation unlocks.
 6. If repeatable and the output stack has no room for another completion, the
    entry leaves the queue; otherwise it resets to zero progress and stays.
@@ -365,8 +348,7 @@ Death is a normal, expected, frequent event. It is the loop, not the fail state.
 
 - Every skill's **core mastery**.
 - `actionCompletionCounts` — lifetime totals that drive automation unlocks.
-- Automation settings and as-needed flags, keyed by `templateKey`.
-- Skill points.
+- Automation settings and as-needed flags, keyed by action id.
 - Accumulated rebirth health bonus.
 - The life number, counting up from 1.
 
@@ -409,7 +391,7 @@ repeatable actions  → 200 lifetime completions     🎚️
 one-time actions    →   5 lifetime completions     🎚️
 ```
 
-Keyed by `templateKey`, counted across deaths, never lost.
+Keyed by action id, counted across deaths, never lost.
 
 ### The mode cycle
 
@@ -478,7 +460,6 @@ is what lets AN injections be exact instead of open-ended.
 |---|---|---|
 | `TICK_INTERVAL_MS` | 100 | 10 ticks per real second |
 | `TICKS_PER_MINUTE` | 600 | 600 ticks = 60 s |
-| `TICKS_PER_SKILL_POINT` | 9,000 | 15-minute run → 1 skill point |
 | `BASE_HEALTH` | 100 | Starting maximum health |
 | `BASE_DAMAGE_PER_TICK` | 0.01 🎚️ | Decay at the start of a run |
 | `DECAY_GROWTH_RATE` | 1.25 🎚️ | Decay multiplied per minute elapsed |

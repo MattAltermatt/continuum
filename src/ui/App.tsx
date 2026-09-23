@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
-import { scrub, SCRUB_HEAD, SCRUB_ORDER } from '../data/scrub';
+import { saltRoad } from '../data/salt-road';
 import { covers, decayPerSecond, foodCeilingPerSecond } from '../engine/health';
 import { firstRunnable } from '../engine/queue';
 import { ticksPerSecond, ticksToSeconds } from '../engine/time';
@@ -20,7 +20,7 @@ import { Rates } from './Rates';
 import { SkillsBand } from './SkillsBand';
 
 export function App() {
-  const { state, view, log, dispatch, card } = useGame(scrub);
+  const { state, view, log, dispatch, card } = useGame(saltRoad);
   // The dev handle reads the committed state. The handle wraps its writes in
   // flushSync, so a read on the line after a dispatch or step sees its result;
   // the layout effect updates the ref inside that same commit.
@@ -35,11 +35,11 @@ export function App() {
   }, [dispatch]);
 
   // Every chunk renders the view: while the card is up that is the next life, never a dead state.
-  const working = firstRunnable(view, scrub);
+  const working = firstRunnable(view, saltRoad);
   const live = view.paused === 'none';
   // "Running" means working AND the clock is live: no sheen, no stop mark, no countdown on a stopped game.
   const runningActionId = live && working !== -1 ? view.queue[working]!.actionId : null;
-  const runningSkill = runningActionId ? scrub.actions[runningActionId]!.verb : null;
+  const runningSkill = runningActionId ? saltRoad.actions[runningActionId]!.verb : null;
   const stopped = !live || working === -1;   // idle, waiting, paused, or the card (the view is on a system pause)
   const clockNote = !live ? 'paused' : view.queue.length === 0 ? 'idle' : working === -1 ? 'waiting' : null;
   // Everything behind the death card takes no focus and no click. Wrappers carry it; no component gets a prop.
@@ -63,25 +63,25 @@ export function App() {
           <span className="visually-hidden">{ticksPerSecond()} ticks per second</span>
         </div>
       </div>
-      <div className="inert-wrap" inert={inert}><SkillsBand skills={view.skills} runningSkill={runningSkill} /></div>
+      <div className="inert-wrap" inert={inert}><SkillsBand content={saltRoad} skills={view.skills} runningSkill={runningSkill} /></div>
       <div className="columns">
         <div className="columns__chapter">
           <div inert={inert}>
             <ChapterPanel
-              content={scrub} order={SCRUB_ORDER} head={SCRUB_HEAD} state={view} runningActionId={runningActionId}
+              content={saltRoad} book={saltRoad.name} chapter={saltRoad.chapters[0]!} state={view} runningActionId={runningActionId}
               onNow={(id) => dispatch({ type: 'queue', actionId: id, front: true })}
               onQueue={(id) => dispatch({ type: 'queue', actionId: id })}
             />
           </div>
-          {card && <DeathCard summary={card} onBegin={() => dispatch({ type: 'begin' })} />}
+          {card && <DeathCard summary={card} content={saltRoad} onBegin={() => dispatch({ type: 'begin' })} />}
         </div>
         <div className="middle" inert={inert}>
-          <Rates decay={decayPerSecond(view)} ceiling={foodCeilingPerSecond(view, scrub)} covered={covers(view, scrub)} stopped={stopped} />
-          <Food state={view} content={scrub} />
-          <Pack state={view} content={scrub} />
-          <Log lines={log} content={scrub} />
+          <Rates decay={decayPerSecond(view)} ceiling={foodCeilingPerSecond(view, saltRoad)} covered={covers(view, saltRoad)} stopped={stopped} />
+          <Food state={view} content={saltRoad} />
+          <Pack state={view} content={saltRoad} />
+          <Log lines={log} content={saltRoad} />
         </div>
-        <div className="inert-wrap" inert={inert}><Queue state={view} content={scrub} working={working} live={live} onRemove={(id) => dispatch({ type: 'remove', actionId: id })} /></div>
+        <div className="inert-wrap" inert={inert}><Queue state={view} content={saltRoad} working={working} live={live} onRemove={(id) => dispatch({ type: 'remove', actionId: id })} /></div>
       </div>
     </main>
   );

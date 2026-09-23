@@ -10,18 +10,11 @@ import { balance } from './balance';
  */
 describe('balance', () => {
   it('holds the canonical time constants', () => {
-    expect(balance.time.tickIntervalMs).toBe(100);
-    expect(balance.time.ticksPerMinute).toBe(600);
-    expect(balance.time.ticksPerSkillPoint).toBe(9_000);
+    expect(balance.time).toEqual({ tickIntervalMs: 100, ticksPerMinute: 600 });
   });
 
   it('derives ticksPerMinute consistently from the tick interval', () => {
     expect(balance.time.tickIntervalMs * balance.time.ticksPerMinute).toBe(60_000);
-  });
-
-  it('awards a skill point every fifteen minutes of survival', () => {
-    const minutes = balance.time.ticksPerSkillPoint / balance.time.ticksPerMinute;
-    expect(minutes).toBe(15);
   });
 
   it('holds the canonical health and decay constants', () => {

@@ -7,15 +7,14 @@
  * No automation here.
  */
 import { balance } from '../balance';
-import type { ActionDefinition, ActionId, Content, ItemId, SkillId } from '../data/types';
-import { SKILL_IDS } from '../data/types';
+import type { ActionDefinition, ActionId, Content, ItemId, SkillDefinition, SkillId } from '../data/types';
 import type { GameEvent, GameState, QueueEntry, SkillState } from './types';
 import { award, newSkill, tickExp } from './skills';
 import { add, has, room, take } from './inventory';
 import { nextCostItem, nextUnitDue, unitThreshold } from './costs';
 
-export function newState(): GameState {
-  const skills = Object.fromEntries(SKILL_IDS.map((id) => [id, newSkill()])) as Record<SkillId, SkillState>;
+/** A fresh run around the given ledgers. newState builds them from a roster; rebirth carries them over. */
+export function blankRun(skills: Readonly<Record<SkillId, SkillState>>, lifeStartCore: Readonly<Record<SkillId, number>>): GameState {
   return {
     runTicks: 0,
     health: balance.health.base,
@@ -32,8 +31,16 @@ export function newState(): GameState {
     events: [],
     life: 1,
     rebirthBonus: 0,
-    lifeStartCore: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
+    lifeStartCore,
   };
+}
+
+/** The first life of a book: one fresh skill per roster entry (spec 2026-09-23 section 2). */
+export function newState(roster: readonly SkillDefinition[]): GameState {
+  return blankRun(
+    Object.fromEntries(roster.map((s) => [s.id, newSkill()])),
+    Object.fromEntries(roster.map((s) => [s.id, 0])),
+  );
 }
 
 export function enqueue(state: GameState, content: Content, actionId: ActionId, opts: { front?: boolean } = {}): GameState {
@@ -146,8 +153,7 @@ function complete(state: GameState, content: Content, action: ActionDefinition, 
   if (action.healthDecayMultiplier !== undefined) {
     next = { ...next, decayMultiplier: next.decayMultiplier * action.healthDecayMultiplier };
   }
-  const key = action.templateKey ?? action.id;
-  next = { ...next, completionCounts: { ...next.completionCounts, [key]: (next.completionCounts[key] ?? 0) + 1 } };
+  next = { ...next, completionCounts: { ...next.completionCounts, [action.id]: (next.completionCounts[action.id] ?? 0) + 1 } };
   events.push({ type: 'completed', actionId: action.id, oneTime: action.isOneTime });
   const without = next.queue.filter((_, i) => i !== index);
   if (action.isOneTime) {
@@ -184,6 +190,8 @@ export function stepQueue(state: GameState, content: Content, index: number): Ga
   // Pay every threshold the tick's progress would cross; an unpayable one clamps
   // progress to it. So completion below can only happen with every unit paid.
   const skill = next.skills[action.verb];
+  // A validated book has a roster entry for every verb (src/data/validate.ts); an unvalidated fixture that lacks one is a bug, not a state.
+  if (skill === undefined) throw new Error(`no skill state for verb "${action.verb}"`);
   const after = payDue(next, action, { ...before.entry, progress: before.entry.progress + tickExp(skill) });
 
   // XP is the progress actually made (spec section 9: progress advances by the

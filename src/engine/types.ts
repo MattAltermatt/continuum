@@ -43,7 +43,7 @@ export interface GameState {
   readonly foodCooldowns: Readonly<Record<ItemId, number>>;
   readonly queue: readonly QueueEntry[];
   readonly completedOneTime: readonly ActionId[];
-  /** Lifetime completions by templateKey. Drives automation later. */
+  /** Lifetime completions by action id. Drives automation later. */
   readonly completionCounts: Readonly<Record<string, number>>;
   readonly decayMultiplier: number;
   /** Which life this is, from 1. Persists and counts up at rebirth. */

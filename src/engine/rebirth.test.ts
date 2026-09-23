@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
-import { SKILL_IDS } from '../data/types';
 import { newState } from './queue';
 import { deathSummary, rebirth, rebirthGain } from './rebirth';
 import type { GameState } from './types';
 
 const minute = balance.time.ticksPerMinute;
+const roster = [{ id: 'forage', name: 'Forage', icon: 'sprout' }, { id: 'mine', name: 'Mine', icon: 'pickaxe' }, { id: 'build', name: 'Build', icon: 'house' }] as const;
 
 /** A dead state with every field away from its default, so a reset and a persist are both visible. */
 function deadLife(): GameState {
-  const fresh = newState();
+  const fresh = newState(roster);
   return {
     ...fresh,
     runTicks: 10 * minute,
@@ -49,7 +49,8 @@ describe('rebirthGain', () => {
 });
 
 describe('rebirth: what resets (spec 2.1)', () => {
-  const next = rebirth(deadLife());
+  const dead = deadLife();
+  const next = rebirth(dead);
   it('empties the pack, food included, the queue, one-time completions and food cooldowns', () => {
     expect(next.inventory).toEqual({});
     expect(next.queue).toEqual([]);
@@ -65,16 +66,19 @@ describe('rebirth: what resets (spec 2.1)', () => {
   it('starts the life on a system pause, which Begin replaces with none', () => {
     expect(next.paused).toBe('system');
   });
-  it('puts every run ledger back to level 0 with no exp', () => {
-    for (const id of SKILL_IDS) expect(next.skills[id].run).toEqual({ level: 0, exp: 0 });
+  it('puts every run ledger back to level 0 with no exp, for every skill the dead state had', () => {
+    expect(Object.keys(next.skills)).toEqual(Object.keys(dead.skills));
+    for (const id of Object.keys(dead.skills)) expect(next.skills[id]!.run).toEqual({ level: 0, exp: 0 });
   });
 });
 
 describe('rebirth: what persists (spec 2.2)', () => {
   const dead = deadLife();
   const next = rebirth(dead);
-  it('keeps every core ledger, level and exp', () => {
-    for (const id of SKILL_IDS) expect(next.skills[id].core).toEqual(dead.skills[id].core);
+  it('keeps every core ledger, level and exp, and snapshots the same keys', () => {
+    expect(Object.keys(next.skills)).toEqual(Object.keys(dead.skills));
+    expect(Object.keys(next.lifeStartCore)).toEqual(Object.keys(dead.skills));
+    for (const id of Object.keys(dead.skills)) expect(next.skills[id]!.core).toEqual(dead.skills[id]!.core);
   });
   it('keeps lifetime completion counts', () => {
     expect(next.completionCounts).toEqual({ forage: 7, cabin: 1 });
@@ -89,17 +93,17 @@ describe('rebirth: what persists (spec 2.2)', () => {
   it('snapshots the core levels this life begins with', () => {
     expect(next.lifeStartCore.forage).toBe(3);
     expect(next.lifeStartCore.mine).toBe(1);
-    expect(next.lifeStartCore.fish).toBe(0);
+    expect(next.lifeStartCore.build).toBe(0);
   });
 });
 
 describe('rebirth: guard and accrual', () => {
   it('does nothing to a state that is not dead', () => {
-    const alive = newState();
+    const alive = newState(roster);
     expect(rebirth(alive)).toBe(alive);
   });
   it('accrues across three deaths: the bonus is the running sum of the gains, and max is base + bonus', () => {
-    let s = newState();
+    let s = newState(roster);
     const gains: number[] = [];
     for (const t of [7 * minute, 9 * minute, 11 * minute]) {
       gains.push(rebirthGain(t));
@@ -119,19 +123,19 @@ describe('rebirth: every field is classified', () => {
   const RESETS = ['runTicks', 'paused', 'dead', 'inventory', 'foodCooldowns', 'queue', 'completedOneTime', 'decayMultiplier', 'events'];
   const PERSISTS = ['completionCounts'];
   const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'rebirthBonus', 'lifeStartCore'];
-  it('the three lists cover newState() exactly, with no overlap', () => {
+  it('the three lists cover newState(roster) exactly, with no overlap', () => {
     const all = [...RESETS, ...PERSISTS, ...DERIVED];
     expect(new Set(all).size).toBe(all.length);
-    expect([...all].sort()).toEqual(Object.keys(newState()).sort());
+    expect([...all].sort()).toEqual(Object.keys(newState(roster)).sort());
   });
-  it('every reset field equals newState() after rebirth, except paused, which is system', () => {
+  it('every reset field equals newState(roster) after rebirth, except paused, which is system', () => {
     const next = rebirth(deadLife()) as unknown as Record<string, unknown>;
-    const fresh = { ...newState(), paused: 'system' } as unknown as Record<string, unknown>;
+    const fresh = { ...newState(roster), paused: 'system' } as unknown as Record<string, unknown>;
     for (const k of RESETS) expect(next[k], k).toEqual(fresh[k]);
   });
   it('every persist field is exercised (differs from newState in deadLife) and survives unchanged', () => {
     const dead = deadLife() as unknown as Record<string, unknown>;
-    const fresh = newState() as unknown as Record<string, unknown>;
+    const fresh = newState(roster) as unknown as Record<string, unknown>;
     const next = rebirth(deadLife()) as unknown as Record<string, unknown>;
     for (const k of PERSISTS) {
       expect(dead[k], k).not.toEqual(fresh[k]);
@@ -157,7 +161,7 @@ describe('deathSummary', () => {
     expect(g.progress).toBeCloseTo(2.5 / need, 12);
   });
   it('a death on the first tick: a tiny positive gain and no skill lines', () => {
-    const s = deathSummary({ ...newState(), runTicks: 1, dead: true, health: 0 });
+    const s = deathSummary({ ...newState(roster), runTicks: 1, dead: true, health: 0 });
     expect(s.gain).toBeGreaterThan(0);
     expect(s.coreGains).toEqual([]);
   });

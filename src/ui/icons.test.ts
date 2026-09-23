@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { SKILL_IDS } from '../data/types';
-import { GearIcon, SKILL_ICONS } from './icons';
+import { ICON_NAMES } from '../data/icons';
+import { GearIcon, ICONS } from './icons';
 
 describe('icons', () => {
-  it('has a defined component for every skill and the gear', () => {
-    for (const id of SKILL_IDS) expect(SKILL_ICONS[id]).toBeDefined();
+  it('has a defined component for every name in the vocabulary, and the gear', () => {
+    for (const name of ICON_NAMES) expect(ICONS[name]).toBeDefined();
     expect(GearIcon).toBeDefined();
   });
 });

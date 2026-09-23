@@ -74,14 +74,14 @@ function reduce(content: Content) {
  * The game opens live. Under decision #41 an empty queue costs no time anyway, so
  * a start-paused state would only make the first click look broken.
  */
-function initial(): Model {
-  return { state: setPaused(newState(), 'none'), log: [{ seq: 0, at: 0, event: { type: 'lifeBegins', life: 1 } }], nextSeq: 1 };
+function initial(content: Content): Model {
+  return { state: setPaused(newState(content.roster), 'none'), log: [{ seq: 0, at: 0, event: { type: 'lifeBegins', life: 1 } }], nextSeq: 1 };
 }
 
 export function useGame(content: Content): {
   state: GameState; view: GameState; log: readonly LogLine[]; dispatch: (a: GameAction) => void; card: DeathSummary | null;
 } {
-  const [model, dispatch] = useReducer(reduce(content), undefined, initial);
+  const [model, dispatch] = useReducer(reduce(content), content, initial);
   useEffect(() => {
     const id = setInterval(() => dispatch({ type: 'tick' }), balance.time.tickIntervalMs);
     return () => clearInterval(id);
