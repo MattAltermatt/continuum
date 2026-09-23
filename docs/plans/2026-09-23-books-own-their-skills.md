@@ -619,16 +619,19 @@ actions use. For `queue.test.ts`, whose `quick` row uses `craft`:
   ],
 ```
 
-For the other three, the same list without `craft` after checking each
-fixture's `verb` fields (a verb without a roster entry becomes a thrown
-error in Task 6).
+For `tick.test.ts`, the same list without `craft`. `inventory.test.ts` and
+`health.test.ts` have `actions: {}`; give them the same three-entry list
+(forage, mine, build) rather than an empty roster, so `newState` in Task 6
+has ledgers to build. A verb without a roster entry becomes a thrown error
+in Task 6.
 
 - [ ] **Step 6: Re-point every importer of `scrub`, and the head's book name**
 
 Run: `grep -rln "data/scrub'\|'./scrub'" src`
 
 In each file replace the `scrub` import with `import { saltRoad } from '../data/salt-road'`
-and the imported identifier `scrub` with `saltRoad` (never `balance.content.scrub`).
+and the imported identifier `scrub` with `saltRoad` (never `balance.content.scrub`),
+including the two `...scrub` spreads at `src/ui/Queue.test.tsx:76`.
 `SCRUB_ORDER` becomes `saltRoad.chapters[0]!.order`; `SCRUB_HEAD` becomes
 `saltRoad.chapters[0]!.head`.
 
@@ -930,7 +933,7 @@ mechanical edit: about 116 `newState()` call sites in 11 test files.
 - Modify: every `newState()` caller (about 116 in 11 test files)
 - Modify: `src/engine/rebirth.test.ts` (the two loops; `.fish` → `.build`)
 - Modify: `src/engine/queue.test.ts` (nine `.skills.<id>` reads gain `!`; a throw test)
-- Modify: `src/engine/tick.test.ts:63` (one read gains `!`)
+- Modify: `src/engine/tick.test.ts` (the one `.skills.<id>` read tsc names gains `!`)
 - Modify: `README.md:16`
 
 **Interfaces:**
@@ -962,8 +965,9 @@ describe('a verb with no skill state', () => {
 ```
 
 Run: `npm test`
-Expected: red. `newState(content.roster)` does not typecheck yet and, at
-runtime, `stepQueue` throws a `TypeError` without "chop" in it.
+Expected: red. `newState(content.roster)` fails `tsc` (TS2554, one argument
+too many), and at runtime nothing throws at all, because the twelve-key
+state `newState()` still builds has a `chop` ledger. Step 2 makes both true.
 
 - [ ] **Step 2: The type, the run literal, `newState(roster)`, the guard**
 
@@ -1070,7 +1074,7 @@ returns nothing.
 
 `src/engine/queue.test.ts`: every `s.skills.<id>` / `settled.skills.<id>`
 read (nine; the compiler names each line) becomes `s.skills.<id>!`.
-`src/engine/tick.test.ts:63` likewise.
+The one read in `src/engine/tick.test.ts` that tsc names, likewise.
 
 `src/engine/rebirth.test.ts`: drop the `SKILL_IDS` import. Name the
 `deadLife()` result `dead` in the first describe as the second already
