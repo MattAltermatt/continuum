@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Folding layout</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 24px; background: #12151c; color: #d8d4cc;
+         font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  main { max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 16px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
+  p.note { color: #9a968e; max-width: 90ch; }
+  figure { margin: 32px 0; }
+  figcaption { margin-bottom: 8px; font-weight: 600; }
+  figcaption span { font-weight: 400; color: #9a968e; }
+  img { max-width: 100%; display: block; border: 1px solid #2a2f3a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>The page folds below 1280 instead of scrolling</h1>
+  <p class="note">Captured from the built change on 2026-09-23 (not a restyle), with two
+  rows queued and the game paused. User directive: fitting a narrower desktop window is
+  a utility, not a phone concern. At 1280 and wider nothing changes. The floor is the
+  action row (712px) plus page padding: 732px. A phone layout is #62.</p>
+  <figure>
+    <figcaption>1100 <span>(band wraps 2 + 1; queue under the middle column)</span></figcaption>
+    <img src="2026-09-23-fold-1100.png" alt="Layout at 1100px">
+  </figure>
+  <figure>
+    <figcaption>900 <span>(chapter full width; middle and queue side by side under it)</span></figcaption>
+    <img src="2026-09-23-fold-900.png" alt="Layout at 900px">
+  </figure>
+  <figure>
+    <figcaption>732, the floor <span>(one skill per row; no sideways scroll)</span></figcaption>
+    <img src="2026-09-23-fold-732.png" alt="Layout at 732px">
+  </figure>
+</main>
+</body>
+</html>
