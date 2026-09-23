@@ -456,15 +456,16 @@ visible change is three skill cells instead of twelve.
    `icons.test.ts` keeps the reverse check that every vocabulary name has a
    component. A roster cap is deferred with the generator.
 5. **Drop the union.** The skill id is a string from the roster;
-   `newState(roster)` and `rebirth(dead, roster)` build the skill map from
-   it (the roster, not the whole book, so engine fixtures stay small; the
-   queue test's craft fixture gets a roster of its own); `deathSummary` and
-   `rebirth` iterate the state's keys rather than `SKILL_IDS`; the
+   `newState(roster)` builds the skill map from it (the roster, not the
+   whole book, so engine fixtures stay small; the queue test's craft fixture
+   gets a roster of its own); `rebirth(dead)` keeps its signature and, with
+   `deathSummary`, rebuilds from the dead state's own keys rather than
+   `SKILL_IDS`, through a shared run-literal helper; the
    `coreLevel` event and `lifeStartCore` are keyed by string. The engine
    throws on an action whose verb has no skill state (a validated book
    cannot produce one); the UI uses `!`. *(panel)* `newState` has about 118
-   call sites in 11 test files plus `useGame` and `rebirth`, and `rebirth`
-   ten; that is the mechanical edit.
+   call sites in 11 test files plus `useGame`; that is the mechanical edit.
+   **Plan:** `docs/plans/2026-09-23-books-own-their-skills.md`.
 
 **Not in the slice, each filed with no milestone:** the headless play, the
 `book-author` skill and the second book (next, §9), `hurts` and the damage
