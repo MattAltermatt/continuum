@@ -444,10 +444,9 @@ its front.
    `ActionRow`, `DeathCard`, `narrate` and `App` read names and icons
    through the roster rather than the `SKILLS` global, so the band shows
    the three-skill roster here; the skill ids are still the old union at
-   this step, and `state.skills` may still hold twelve keys. *(panel)* The
-   one intended expectation change in the suite is `SkillsBand.test`'s
-   "renders all twelve"; `scrub.test`'s "names all twelve" and
-   `icons.test`'s union check are replaced in step 4. A mockup of the
+   this step, and `state.skills` may still hold twelve keys. *(panel)* `SkillsBand.test`'s
+   "renders all twelve" becomes the roster of three; `scrub.test`'s "names
+   all twelve" and `icons.test`'s union check are replaced. A mockup of the
    three-cell band is committed and the 🎨 pick made before this step's UI
    lands (decision #31).
 4. **The validator**, static, in `src/data/`, with a test per rule and a
