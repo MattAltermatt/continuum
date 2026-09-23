@@ -61,8 +61,8 @@ its roster the same way.
 **The band shows the book's whole roster, in roster order, from life 1.**
 *(panel)* A skill whose rows sit in a later chapter shows at zero until it is
 reached; the band never grows or reshuffles under the player, which 09-22
-§8.1 forbids. How three cells sit in today's four-column grid is a 🎨 pick
-made from a mockup at the UI step (§12).
+§8.1 forbids. How three cells sit is settled: 360px cells that wrap by
+window width (§12).
 
 The verb test (09-22 §6: its own tool, its own curve, a unique output) is the
 rule for whether a skill earns a slot, applied by the book's author rather
@@ -360,8 +360,8 @@ field (§5).
   roster is three of them. The verb test (§6) and §7.1–7.3 stand as
   authoring rules.
 - **§8.2 "twelve, four across, three rows, always the same order"** becomes
-  N per book, in roster order. Book one shows **three cells**; how they sit
-  is a mockup question (§12). The grid's shape at larger N is #46's.
+  N per book, in roster order. Book one shows **three cells**, at 360px
+  each, wrapping by window width (§12); the same rule holds at larger N.
   **§8.3's** hover counter "first-used book" goes.
 - **§8.6 "No book switcher: books are places, reached by Travel rows"** is
   superseded by the shelf (§7, §12), designed later.
@@ -446,9 +446,8 @@ its front.
    the three-skill roster here; the skill ids are still the old union at
    this step, and `state.skills` may still hold twelve keys. *(panel)* `SkillsBand.test`'s
    "renders all twelve" becomes the roster of three; `scrub.test`'s "names
-   all twelve" and `icons.test`'s union check are replaced. A mockup of the
-   three-cell band is committed and the 🎨 pick made before this step's UI
-   lands (decision #31).
+   all twelve" and `icons.test`'s union check are replaced. The band's
+   mockup and 🎨 pick were made first (decision #31; settled in §12).
 4. **The validator**, static, in `src/data/`, with a test per rule (the
    plan panel ran a mutation loop over the plan's file; the tests are the
    check): every row's verb is in the

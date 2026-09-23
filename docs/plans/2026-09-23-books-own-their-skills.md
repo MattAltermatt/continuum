@@ -9,7 +9,7 @@ carries the spec.
 **Task 1 pick (2026-09-23): neither A nor B.** Shown both, the user chose a
 third layout: skill cells at a fixed **360px**, filling left to right and
 wrapping by window width (three to a row at 1280, five at 1920; one cell to a
-phone's width). Mockups `docs/mockups/2026-09-23-wrapping-band.html` (chosen)
+phone's width once #62 lifts the 1280 minimum). Mockups `docs/mockups/2026-09-23-wrapping-band.html` (chosen)
 and `2026-09-23-skills-column.html` (a right-hand column, rejected). Health on
 top and a bottom bar for clock, gear and pause were picked in the same pass;
 they belong to #46 and are not in this slice. A phone layout is #62.
@@ -161,6 +161,10 @@ lucide-react icons.
 ---
 
 ### Task 1: A mockup of the three-cell band, and the user's pick 🎨
+
+**Done 2026-09-23** (commits 0fe64d1 to a1caff9). The A/B captures below were
+made and shown; the user picked a third layout instead, recorded in the
+status note at the top. Kept as the record; do not redo.
 
 The one visible change of the slice. Decision #31: a committed mockup before
 the UI lands; the user chooses between the two layouts. It is rendered from
@@ -738,6 +742,7 @@ holds twelve keys, so `skills[s.id]!` is defined for every roster entry.
 - Modify: `src/ui/narrate.ts`
 - Modify: `src/ui/App.tsx` (passes `content` to the band and the card)
 - Modify: `src/styles.css:73` (the Task 1 pick: 360px cells that wrap)
+- Modify: `CLAUDE.md` (the 1280px gotcha: the band now reflows)
 - Delete: `src/data/skills.ts`
 
 **Interfaces:**
@@ -872,6 +877,13 @@ export function SkillCell({ skill, state, running }: { skill: SkillDefinition; s
 At the 1280px minimum the page's content is 1260px wide, so three cells sit
 on a row (1088px) and the rest of the band is empty on the right.
 
+`CLAUDE.md`, Gotchas: the line "**The layout has a 1280px minimum and does
+not reflow.**" becomes "**The layout has a 1280px minimum; only the skills
+band reflows.** Its cells are a fixed 360px and wrap by window width
+(mockup 2026-09-23-wrapping-band). Nothing else reflows: desktop target,
+accepted (audit 2026-09-22); a phone layout is #62." Add `CLAUDE.md` to this
+task's `git add`.
+
 - [ ] **Step 5: The row, the queue, the card, the log**
 
 `src/ui/ActionRow.tsx`: replace `import { SKILLS } from '../data/skills';`
@@ -925,7 +937,7 @@ Expected: all green; `grep -rn "SKILLS\b\|SKILL_ICONS" src` returns nothing.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add -A src
+git add -A src CLAUDE.md
 git commit -m "ui: names and icons come from the roster; the band shows the book's skills"
 ```
 
@@ -1417,7 +1429,9 @@ shipped, e.g. `feat: books own their skills; the format, the validator, a
 roster of three`. Keep the spec, plan and mockup commits as they are: they
 are the record of the design rounds. Do not FF-merge: the user verifies in
 Chrome first (CLAUDE.md, "user-verify before FF-merge"). Hand over the URL
-and the three things to look at: the band, the death card, the log line.
+and the three things to look at: the band (at 1280, and at 1920 where the
+three cells sit left with the rest of the row empty, a state the mockup did
+not show), the death card, the log line.
 
 **Tracker, already done at the planning session's stop (2026-09-23):** #24
 closed with its answer; #36 and #37 closed as answered by the spec; the
