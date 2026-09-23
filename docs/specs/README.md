@@ -11,4 +11,4 @@ rejected, and why. What is queued lives in
 |---|---|
 | 2026-09-22 | [Books, chapters, verbs, and the one screen](2026-09-22-books-chapters-verbs.md) — the game's shape, the wall rule, the twelve verbs and why, and every chunk of the one screen with its mockup |
 | 2026-09-23 | [v0.2: a run you can lose](2026-09-23-v0-2-a-run-you-can-lose.md) — the display rule (now, never a prediction), death and rebirth, the death card, the bonus reshaped to 1.1^min − 1, rates and food chunks |
-| 2026-09-23 | [Categories, books, and the shelf](2026-09-23-cores-books-and-the-shelf.md) — the pivot: each book owns its skills and their ledgers, six categories as tags, nothing crosses books but badges, the shop and the bookmark; the profile, the generator's brief, and the two shared-ledger shapes the panel measured and the user dropped |
+| 2026-09-23 | [Books own their skills](2026-09-23-books-own-their-skills.md) — the pivot: each book declares its own skills and keeps their two ledgers, nothing crosses books but badges, the shop and the bookmark; the shelf loop, the generator's brief, and the shared-ledger and category shapes the panel measured and the user dropped |
