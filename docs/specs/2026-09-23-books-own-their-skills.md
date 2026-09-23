@@ -302,8 +302,10 @@ output    the same book format The Salt Road is written in
 *(panel)* **The validator is the hard part, not the generator.** Static rules
 pass books that lock the engine forever under decision #41: a cost cycle
 (rope needs plank, plank needs rope) and a producer whose yield exceeds its
-cap both froze the real engine at tick 927 with no death and no rebirth, so
-both are static rules now (§11). And the play's verdict flips with its
+cap both froze the real engine at tick 927 with no death and no rebirth; a
+static rule for each was tried in the plan and dropped (§11 step 4), since
+the queue and cap semantics they lean on are replaced by #47 and #45, and
+the headless play catches both. And the play's verdict flips with its
 policy: on a 150-stone hall the lives to finish were 8 with a food-aware
 policy, 9 with push-everything, 42 with no foraging, and a bot that re-plans
 every tick is superhuman until automation exists. The policy and the bound
@@ -416,7 +418,10 @@ what crosses books land with the shop.
 *(panel)* It is a re-key with one consumer, the second book, which is the
 next slice and the thing that produces every number §6 and §12 defer.
 Behaviour is preserved across a medium-sized mechanical refactor; the one
-visible change is three skill cells instead of twelve.
+visible change is three skill cells instead of twelve. *(plan panel)* Six
+tests change an asserted value, all intended and listed in the plan; the
+mockup and the user's pick come first, so the run's one hard stop is at
+its front.
 
 **In the slice, in an order where each step ends green:**
 
@@ -445,16 +450,26 @@ visible change is three skill cells instead of twelve.
    `icons.test`'s union check are replaced in step 4. A mockup of the
    three-cell band is committed and the 🎨 pick made before this step's UI
    lands (decision #31).
-4. **The validator**, static, in `src/data/`, with a test per rule: every
-   row's verb is in the roster; every roster skill has at least one row;
-   every icon name is in the vocabulary; every item a row names exists;
-   every item a row costs has a producing row in the same or an earlier
-   chapter *(panel: this makes the action row's hard-coded "Craft" fallback
-   unreachable; the else branch shows the item name alone)*; the cost graph
-   is acyclic; no producer's yield exceeds its item's cap; the first chapter
-   has a row with no inputs; the book round-trips through JSON. *(panel)*
-   `icons.test.ts` keeps the reverse check that every vocabulary name has a
-   component. A roster cap is deferred with the generator.
+4. **The validator**, static, in `src/data/`, with a test per rule and a
+   mutation check that every rule has one: every row's verb is in the
+   roster; every roster skill has at least one row; no roster id is declared
+   twice; every icon name is in the vocabulary; every item a row produces
+   or costs exists; every record key equals its entry's id; every chapter
+   order id is a row and every row is in exactly one chapter; the first
+   chapter has a row with no inputs; the book round-trips through JSON,
+   which proves it serializable and no more. *(plan panel)* Rules about
+   play, a cost cycle, a yield above the cap, a producer in an earlier
+   chapter, were tried and dropped: they lean on stall-in-place and per-item
+   caps, which #47 and #45 replace right after this seam; measured, the
+   cycle rule accepted a same-class softlock (a one-time key at cap 1 and a
+   row costing two) and rejected a playable book; and the chapter rule
+   decides whether materials cross a chapter boundary, which 09-22 §9
+   leaves open. They are filed against the headless play (§9), where the
+   engine is the judge. *(panel)* The completeness tests over the fixed
+   union (`icons.test.ts`, `scrub.test.ts`) are replaced; `icons.test.ts`
+   keeps the reverse check that every vocabulary name has a component. The
+   action row's hard-coded "Craft" fallback goes; the else branch shows the
+   item name. A roster cap is deferred with the generator.
 5. **Drop the union.** The skill id is a string from the roster;
    `newState(roster)` builds the skill map from it (the roster, not the
    whole book, so engine fixtures stay small; the queue test's craft fixture
@@ -475,7 +490,8 @@ carve-out, the ledger rename, the roster cap, and the skill grid at larger
 N (#46).
 
 **Tests the slice ends on** *(panel: "green" means edited mechanically, with
-no tuning literal changed and one roster-enumeration expectation changed)*:
+no tuning literal changed; the six tests whose asserted value changes are
+listed in the plan)*:
 every existing engine and component test, including `playable.test.ts`'s
 progression across lives, with the roster order and every number preserved;
 the validator accepts The Salt Road and rejects each malformed book above;

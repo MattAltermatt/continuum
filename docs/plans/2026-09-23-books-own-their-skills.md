@@ -1,22 +1,26 @@
 # Books own their skills: the seam — Implementation Plan
 
-**Status:** written 2026-09-23, to be executed in a later session on
-`feature/cores-books-and-the-shelf` (the branch that carries the spec).
+**Status:** written 2026-09-23, revised after plan-panel round one (reviewer A
+built every task in a scratch copy; the naysayer attacked the validator with
+real books). To be executed in a later session on
+`feature/cores-books-and-the-shelf`, the branch that carries the spec.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every book declares its own skills. The fixed twelve-verb union
 becomes book data, The Salt Road becomes a value of a `Book` type with a
-three-skill roster, a static validator guards the format, and nothing about
-how the one book plays changes.
+three-skill roster, a static validator replaces the compile-time check the
+union gave, and nothing about how the one book plays changes.
 
 **Architecture:** `Content` gains a `roster`; `Book` is `Content` plus an id,
 a name and chapters. The engine builds the skill map from the roster instead
 of a global list, and every UI name and icon lookup goes through the roster
 instead of two module-level globals (`SKILLS`, `SKILL_ICONS`). An icon
 vocabulary of plain names lives in `src/data/` so the data layer never
-imports the UI. A validator in `src/data/` returns a list of problems and is
-the only thing that checks a book once the union is gone.
+imports the UI. A validator in `src/data/` returns a list of problems; it
+checks the format's integrity and nothing about play, because the queue and
+inventory rules it would lean on are replaced by #47 and #45 right after
+this seam, and the headless play (spec §9) is the judge of play.
 
 **Tech Stack:** TypeScript (strict, `noUncheckedIndexedAccess`), React, Vite,
 Vitest (`node` for engine, `// @vitest-environment jsdom` for components),
@@ -25,47 +29,164 @@ lucide-react icons.
 **Spec:** `docs/specs/2026-09-23-books-own-their-skills.md`, §2, §3, §10 and
 §11. The plan implements §11; §10 says which doc lines the slice edits.
 
+## Revision 1 (2026-09-23), what the panel changed
+
+- **Order.** The mockup and the user's pick move to Task 1, so the one hard
+  stop sits at the front of a subagent-driven run. `newState(roster)` and
+  the rebirth rebuild land with the format (Task 4), so the eleven test
+  files that gain rosters are edited once. The UI reads the roster before
+  the union drops, so the UI is written once against the final shape.
+- **The validator is trimmed to format integrity.** The cycle, yield-above-cap
+  and producer-in-an-earlier-chapter rules are dropped: the first two are
+  written against stall-in-place and per-item caps, which #47 and #45
+  replace; measured, the cycle rule accepted a same-class softlock and
+  rejected a playable book; and the chapter rule decides a question the
+  09-22 spec leaves open (materials may reset at a chapter boundary). They
+  are filed against the headless play. Two rules gained the tests they
+  lacked; duplicate roster ids and a record key that differs from its `id`
+  are new rules.
+- **Honest about expectations.** Six tests change an asserted value, not
+  one; they are listed under Global Constraints.
+- **Typecheck-red steps fixed.** Reviewer A found Tasks 3, 6 and 7 green
+  under vitest and red under `tsc`; every `state.skills.<id>` read in tests
+  needs `!` once the key is a string, `RunningHead.test` renders the head
+  directly, and the round-trip test imports `type Book`. All folded in.
+- **The rebirth loops assert the key sets**, iterating the dead state rather
+  than the output, so a dropped ledger cannot hide.
+- **`rebirth(dead)` keeps its signature, ratified by the panel this round.**
+  Reviewer A measured `blankRun` as field-for-field equal to today's run.
+  The naysayer's objection, that a saved state from before a roster change
+  can never heal, is a save/load migration concern and is recorded on #27;
+  no state is persisted today.
+- **Review before Chrome** in the last task, per CLAUDE.md.
+
 ## Global Constraints
 
 - **No tuning number changes.** `balance.content.scrub` stays as it is and
   the Salt Road reads every number from it. Removing `ticksPerSkillPoint` is
-  the one `balance.ts` edit, named in Task 1 for the tuning guard.
+  the one `balance.ts` edit, named in Task 2 for the tuning guard and
+  decided in spec §11 step 1.
 - **No magic numbers** in `src/engine/`, `src/data/`, `src/state/`
   (`decision #3`, hook `.claude/hooks/tuning-literals.sh`).
 - **The engine never imports from `src/ui/`; `src/data/` imports only
   `src/data/` and `src/balance.ts`** (`src/purity.test.ts`). The icon
   vocabulary is plain strings in `src/data/`; lucide stays in `src/ui/`.
-- **Behaviour is preserved.** Every existing test passes after mechanical
-  edits; the one intended expectation change is `SkillsBand.test`'s "renders
-  all twelve" (Task 5). No engine number, order or event changes.
+- **Behaviour is preserved.** No engine number, order or event changes.
+  **Tests whose asserted value changes, all intended:** `balance.test`
+  (time constants, one test deleted), `scrub.test` → `salt-road.test`
+  ("names all twelve" → the roster of three), `icons.test` (twelve ids → the
+  vocabulary), `rebirth.test` (`.fish` → `.build`; the loops iterate the
+  dead state), `SkillsBand.test` (twelve cells → three), and the action
+  row's unreachable "Craft" fallback text, which becomes the item name.
 - **The band shows the book's whole roster, in roster order** (spec §2). The
   Salt Road's roster is `forage, mine, build`, in that order.
 - **Ledger names stay `core` and `run`** in code and on screen (spec §2; the
   rename is filed for later).
+- **Run in the main checkout, not a worktree.** `gates-on-stop.sh` exits
+  silently when `node_modules/.bin/tsc` is missing, so an uninstalled
+  worktree runs with the Stop guard off. `node_modules` here holds a
+  self-referential `node_modules/node_modules` symlink; do not `cp -R` it.
+- **Commands one at a time, no `&&` chains** (they defeat the allowlist).
+  Run the whole suite with `npm test`; `npx vitest run <file>` is not
+  allowlisted and will prompt. Deleting a file needs `git rm`, which
+  prompts once; that is fine.
 - **Commit messages:** terse, one line, no trailers, no emoji.
 - **Gates before hand-off:** `npm run typecheck`, `npm run lint`, `npm test`,
-  `npm run test:hooks`, then Chrome (`/chrome-verify`).
+  `npm run test:hooks`, `npm run build`, the code panel, then Chrome.
 
 ## Review Focus
 
-1. **A book whose row names a verb missing from the roster** must be
-   rejected by the validator, not reach the engine, where it would throw on
-   the first tick (Task 6, `rejects a row whose verb is not in the roster`).
-2. **A cost cycle** (rope needs plank, plank needs rope) freezes the engine
-   forever under decision #41 with no death; the validator must refuse it
-   (Task 6, `rejects a cost cycle`).
-3. **A producer whose yield exceeds its item's cap** never lands and freezes
-   the same way; refused (Task 6, `rejects a yield above the cap`).
-4. **Rebirth after the union is gone** must carry every core ledger and
-   snapshot `lifeStartCore` from the state's own keys, not a global list
-   (Task 7, existing rebirth tests re-pointed at `Object.keys`).
-5. **The death card and the log name a skill through the roster**, so a
-   skill id with no roster entry can't render; the validator makes that
-   unreachable and the UI uses `!` (Task 5, `DeathCard.test`, `narrate.test`).
+1. **A book whose row names a verb missing from the roster** is rejected by
+   the validator, never reaching the engine, where it would throw on the
+   first tick (Task 7, `rejects a row whose verb is not in the roster`; the
+   throw itself has a must-fire test in Task 6).
+2. **A cost or a product naming an item the book does not define** is
+   rejected (Task 7, two tests; the naysayer found the cost half untested).
+3. **Two roster entries with one id** would render two cells with one React
+   key and dirty the console; rejected (Task 7).
+4. **Rebirth after the union is gone** carries every core ledger and
+   snapshots `lifeStartCore` from the dead state's own keys; the tests
+   assert the key sets match (Task 6).
+5. **The death card and the log name a skill through the roster**; a skill
+   id with no roster entry cannot render, the validator makes it unreachable
+   and the UI uses `!` (Task 5, `DeathCard.test`, `narrate.test`).
 
 ---
 
-### Task 1: Skill points out
+### Task 1: A mockup of the three-cell band, and the user's pick 🎨
+
+The one visible change of the slice. Decision #31: a committed mockup before
+the UI lands; the user chooses between the two layouts. It is rendered from
+the **real band**, not drawn: the mockups under `docs/mockups/` use a stale
+`.sk` class whose columns and padding differ from `src/styles.css`.
+
+**Files:**
+- Create: `docs/mockups/2026-09-23-three-cell-band-a.png`, `-b.png`,
+  `docs/mockups/2026-09-23-three-cell-band.html` (the two PNGs side by side
+  with captions)
+- Modify: `docs/mockups/README.md` (one index line)
+
+- [ ] **Step 1: Start the dev server and open the game in Chrome**
+
+Invoke `/chrome-verify`'s start step (background `npm run dev`, read the
+port it took, open `http://localhost:<port>/` through chrome-devtools-mcp).
+Resize the page to 1280 wide.
+
+- [ ] **Step 2: Reduce the live band to three cells and capture A**
+
+With `evaluate_script`:
+
+```js
+for (const el of document.querySelectorAll('.skills [data-skill]')) {
+  if (!['forage', 'mine', 'build'].includes(el.dataset.skill)) el.remove();
+}
+```
+
+`take_screenshot` of the page; save as
+`docs/mockups/2026-09-23-three-cell-band-a.png`. This is layout **A**: four
+columns, the fourth slot empty.
+
+- [ ] **Step 3: Capture B**
+
+```js
+document.querySelector('.skills').style.gridTemplateColumns = 'repeat(3, 1fr)';
+```
+
+`take_screenshot`; save as `docs/mockups/2026-09-23-three-cell-band-b.png`.
+Layout **B**: one column per roster entry.
+
+- [ ] **Step 4: The index page and the README line**
+
+`docs/mockups/2026-09-23-three-cell-band.html`: a plain page with both PNGs
+stacked, each captioned `A. four across, fourth slot empty` and `B. one
+column per skill`, at 1280px. Add to `docs/mockups/README.md`:
+
+```
+| 2026-09-23 | [three-cell-band](2026-09-23-three-cell-band.html) | the real band at a three-skill roster: A empty fourth slot, B stretched to three across |
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add docs/mockups
+git commit -m "mockup: the skills band at three cells, two layouts, from the live band"
+```
+
+- [ ] **Step 6: Ask the user, and wait**
+
+```
+file:///Users/matt/dev/MattAltermatt/continuum/docs/mockups/2026-09-23-three-cell-band.html
+! o docs/mockups/2026-09-23-three-cell-band.html
+```
+
+Ask: "Three cells: A (empty fourth slot, the grid stays four across) or B
+(stretched, one column per skill)?" Recommend A: #46 redesigns the band at N
+and A leaves the grid's geometry alone. **Stop until the answer arrives.**
+Record it in this file's status line; Task 5 applies it.
+
+---
+
+### Task 2: Skill points out
 
 **Files:**
 - Modify: `src/balance.ts:17-21` (remove `ticksPerSkillPoint`)
@@ -74,7 +195,6 @@ lucide-react icons.
   (persists list), `:481` (constants table row)
 
 **Interfaces:**
-- Consumes: nothing.
 - Produces: `balance.time` has two keys, `tickIntervalMs` and `ticksPerMinute`.
 
 - [ ] **Step 1: Confirm nothing reads skill points**
@@ -94,10 +214,10 @@ In `src/balance.test.ts` replace the first `it` and delete the third:
 
 Delete the block `it('awards a skill point every fifteen minutes of survival', …)`.
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [ ] **Step 3: Run the suite to verify it fails**
 
-Run: `npx vitest run src/balance.test.ts`
-Expected: FAIL, the `toEqual` sees an extra key `ticksPerSkillPoint`.
+Run: `npm test`
+Expected: one failure, `balance.test` sees an extra key `ticksPerSkillPoint`.
 
 - [ ] **Step 4: Remove the field**
 
@@ -108,47 +228,43 @@ In `src/balance.ts` delete these two lines and the blank before them:
     ticksPerSkillPoint: 9_000,
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
-
-Run: `npx vitest run src/balance.test.ts`
-Expected: PASS.
-
-- [ ] **Step 6: Edit MECHANICS.md**
+- [ ] **Step 5: Edit MECHANICS.md**
 
 Delete the `### Skill points` subsection (heading through "the slowest clock
 in the game."). In "What persists" delete the line `- Skill points.`. In the
 constants table delete the row beginning `| \`TICKS_PER_SKILL_POINT\``.
 
-- [ ] **Step 7: Run every gate**
+- [ ] **Step 6: Gates**
 
-Run: `npm run typecheck && npm run lint && npm test`
-Expected: all green.
+Run `npm run typecheck`, then `npm run lint`, then `npm test`.
+Expected: all green, 223 tests.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add src/balance.ts src/balance.test.ts MECHANICS.md
-git commit -m "engine: remove skill points, a currency nothing reads"
+git commit -m "engine: remove skill points, a currency nothing reads (spec 2026-09-23 s11 step 1)"
 ```
 
 ---
 
-### Task 2: `templateKey` out
+### Task 3: `templateKey` out
 
 **Files:**
 - Modify: `src/data/types.ts:41-42` (remove the field)
 - Modify: `src/engine/queue.ts:149` (`complete`)
+- Modify: `src/engine/types.ts:46` (a comment)
 - Modify: `src/ui/ActionRow.tsx:73` (`done`)
-- Modify: `MECHANICS.md:81,83,89-92,164,368,412` (every `templateKey` mention)
+- Modify: `MECHANICS.md:72,81,83,86-92,164,368,412`
 
 **Interfaces:**
-- Consumes: nothing.
 - Produces: completion counts are keyed by `action.id`, always.
 
 - [ ] **Step 1: Confirm no content or test sets the field**
 
 Run: `grep -rn "templateKey" src`
-Expected: hits only in `src/data/types.ts`, `src/engine/queue.ts`, `src/ui/ActionRow.tsx`.
+Expected: hits only in `src/data/types.ts`, `src/engine/queue.ts`,
+`src/engine/types.ts` (a comment), `src/ui/ActionRow.tsx`.
 
 - [ ] **Step 2: Remove the field and both readers**
 
@@ -172,6 +288,9 @@ with
   next = { ...next, completionCounts: { ...next.completionCounts, [action.id]: (next.completionCounts[action.id] ?? 0) + 1 } };
 ```
 
+In `src/engine/types.ts` change the comment on `completionCounts` to
+`/** Lifetime completions by action id. Drives automation later. */`.
+
 In `src/ui/ActionRow.tsx` replace
 
 ```ts
@@ -186,74 +305,78 @@ with
 
 - [ ] **Step 3: Edit MECHANICS.md**
 
-Delete the `templateKey?: string` line from the `ActionDefinition` block and
-the bullet that begins `- **\`templateKey\`** is the action's *stable*
-identity`. Change `requires?: Record<string, number> // gating: templateKey →
-completions needed` to `// gating: action id → completions needed`. Change
+In the `ActionDefinition` block delete the `category: ActionCategory` line
+(spec §10) and the `templateKey?: string` line. Change
+`requires?: Record<string, number> // gating: templateKey → completions needed`
+to end `// gating: action id → completions needed`. Delete the bullet that
+begins `- **\`templateKey\`** is the action's *stable* identity`, and change
+the sentence above it from "Two fields carry more weight than their size
+suggests" to "One field carries more weight than its size suggests". Change
 step 5 of the completion order to `Increment \`actionCompletionCounts[id]\``.
 In "What persists" change `keyed by \`templateKey\`` to `keyed by action id`.
 Under the automation thresholds change `Keyed by \`templateKey\`` to `Keyed by
 action id`.
 
-- [ ] **Step 4: Run every gate**
+- [ ] **Step 4: Gates**
 
-Run: `npm run typecheck && npm run lint && npm test`
+Run `npm run typecheck`, then `npm run lint`, then `npm test`.
 Expected: all green; no test changed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/data/types.ts src/engine/queue.ts src/ui/ActionRow.tsx MECHANICS.md
+git add src/data/types.ts src/engine/queue.ts src/engine/types.ts src/ui/ActionRow.tsx MECHANICS.md
 git commit -m "engine: drop templateKey; completion counts key on the action id"
 ```
 
 ---
 
-### Task 3: The book format, the icon vocabulary, and The Salt Road as a value
+### Task 4: The book format, the icon vocabulary, The Salt Road as a value, and `newState(roster)`
 
-The union stays. `SKILLS` and `SKILL_ICONS` stay for one more task so the UI
-is untouched here; the band still shows twelve.
+The union stays. `SKILLS` and `SKILL_ICONS` stay for one more task so the
+band still shows twelve here. `newState` takes a roster now, while the
+union can still type it, so the eleven test files that gain a roster are
+edited once.
 
 **Files:**
-- Modify: `src/data/types.ts` (add `IconName`, `SkillDefinition`, `Chapter`,
-  `Book`; add `roster` to `Content`; drop `book` from `ChapterHead`)
-- Create: `src/data/icons.ts`
-- Create: `src/data/roster.ts`
-- Create: `src/data/salt-road.ts` (replaces `src/data/scrub.ts`)
-- Create: `src/data/salt-road.test.ts` (replaces `src/data/scrub.test.ts`)
+- Modify: `src/data/types.ts` (add `SkillDefinition`, `Chapter`, `Book`;
+  add `roster` to `Content`; drop `book` from `ChapterHead`)
+- Create: `src/data/icons.ts`, `src/data/roster.ts`, `src/data/roster.test.ts`
+- Create: `src/data/salt-road.ts`, `src/data/salt-road.test.ts`
 - Delete: `src/data/scrub.ts`, `src/data/scrub.test.ts`
+- Modify: `src/engine/queue.ts` (`blankRun`, `newState(roster)`)
+- Modify: `src/engine/rebirth.ts` (rebuild from the dead state's keys)
 - Modify: every `Content` fixture: `src/engine/inventory.test.ts:5`,
   `src/engine/queue.test.ts:8`, `src/engine/tick.test.ts:9`,
   `src/engine/health.test.ts:9`
 - Modify: every importer of `scrub`: `src/ui/App.tsx`, `src/ui/ChapterPanel.test.tsx`,
   `src/ui/ActionRow.test.tsx`, `src/ui/Food.test.tsx`, `src/ui/Pack.test.tsx`,
   `src/ui/Log.test.tsx`, `src/ui/Queue.test.tsx`, `src/ui/narrate.test.ts`,
-  `src/state/useGame.test.tsx`, `src/engine/skills.test.ts`, `src/engine/playable.test.ts`
-- Modify: `src/ui/RunningHead.tsx`, `src/ui/ChapterPanel.tsx` (the book name
-  is a prop, not a head field)
+  `src/state/useGame.test.tsx`, `src/engine/playable.test.ts`
+- Modify: every `newState()` caller (about 116 in 11 test files, plus
+  `src/state/useGame.ts`)
+- Modify: `src/ui/RunningHead.tsx`, `src/ui/RunningHead.test.tsx`,
+  `src/ui/ChapterPanel.tsx` (the book name is a prop, not a head field)
 
 **Interfaces:**
-- Consumes: `Content`, `ChapterHead` from `src/data/types.ts`.
 - Produces:
 
 ```ts
+// src/data/icons.ts
+export const ICON_NAMES: readonly [...twelve names...]; export type IconName = (typeof ICON_NAMES)[number]
 // src/data/types.ts
-export type IconName = (typeof ICON_NAMES)[number];            // from ./icons
 export interface SkillDefinition { readonly id: SkillId; readonly name: string; readonly icon: IconName }
 export interface Chapter { readonly head: ChapterHead; readonly order: readonly ActionId[] }
-export interface Content {
-  readonly roster: readonly SkillDefinition[];
-  readonly actions: Readonly<Record<ActionId, ActionDefinition>>;
-  readonly items: Readonly<Record<ItemId, ItemDefinition>>;
-}
+export interface Content { readonly roster: readonly SkillDefinition[]; readonly actions: …; readonly items: … }
 export interface Book extends Content { readonly id: string; readonly name: string; readonly chapters: readonly Chapter[] }
-export interface ChapterHead { readonly numeral: string; readonly chapter: string; readonly story: string }   // no `book`
-// src/data/icons.ts
-export const ICON_NAMES: readonly [...] ; export type IconName
+export interface ChapterHead { readonly numeral: string; readonly chapter: string; readonly story: string }
 // src/data/roster.ts
 export function skillOf(content: Pick<Content, 'roster'>, id: SkillId): SkillDefinition   // throws if absent
 // src/data/salt-road.ts
 export const saltRoad: Book
+// src/engine/queue.ts
+export function blankRun(skills: Readonly<Record<SkillId, SkillState>>, lifeStartCore: Readonly<Record<SkillId, number>>): GameState
+export function newState(roster: readonly SkillDefinition[]): GameState
 ```
 
 - [ ] **Step 1: Write the failing tests for the vocabulary and the roster helper**
@@ -288,10 +411,10 @@ describe('skillOf', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [ ] **Step 2: Run the suite to verify it fails**
 
-Run: `npx vitest run src/data/roster.test.ts`
-Expected: FAIL, modules `./icons` and `./roster` not found.
+Run: `npm test`
+Expected: `roster.test` fails to load (`./icons`, `./roster` not found).
 
 - [ ] **Step 3: Add the vocabulary, the types, and the helper**
 
@@ -336,7 +459,7 @@ export interface Content {
 }
 ```
 
-Change `ChapterHead` to drop `book` and add `Chapter` and `Book`:
+Change `ChapterHead` to drop `book`, and add `Chapter` and `Book`:
 
 ```ts
 /** The running head (spec section 8.6). The book's name comes from the book. */
@@ -373,12 +496,7 @@ export function skillOf(content: Pick<Content, 'roster'>, id: SkillId): SkillDef
 }
 ```
 
-- [ ] **Step 4: Run the new test to verify it passes**
-
-Run: `npx vitest run src/data/roster.test.ts`
-Expected: PASS. (`npm run typecheck` is red now: every `Content` lacks `roster`. Next steps fix that.)
-
-- [ ] **Step 5: Write The Salt Road as a `Book`**
+- [ ] **Step 4: Write The Salt Road as a `Book`**
 
 Create `src/data/salt-road.ts` (the body of `scrub.ts`, reshaped; every
 number still from `balance.content.scrub`):
@@ -435,10 +553,12 @@ export const saltRoad: Book = {
 };
 ```
 
-Create `src/data/salt-road.test.ts` from `scrub.test.ts`, with these changes:
-import `saltRoad` instead of `scrub, SCRUB_HEAD, SCRUB_ORDER`; replace every
-`scrub.` with `saltRoad.`; replace `SCRUB_ORDER` with
-`saltRoad.chapters[0]!.order`; replace the last test with:
+Create `src/data/salt-road.test.ts` from `scrub.test.ts` with these edits:
+import `saltRoad` from `./salt-road` instead of `scrub, SCRUB_HEAD,
+SCRUB_ORDER`; replace the **imported identifier** `scrub` with `saltRoad`
+(leave `balance.content.scrub` alone, it is a balance key); replace
+`SCRUB_ORDER` with `saltRoad.chapters[0]!.order`; drop the `SKILLS` and
+`SKILL_IDS` imports; replace the last test with:
 
 ```ts
   it('declares a roster of the three skills its rows use, and one chapter with a head', () => {
@@ -450,13 +570,86 @@ import `saltRoad` instead of `scrub, SCRUB_HEAD, SCRUB_ORDER`; replace every
   });
 ```
 
-Delete `src/data/scrub.ts` and `src/data/scrub.test.ts` (`git rm`).
+`git rm src/data/scrub.ts src/data/scrub.test.ts`.
 
-- [ ] **Step 6: Give every engine `Content` fixture a roster**
+- [ ] **Step 5: `blankRun`, `newState(roster)`, and rebirth from the dead state's keys**
+
+In `src/engine/queue.ts` replace `import { SKILL_IDS } from '../data/types';`
+with nothing (drop it) and add `SkillDefinition` to the type import; replace
+`newState` with:
+
+```ts
+/** A fresh run around the given ledgers. newState builds them from a roster; rebirth carries them over. */
+export function blankRun(skills: Readonly<Record<SkillId, SkillState>>, lifeStartCore: Readonly<Record<SkillId, number>>): GameState {
+  return {
+    runTicks: 0,
+    health: balance.health.base,
+    maxHealth: balance.health.base,
+    paused: 'system',
+    dead: false,
+    skills,
+    inventory: {},
+    foodCooldowns: {},
+    queue: [],
+    completedOneTime: [],
+    completionCounts: {},
+    decayMultiplier: 1,
+    events: [],
+    life: 1,
+    rebirthBonus: 0,
+    lifeStartCore,
+  };
+}
+
+/** The first life of a book: one fresh skill per roster entry (spec 2026-09-23 section 2). */
+export function newState(roster: readonly SkillDefinition[]): GameState {
+  return blankRun(
+    Object.fromEntries(roster.map((s) => [s.id, newSkill()])) as Record<SkillId, SkillState>,
+    Object.fromEntries(roster.map((s) => [s.id, 0])) as Record<SkillId, number>,
+  );
+}
+```
+
+(The casts are needed while `SkillId` is still the union; Task 6 may drop them.)
+
+In `src/engine/rebirth.ts` replace `import { SKILL_IDS, type SkillId } from '../data/types';`
+with `import type { SkillId } from '../data/types';` and `import { newState } from './queue';`
+with `import { blankRun } from './queue';`. In `deathSummary`:
+
+```ts
+  const ids = Object.keys(dead.skills) as SkillId[];
+  const coreGains = ids
+    .filter((id) => dead.skills[id]!.core.level > (dead.lifeStartCore[id] ?? 0))
+    .map((id) => {
+      const core = dead.skills[id]!.core;
+      return { skill: id, from: dead.lifeStartCore[id] ?? 0, to: core.level, progress: core.exp / expToNextLevel(balance.skills.coreMastery.baseExp, core.level) };
+    });
+```
+
+In `rebirth`:
+
+```ts
+  const ids = Object.keys(dead.skills) as SkillId[];
+  const skills = Object.fromEntries(ids.map((id) => [id, { core: dead.skills[id]!.core, run: newSkill().run }])) as Record<SkillId, SkillState>;
+  const lifeStartCore = Object.fromEntries(ids.map((id) => [id, skills[id]!.core.level])) as Record<SkillId, number>;
+  return { ...blankRun(skills, lifeStartCore), paused: 'system', life: dead.life + 1, rebirthBonus, maxHealth, health: maxHealth, completionCounts: dead.completionCounts };
+```
+
+`src/state/useGame.ts`: `initial` takes the content:
+
+```ts
+function initial(content: Content): Model {
+  return { state: setPaused(newState(content.roster), 'none'), log: [{ seq: 0, at: 0, event: { type: 'lifeBegins', life: 1 } }], nextSeq: 1 };
+}
+```
+
+and `useReducer(reduce(content), content, initial)`.
+
+- [ ] **Step 6: Every engine `Content` fixture gets a roster, and every `newState()` a roster**
 
 In each of `src/engine/inventory.test.ts`, `src/engine/queue.test.ts`,
 `src/engine/tick.test.ts`, `src/engine/health.test.ts`, add as the first
-field of the `content` literal a roster that names every verb the fixture's
+field of the `content` literal a roster naming every verb the fixture's
 actions use. For `queue.test.ts`, whose `quick` row uses `craft`:
 
 ```ts
@@ -468,30 +661,53 @@ actions use. For `queue.test.ts`, whose `quick` row uses `craft`:
   ],
 ```
 
-For the other three, the same list without `craft` (check each fixture's
-`verb` fields; a verb with no roster entry is what Task 7 makes a thrown
-error, so get it right here).
+For the other three, the same list without `craft` after checking each
+fixture's `verb` fields (a verb without a roster entry becomes a thrown
+error in Task 6).
 
-- [ ] **Step 7: Re-point every importer of `scrub`**
+Then, in every test file: `newState()` becomes `newState(content.roster)`
+where the file has a local `content` fixture, `newState(saltRoad.roster)`
+where it imports `saltRoad`, and where it has neither add at the top
+
+```ts
+const roster = [{ id: 'forage', name: 'Forage', icon: 'sprout' }, { id: 'mine', name: 'Mine', icon: 'pickaxe' }, { id: 'build', name: 'Build', icon: 'house' }] as const;
+```
+
+and call `newState(roster)`. Run `grep -rn "newState()" src` until it
+returns nothing.
+
+`src/engine/rebirth.test.ts`: the two loops over `SKILL_IDS` become
+
+```ts
+  it('puts every run ledger back to level 0 with no exp, for every skill the dead state had', () => {
+    expect(Object.keys(next.skills)).toEqual(Object.keys(dead.skills));
+    for (const id of Object.keys(dead.skills)) expect(next.skills[id]!.run).toEqual({ level: 0, exp: 0 });
+  });
+```
+
+(with `dead` in scope of that describe: name the `deadLife()` result `dead`
+there as the second describe already does) and
+
+```ts
+  it('keeps every core ledger, level and exp, and snapshots the same keys', () => {
+    expect(Object.keys(next.skills)).toEqual(Object.keys(dead.skills));
+    expect(Object.keys(next.lifeStartCore)).toEqual(Object.keys(dead.skills));
+    for (const id of Object.keys(dead.skills)) expect(next.skills[id]!.core).toEqual(dead.skills[id]!.core);
+  });
+```
+
+Drop the `SKILL_IDS` import. The assertion `expect(next.lifeStartCore.fish).toBe(0)`
+becomes `expect(next.lifeStartCore.build).toBe(0)` (this fixture's roster
+has no fish; build is the roster skill that did not move).
+
+- [ ] **Step 7: Re-point every importer of `scrub`, and the head's book name**
 
 Run: `grep -rln "data/scrub'\|'./scrub'" src`
 
-In each file replace `import { scrub, SCRUB_HEAD, SCRUB_ORDER } from '../data/scrub'`
-(or whichever subset) with `import { saltRoad } from '../data/salt-road'`,
-and `scrub` with `saltRoad` throughout. `SCRUB_ORDER` becomes
-`saltRoad.chapters[0]!.order`; `SCRUB_HEAD` becomes
+In each file replace the `scrub` import with `import { saltRoad } from '../data/salt-road'`
+and the imported identifier `scrub` with `saltRoad` (never `balance.content.scrub`).
+`SCRUB_ORDER` becomes `saltRoad.chapters[0]!.order`; `SCRUB_HEAD` becomes
 `saltRoad.chapters[0]!.head`.
-
-In `src/ui/App.tsx`, the chapter panel call becomes:
-
-```tsx
-            <ChapterPanel
-              content={saltRoad} book={saltRoad.name} chapter={saltRoad.chapters[0]!} state={view} runningActionId={runningActionId}
-```
-
-and `useGame(scrub)` becomes `useGame(saltRoad)`; every other `scrub` becomes `saltRoad`.
-
-- [ ] **Step 8: The head takes the book name as a prop**
 
 `src/ui/RunningHead.tsx`:
 
@@ -508,6 +724,11 @@ export function RunningHead({ book, head }: { book: string; head: ChapterHead })
   );
 }
 ```
+
+`src/ui/RunningHead.test.tsx` renders the head directly; its render becomes
+`render(<RunningHead book="The Salt Road" head={{ numeral: 'II', chapter: 'The Flats', story: 'White ground.' }} />);`
+(keep the file's own numeral, chapter and story; only move `book` out of
+the head literal into the prop).
 
 `src/ui/ChapterPanel.tsx`:
 
@@ -538,73 +759,28 @@ export function ChapterPanel({ content, book, chapter, state, runningActionId, o
 `src/ui/ChapterPanel.test.tsx`: every `<ChapterPanel content={scrub} order={SCRUB_ORDER} head={SCRUB_HEAD}`
 becomes `<ChapterPanel content={saltRoad} book={saltRoad.name} chapter={saltRoad.chapters[0]!}`;
 `SCRUB_HEAD.story` becomes `saltRoad.chapters[0]!.head.story`; `[...SCRUB_ORDER]`
-becomes `[...saltRoad.chapters[0]!.order]`. Any test that rendered
-`RunningHead` directly passes `book="The Salt Road"`.
+becomes `[...saltRoad.chapters[0]!.order]`.
 
-- [ ] **Step 9: Run every gate**
+`src/ui/App.tsx`: `useGame(saltRoad)`; the chapter panel call becomes
 
-Run: `npm run typecheck && npm run lint && npm test`
-Expected: all green. The band still shows twelve (`SkillsBand` untouched).
+```tsx
+            <ChapterPanel
+              content={saltRoad} book={saltRoad.name} chapter={saltRoad.chapters[0]!} state={view} runningActionId={runningActionId}
+```
 
-- [ ] **Step 10: Commit**
+and every other `scrub` becomes `saltRoad`.
+
+- [ ] **Step 8: Gates**
+
+Run `npm run typecheck`, then `npm run lint`, then `npm test`.
+Expected: all green, 226 tests. The band still shows twelve.
+
+- [ ] **Step 9: Commit**
 
 ```bash
 git add -A src
-git commit -m "data: the book format; The Salt Road as a Book with a roster of three"
+git commit -m "data: the book format; The Salt Road as a Book; newState takes the roster"
 ```
-
----
-
-### Task 4: A mockup of the three-cell band, and the user's pick 🎨
-
-The one visible change of the slice. Decision #31: a committed mockup before
-the UI lands; the user chooses between the two layouts.
-
-**Files:**
-- Create: `docs/mockups/2026-09-23-three-cell-band.html`
-- Modify: `docs/mockups/README.md` (one index line)
-
-- [ ] **Step 1: Build the mockup**
-
-Copy the skills-band markup and styles from
-`docs/mockups/2026-09-22-skills-hover.html` (or the layout mockup that holds
-the band) into a new page that renders the same band twice, one above the
-other, each with the three Salt Road cells (Forage, Mine, Build) at Lv 0:
-
-- **A. Empty slot:** the band keeps `grid-template-columns: repeat(4, 1fr)`;
-  three cells fill the left three quarters and the fourth is blank.
-- **B. Stretched:** the band uses `grid-template-columns: repeat(3, 1fr)`
-  (one column per roster entry); three cells span the width.
-
-Label each variant with a letter and a one-line caption. Keep the page at
-the 1280px minimum width the layout assumes. Add the line to
-`docs/mockups/README.md`:
-
-```
-| 2026-09-23 | [three-cell-band](2026-09-23-three-cell-band.html) | the skills band at a three-skill roster: A empty fourth slot, B stretched to three across |
-```
-
-- [ ] **Step 2: Commit the mockup**
-
-```bash
-git add docs/mockups
-git commit -m "mockup: the skills band at three cells, two layouts"
-```
-
-- [ ] **Step 3: Ask the user, and wait**
-
-Give both lines:
-
-```
-file:///Users/matt/dev/MattAltermatt/continuum/docs/mockups/2026-09-23-three-cell-band.html
-! o docs/mockups/2026-09-23-three-cell-band.html
-```
-
-Ask: "Three cells: A (empty fourth slot, the grid stays four across for the
-day the roster grows) or B (stretched, one column per skill)?" Recommend A:
-#46 redesigns the band at N anyway, and A leaves the grid's geometry alone.
-**Stop until the answer arrives.** Record it in the plan's status line and
-in `src/styles.css` as a comment beside `.skills` in Task 5.
 
 ---
 
@@ -624,11 +800,10 @@ through `skillOf`; the icon component comes from a UI map keyed by
 - Modify: `src/ui/DeathCard.tsx` (takes `content`), `src/ui/DeathCard.test.tsx`
 - Modify: `src/ui/narrate.ts`
 - Modify: `src/ui/App.tsx` (passes `content` to the band and the card)
-- Modify: `src/styles.css:73` (only if the user picked B in Task 4)
+- Modify: `src/styles.css:73` (per the Task 1 pick)
 - Delete: `src/data/skills.ts`
 
 **Interfaces:**
-- Consumes: `skillOf`, `ICON_NAMES`, `IconName`, `SkillDefinition` (Task 3).
 - Produces:
 
 ```ts
@@ -659,7 +834,7 @@ describe('icons', () => {
 });
 ```
 
-`src/ui/SkillsBand.test.tsx` (the one intended expectation change):
+`src/ui/SkillsBand.test.tsx`:
 
 ```tsx
 // @vitest-environment jsdom
@@ -671,7 +846,7 @@ import { SkillsBand } from './SkillsBand';
 
 describe('SkillsBand', () => {
   it('renders the roster in roster order, with only the running one marked', () => {
-    const { container } = render(<SkillsBand content={saltRoad} skills={newState().skills} runningSkill="mine" />);
+    const { container } = render(<SkillsBand content={saltRoad} skills={newState(saltRoad.roster).skills} runningSkill="mine" />);
     const cells = Array.from(container.querySelectorAll('[data-skill]')).map((el) => el.getAttribute('data-skill'));
     expect(cells).toEqual(['forage', 'mine', 'build']);
     expect(container.querySelectorAll('.working')).toHaveLength(1);
@@ -686,10 +861,11 @@ and replace every `id="forage"` with `skill={skill}`.
 `src/ui/DeathCard.test.tsx`: import `saltRoad` and pass `content={saltRoad}`
 to every `<DeathCard …>`.
 
-- [ ] **Step 2: Run them to verify they fail**
+- [ ] **Step 2: Run the suite to verify it fails**
 
-Run: `npx vitest run src/ui`
-Expected: FAIL on the four files above (unknown props, missing exports).
+Run: `npm test`
+Expected: `icons.test`, `SkillsBand.test` and `SkillCell.test` fail
+(`DeathCard.test` is red only under `tsc`, since React ignores the extra prop).
 
 - [ ] **Step 3: The icon map**
 
@@ -725,7 +901,7 @@ export function SkillsBand({ content, skills, runningSkill }: {
 }) {
   return (
     <section className="skills" aria-label="skills">
-      {content.roster.map((s) => <SkillCell key={s.id} skill={s} state={skills[s.id]} running={s.id === runningSkill} />)}
+      {content.roster.map((s) => <SkillCell key={s.id} skill={s} state={skills[s.id]!} running={s.id === runningSkill} />)}
     </section>
   );
 }
@@ -749,11 +925,10 @@ export function SkillCell({ skill, state, running }: { skill: SkillDefinition; s
 
 (the rest unchanged).
 
-If the user picked **B** in Task 4, change `src/styles.css:73` to
-`.skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }`
-with the comment `/* one column per roster entry; #46 revisits the band at N */`.
-If **A**, leave the line and add the comment
-`/* four across; a three-skill roster leaves the fourth slot empty (mockup 2026-09-23-three-cell-band, pick A) */`.
+`src/styles.css:73`, per the Task 1 pick. If **A**, leave the rule and add
+above it `/* four across; a three-skill roster leaves the fourth slot empty (mockup 2026-09-23-three-cell-band, pick A) */`.
+If **B**, change it to `.skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }`
+with `/* one column per roster entry (mockup 2026-09-23-three-cell-band, pick B); #46 revisits the band at N */`.
 
 - [ ] **Step 5: The row, the queue, the card, the log**
 
@@ -764,25 +939,25 @@ with `import { skillOf } from '../data/roster';` and `SKILL_ICONS` with
 ```tsx
 function makerOf(content: Content, item: ItemId): string | null {
   const producer = Object.values(content.actions).find((a) => a.producedItem === item);
-  return producer ? skillOf(content, producer.verb).name : null;   // a validated book always has one (Task 6)
+  return producer ? skillOf(content, producer.verb).name : null;
 }
 ```
 
 In the component: `const skill = skillOf(content, action.verb);`,
-`const Icon = ICONS[skill.icon];`, `const rowName = \`${skill.name} ${action.noun}\`;`,
-`<b>{skill.name}</b>` in place of `<b>{SKILLS[action.verb].name}</b>`, and the
-instruction line becomes
+`const Icon = ICONS[skill.icon];`, `const perSecond = tickExp(state.skills[action.verb]!) * ticksPerSecond();`,
+`const rowName = \`${skill.name} ${action.noun}\`;`, `<b>{skill.name}</b>` in
+place of `<b>{SKILLS[action.verb].name}</b>`, and the instruction line becomes
 
 ```tsx
             <div key={c.item}>missing {c.owed - c.have} {c.item} · <b>{makerOf(content, c.item) ?? c.item} {c.atCap ? 'more as it builds' : 'some!'}</b></div>
 ```
 
-`src/ui/Queue.tsx`: same two import swaps; inside the map,
-`const skill = skillOf(content, a.verb); const Icon = ICONS[skill.icon];`
+`src/ui/Queue.tsx`: same two import swaps; `tickExp(state.skills[a.verb]!)`
+in `remainingSeconds`; inside the map, `const skill = skillOf(content, a.verb); const Icon = ICONS[skill.icon];`
 and `skill.name` in place of both `SKILLS[a.verb].name`.
 
-`src/ui/DeathCard.tsx`: add `content: Pick<Content, 'roster'>` to the props,
-import `skillOf` and `ICONS`, and in the gains map:
+`src/ui/DeathCard.tsx`: add `content: Pick<Content, 'roster'>` to the props
+(import `type { Content }`), import `skillOf` and `ICONS`, and in the gains map:
 
 ```tsx
             const skill = skillOf(content, g.skill);
@@ -798,11 +973,11 @@ import `skillOf` and `ICONS`, and in the gains map:
 `src/ui/App.tsx`: `<SkillsBand content={saltRoad} skills={view.skills} runningSkill={runningSkill} />`
 and `<DeathCard summary={card} content={saltRoad} onBegin={…} />`.
 
-Delete `src/data/skills.ts` (`git rm`).
+`git rm src/data/skills.ts`.
 
-- [ ] **Step 6: Run every gate**
+- [ ] **Step 6: Gates**
 
-Run: `npm run typecheck && npm run lint && npm test`
+Run `npm run typecheck`, then `npm run lint`, then `npm test`.
 Expected: all green; `grep -rn "SKILLS\b\|SKILL_ICONS" src` returns nothing.
 
 - [ ] **Step 7: Commit**
@@ -814,18 +989,110 @@ git commit -m "ui: names and icons come from the roster; the band shows the book
 
 ---
 
-### Task 6: The validator
+### Task 6: Drop the union
 
-Static, in `src/data/`, one test per rule. Returns problems; an empty list
-means valid. Nothing calls it at runtime yet; The Salt Road's test does.
+`SkillId` becomes `string`. The engine throws on a verb with no skill
+state; the UI already trusts the validator with `!`.
 
 **Files:**
-- Create: `src/data/validate.ts`
-- Create: `src/data/validate.test.ts`
+- Modify: `src/data/types.ts:6-15` (`SkillId = string`; delete `SKILL_IDS`)
+- Modify: `src/engine/queue.ts:186` (the guard)
+- Modify: `src/engine/queue.test.ts` (nine `.skills.<id>` reads gain `!`; a throw test)
+- Modify: `src/engine/tick.test.ts:63` (one read gains `!`)
+- Modify: `README.md:16`, `CLAUDE.md` (source layout note on `src/data/`)
+
+**Interfaces:**
+- Produces: `export type SkillId = string;`
+
+- [ ] **Step 1: Write the failing test for the guard**
+
+Append to `src/engine/queue.test.ts`:
+
+```ts
+describe('a verb with no skill state', () => {
+  it('throws: a validated book cannot produce one, so a fixture that does is a bug', () => {
+    const chop: Content = {
+      ...content,
+      actions: { chop: { id: 'chop', verb: 'chop', noun: 'wood', expCost: 1, itemCosts: [], isOneTime: false } },
+    };
+    const s = enqueue(newState(content.roster), chop, 'chop');
+    expect(() => stepQueue(s, chop, 0)).toThrow(/chop/);
+  });
+});
+```
+
+Run: `npm test`
+Expected: FAIL, `stepQueue` reads `undefined.core` and throws a `TypeError`
+without "chop" in it (or, under the union, `tsc` rejects `verb: 'chop'`
+before vitest runs; either way, red).
+
+- [ ] **Step 2: Change the type and add the guard**
+
+In `src/data/types.ts` replace the `SkillId` union and `SKILL_IDS` with:
+
+```ts
+/** A skill id is book data: whatever the book's roster declares (spec 2026-09-23 section 2). */
+export type SkillId = string;
+```
+
+In `src/engine/queue.ts` (`stepQueue`) replace `const skill = next.skills[action.verb];` with:
+
+```ts
+  const skill = next.skills[action.verb];
+  // A validated book has a roster entry for every verb (src/data/validate.ts); an unvalidated fixture that lacks one is a bug, not a state.
+  if (skill === undefined) throw new Error(`no skill state for verb "${action.verb}"`);
+```
+
+Run: `npm run typecheck`
+Expected: red only in tests that read `state.skills.<id>.…` directly. That
+is the edit list for the next step.
+
+- [ ] **Step 3: `!` on every direct skill read in tests**
+
+`src/engine/queue.test.ts`: every `s.skills.<id>` / `settled.skills.<id>`
+read (nine of them; the compiler names each line) becomes
+`s.skills.<id>!`. `src/engine/tick.test.ts:63` likewise. The rebirth loops
+already use `!` from Task 4. The `as Record<…>` casts in `newState` and
+`rebirth` may now be dropped (`Object.fromEntries` returns a string record);
+drop them.
+
+Run `npm run typecheck`, then `npm test`.
+Expected: green, including the new throw test and `playable.test.ts`'s
+progression assertions untouched. `grep -rn "SKILL_IDS" src` returns nothing.
+
+- [ ] **Step 4: Docs this task makes true**
+
+`README.md:16`: replace `the twelve skills` with `the book's three skills
+(forage, mine, build)`. `CLAUDE.md`, source layout: under `data/` add
+`— a book is a value of the Book type in types.ts; src/data/validate.ts is
+the only check on it`.
+
+- [ ] **Step 5: Gates and commit**
+
+Run `npm run typecheck`, then `npm run lint`, then `npm test`, then `npm run test:hooks`.
+Expected: all green.
+
+```bash
+git add -A src README.md CLAUDE.md
+git commit -m "engine: the skill id is book data; the engine throws on a verb with no state"
+```
+
+---
+
+### Task 7: The validator
+
+Static, in `src/data/`, one test per rule, and a mutation check that every
+rule has a test. It checks the format's integrity: the checks the union
+used to give at compile time, plus what the format promises. It says
+nothing about play; that is the headless play's job (spec §9), and the
+rules a first draft had about cycles, caps and chapter order are filed
+against it.
+
+**Files:**
+- Create: `src/data/validate.ts`, `src/data/validate.test.ts`
 - Modify: `src/data/salt-road.test.ts` (accepts; round-trips)
 
 **Interfaces:**
-- Consumes: `Book`, `ICON_NAMES`.
 - Produces: `export function validateBook(book: Book): readonly string[]`
 
 - [ ] **Step 1: Write the failing tests**
@@ -860,70 +1127,53 @@ describe('validateBook', () => {
     expect(validateBook(good)).toEqual([]);
   });
   it('rejects a row whose verb is not in the roster', () => {
-    const b = withActions({ ...good.actions, chop: { ...good.actions.forage!, id: 'chop', verb: 'chop', producedItem: 'berries' } });
+    const b = withActions({ ...good.actions, chop: { ...good.actions.forage!, id: 'chop', verb: 'chop' } });
     expect(validateBook(b)).toContainEqual(expect.stringMatching(/chop.*roster/));
   });
   it('rejects a roster skill with no row', () => {
     const b: Book = { ...good, roster: [...good.roster, { id: 'fish', name: 'Fish', icon: 'fishing-rod' }] };
     expect(validateBook(b)).toContainEqual(expect.stringMatching(/fish.*no row/));
   });
+  it('rejects two roster entries with one id', () => {
+    const b: Book = { ...good, roster: [...good.roster, { id: 'forage', name: 'Forage again', icon: 'sprout' }] };
+    expect(validateBook(b)).toContainEqual(expect.stringMatching(/forage.*twice/));
+  });
   it('rejects an icon name outside the vocabulary', () => {
     const b: Book = { ...good, roster: [{ id: 'forage', name: 'Forage', icon: 'dragon' as never }, good.roster[1]!] };
     expect(validateBook(b)).toContainEqual(expect.stringMatching(/dragon/));
   });
-  it('rejects a row that names an item the book does not define', () => {
+  it('rejects a row that produces an item the book does not define', () => {
     const b = withActions({ ...good.actions, forage: { ...good.actions.forage!, producedItem: 'nuts' } });
-    expect(validateBook(b)).toContainEqual(expect.stringMatching(/nuts/));
+    expect(validateBook(b)).toContainEqual(expect.stringMatching(/produces "nuts"/));
   });
-  it('rejects a cost with no producer in the same or an earlier chapter', () => {
-    const b: Book = {
-      ...good,
-      items: { ...good.items, stone: { id: 'stone', name: 'stone', kind: 'material', cap: 5 } },
-      actions: {
-        ...good.actions,
-        hut: { ...good.actions.hut!, itemCosts: [{ item: 'stone', amount: 1 }] },
-        mine: { id: 'mine', verb: 'forage', noun: 'stone', expCost: 1, producedItem: 'stone', producedAmount: 1, itemCosts: [], isOneTime: false },
-      },
-      chapters: [
-        { head: good.chapters[0]!.head, order: ['forage', 'hut'] },
-        { head: { numeral: 'II', chapter: 'Two', story: 'Later.' }, order: ['mine'] },
-      ],
-    };
-    expect(validateBook(b)).toContainEqual(expect.stringMatching(/stone.*hut/));
+  it('rejects a row that costs an item the book does not define', () => {
+    const b = withActions({ ...good.actions, hut: { ...good.actions.hut!, itemCosts: [{ item: 'planks', amount: 1 }] } });
+    expect(validateBook(b)).toContainEqual(expect.stringMatching(/costs "planks"/));
   });
-  it('rejects a cost cycle: rope needs plank, plank needs rope', () => {
-    const b: Book = {
-      ...good,
-      items: { ...good.items, rope: { id: 'rope', name: 'rope', kind: 'material', cap: 5 }, plank: { id: 'plank', name: 'plank', kind: 'material', cap: 5 } },
-      actions: {
-        ...good.actions,
-        rope: { id: 'rope', verb: 'build', noun: 'rope', expCost: 1, producedItem: 'rope', producedAmount: 1, itemCosts: [{ item: 'plank', amount: 1 }], isOneTime: false },
-        plank: { id: 'plank', verb: 'build', noun: 'a plank', expCost: 1, producedItem: 'plank', producedAmount: 1, itemCosts: [{ item: 'rope', amount: 1 }], isOneTime: false },
-      },
-      chapters: [{ head: good.chapters[0]!.head, order: ['forage', 'hut', 'rope', 'plank'] }],
-    };
-    expect(validateBook(b)).toContainEqual(expect.stringMatching(/cycle/));
+  it('rejects an action whose record key differs from its id, and an item likewise', () => {
+    const b = withActions({ ...good.actions, shed: { ...good.actions.hut!, id: 'hut' } }, ['forage', 'hut', 'shed']);
+    expect(validateBook(b)).toContainEqual(expect.stringMatching(/"shed".*id "hut"/));
+    const c: Book = { ...good, items: { ...good.items, rock: { id: 'stone', name: 'stone', kind: 'material', cap: 5 } } };
+    expect(validateBook(c)).toContainEqual(expect.stringMatching(/"rock".*id "stone"/));
   });
-  it('rejects a yield above the cap', () => {
-    const b = withActions({ ...good.actions, forage: { ...good.actions.forage!, producedAmount: 21 } });
-    expect(validateBook(b)).toContainEqual(expect.stringMatching(/forage.*cap/));
+  it('rejects a chapter order naming an action the book lacks', () => {
+    expect(validateBook(withActions(good.actions, ['forage', 'hut', 'ghost']))).toContainEqual(expect.stringMatching(/ghost/));
+  });
+  it('rejects an action that is in no chapter, and one that is in two', () => {
+    expect(validateBook(withActions(good.actions, ['forage']))).toContainEqual(expect.stringMatching(/hut.*no chapter/));
+    expect(validateBook(withActions(good.actions, ['forage', 'hut', 'hut']))).toContainEqual(expect.stringMatching(/hut.*more than one chapter/));
   });
   it('rejects a first chapter with no row that needs nothing in hand', () => {
     const b = withActions({ hut: good.actions.hut! }, ['hut']);
-    const problems = validateBook({ ...b, roster: [good.roster[1]!] });
-    expect(problems).toContainEqual(expect.stringMatching(/first chapter/));
-  });
-  it('rejects a chapter order naming an action the book lacks, and an action in no chapter', () => {
-    expect(validateBook(withActions(good.actions, ['forage', 'hut', 'ghost']))).toContainEqual(expect.stringMatching(/ghost/));
-    expect(validateBook(withActions(good.actions, ['forage']))).toContainEqual(expect.stringMatching(/hut.*chapter/));
+    expect(validateBook({ ...b, roster: [good.roster[1]!] })).toContainEqual(expect.stringMatching(/first chapter/));
   });
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [ ] **Step 2: Run the suite to verify it fails**
 
-Run: `npx vitest run src/data/validate.test.ts`
-Expected: FAIL, `./validate` not found.
+Run: `npm test`
+Expected: `validate.test` fails to load (`./validate` not found).
 
 - [ ] **Step 3: Write the validator**
 
@@ -931,72 +1181,57 @@ Expected: FAIL, `./validate` not found.
 
 ```ts
 /**
- * Static checks on a book (spec 2026-09-23 section 11, step 4). Once the skill
- * id is book data nothing checks these at compile time. Two of them, the cost
- * cycle and the yield above cap, guard against a book that freezes the engine
- * forever: under decision #41 a queue nothing can run passes no time, so the
- * player never dies and never gets a rebirth. Returns every problem found; an
- * empty list is a valid book.
+ * Static checks on a book (spec 2026-09-23 section 11, step 4): the format's
+ * integrity, which is what the fixed skill union used to guarantee at compile
+ * time, and nothing about play. Whether a book can be finished is the headless
+ * play's question (spec section 9). Returns every problem found; an empty list
+ * is a valid book. Own-property checks throughout, so a key like "constructor"
+ * is not mistaken for a definition.
  */
 import { ICON_NAMES } from './icons';
-import type { ActionId, Book, ItemId } from './types';
+import type { ActionId, Book } from './types';
 
 const icons: ReadonlySet<string> = new Set(ICON_NAMES);
+const has = (record: object, key: string): boolean => Object.hasOwn(record, key);
 
 export function validateBook(book: Book): readonly string[] {
   const problems: string[] = [];
-  const rosterIds = new Set(book.roster.map((s) => s.id));
-  const actions = Object.values(book.actions);
 
+  const seen = new Set<string>();
   for (const s of book.roster) {
+    if (seen.has(s.id)) problems.push(`skill "${s.id}" is declared twice`);
+    seen.add(s.id);
     if (!icons.has(s.icon)) problems.push(`skill "${s.id}" names an icon outside the vocabulary: "${s.icon}"`);
+  }
+
+  for (const [key, a] of Object.entries(book.actions)) {
+    if (key !== a.id) problems.push(`action key "${key}" holds a row whose id is "${a.id}"`);
+  }
+  for (const [key, item] of Object.entries(book.items)) {
+    if (key !== item.id) problems.push(`item key "${key}" holds an item whose id is "${item.id}"`);
+  }
+
+  const actions = Object.values(book.actions);
+  for (const s of book.roster) {
     if (!actions.some((a) => a.verb === s.id)) problems.push(`skill "${s.id}" has no row`);
   }
   for (const a of actions) {
-    if (!rosterIds.has(a.verb)) problems.push(`row "${a.id}" uses verb "${a.verb}", which is not in the roster`);
-    if (a.producedItem !== undefined && book.items[a.producedItem] === undefined) problems.push(`row "${a.id}" produces "${a.producedItem}", which the book does not define`);
+    if (!seen.has(a.verb)) problems.push(`row "${a.id}" uses verb "${a.verb}", which is not in the roster`);
+    if (a.producedItem !== undefined && !has(book.items, a.producedItem)) problems.push(`row "${a.id}" produces "${a.producedItem}", which the book does not define`);
     for (const c of a.itemCosts) {
-      if (book.items[c.item] === undefined) problems.push(`row "${a.id}" costs "${c.item}", which the book does not define`);
+      if (!has(book.items, c.item)) problems.push(`row "${a.id}" costs "${c.item}", which the book does not define`);
     }
-    const item = a.producedItem !== undefined ? book.items[a.producedItem] : undefined;
-    if (item !== undefined && (a.producedAmount ?? 1) > item.cap) problems.push(`row "${a.id}" yields more than the cap of "${item.id}"`);
   }
 
-  // Chapters: every order id is an action, every action is in exactly one chapter.
   const chapterOf = new Map<ActionId, number>();
   book.chapters.forEach((ch, k) => {
     for (const id of ch.order) {
-      if (book.actions[id] === undefined) problems.push(`chapter ${k + 1} orders "${id}", which the book does not define`);
+      if (!has(book.actions, id)) problems.push(`chapter ${k + 1} orders "${id}", which the book does not define`);
       else if (chapterOf.has(id)) problems.push(`row "${id}" appears in more than one chapter`);
       else chapterOf.set(id, k);
     }
   });
   for (const a of actions) if (!chapterOf.has(a.id)) problems.push(`row "${a.id}" is in no chapter`);
-
-  // Every cost has a producer in the same or an earlier chapter.
-  const producersOf = (item: ItemId) => actions.filter((p) => p.producedItem === item);
-  for (const a of actions) {
-    const k = chapterOf.get(a.id) ?? Number.POSITIVE_INFINITY;
-    for (const c of a.itemCosts) {
-      if (book.items[c.item] === undefined) continue;
-      const ok = producersOf(c.item).some((p) => (chapterOf.get(p.id) ?? Number.POSITIVE_INFINITY) <= k);
-      if (!ok) problems.push(`"${c.item}" has no producer in the same or an earlier chapter as row "${a.id}"`);
-    }
-  }
-
-  // The cost graph is acyclic: an edge from a row to each producer of each of its costs.
-  const state = new Map<ActionId, 'visiting' | 'done'>();
-  const visit = (id: ActionId): boolean => {
-    const st = state.get(id);
-    if (st === 'visiting') return true;
-    if (st === 'done') return false;
-    state.set(id, 'visiting');
-    const a = book.actions[id];
-    const found = a !== undefined && a.itemCosts.some((c) => producersOf(c.item).some((p) => visit(p.id)));
-    state.set(id, 'done');
-    return found;
-  };
-  if (actions.some((a) => visit(a.id))) problems.push('the cost graph has a cycle');
 
   const first = book.chapters[0];
   if (first === undefined || !first.order.some((id) => book.actions[id]?.itemCosts.length === 0)) {
@@ -1006,35 +1241,43 @@ export function validateBook(book: Book): readonly string[] {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Run the suite to verify it passes**
 
-Run: `npx vitest run src/data/validate.test.ts`
-Expected: PASS, all ten.
+Run: `npm test`
+Expected: PASS, all eleven `validateBook` tests.
 
-- [ ] **Step 5: The Salt Road is accepted and round-trips**
+- [ ] **Step 5: Mutation check, by hand, once**
 
-Append to `src/data/salt-road.test.ts` (import `validateBook`):
+For each rule in `validate.ts`, comment out its `problems.push` line, run
+`npm test`, and confirm exactly one `validateBook` test goes red; restore
+it. The naysayer found two untested rules in the first draft this way. A
+rule whose removal leaves the suite green gets a test before this task
+ends.
+
+- [ ] **Step 6: The Salt Road is accepted and round-trips**
+
+Append to `src/data/salt-road.test.ts`, adding
+`import { validateBook } from './validate';` and `import type { Book } from './types';`:
 
 ```ts
   it('is a valid book', () => {
     expect(validateBook(saltRoad)).toEqual([]);
   });
-  it('round-trips through JSON: the value is what a generator would emit', () => {
+  it('round-trips through JSON: the value is serializable, which is what a generator emits', () => {
     const copy = JSON.parse(JSON.stringify(saltRoad)) as Book;
     expect(copy).toEqual(saltRoad);
     expect(validateBook(copy)).toEqual([]);
   });
 ```
 
-Run: `npx vitest run src/data`
+Run: `npm test`
 Expected: PASS.
 
-- [ ] **Step 6: Run every gate**
+- [ ] **Step 7: Gates and commit**
 
-Run: `npm run typecheck && npm run lint && npm test && npm run test:hooks`
-Expected: all green. The purity test accepts `src/data/validate.ts` (it imports only `./icons` and `./types`).
-
-- [ ] **Step 7: Commit**
+Run `npm run typecheck`, then `npm run lint`, then `npm test`, then `npm run test:hooks`.
+Expected: all green. The purity test accepts `src/data/validate.ts` (it
+imports only `./icons` and `./types`).
 
 ```bash
 git add src/data/validate.ts src/data/validate.test.ts src/data/salt-road.test.ts
@@ -1043,234 +1286,67 @@ git commit -m "data: a static book validator; The Salt Road passes and round-tri
 
 ---
 
-### Task 7: Drop the union
-
-`SkillId` becomes `string`. The engine builds the skill map from the roster
-and throws on a verb with no skill state; the UI trusts the validator.
-
-**Files:**
-- Modify: `src/data/types.ts:6-15` (`SkillId = string`; delete `SKILL_IDS`)
-- Modify: `src/engine/queue.ts:15-36` (`newState(roster)`), `:186` (guard)
-- Modify: `src/engine/rebirth.ts` (iterate the state's keys; no `SKILL_IDS`)
-- Modify: `src/engine/types.ts:31,40,54` (string keys)
-- Modify: `src/state/useGame.ts:78` (`newState(content.roster)`)
-- Modify: `src/ui/ActionRow.tsx:55`, `src/ui/Queue.tsx:17` (`!` on the skill lookup)
-- Modify: every `newState()` call in tests (about 116 across 11 files) and
-  the two `SKILL_IDS` loops in `src/engine/rebirth.test.ts:69,77`
-- Modify: `README.md:16`, `CLAUDE.md` (source layout note on `src/data/`)
-
-**Interfaces:**
-- Consumes: `SkillDefinition`, `Content.roster`.
-- Produces:
-
-```ts
-export type SkillId = string;
-export function newState(roster: readonly SkillDefinition[]): GameState
-export function rebirth(dead: GameState): GameState          // unchanged signature; rebuilds from Object.keys(dead.skills)
-```
-
-- [ ] **Step 1: Change the type**
-
-In `src/data/types.ts` replace the `SkillId` union and `SKILL_IDS` with:
-
-```ts
-/** A skill id is book data: whatever the book's roster declares (spec 2026-09-23 section 2). */
-export type SkillId = string;
-```
-
-Run: `npm run typecheck`
-Expected: red, in `queue.ts`, `rebirth.ts`, `icons.tsx` (if any reference
-remains) and every test that calls `newState()` with no argument once the
-next step lands. That list is the edit list.
-
-- [ ] **Step 2: The engine builds the map from the roster and guards the lookup**
-
-`src/engine/queue.ts`: replace the `SKILL_IDS` import with
-`import type { SkillDefinition } from '../data/types';` and:
-
-```ts
-export function newState(roster: readonly SkillDefinition[]): GameState {
-  const skills = Object.fromEntries(roster.map((s) => [s.id, newSkill()])) as Record<SkillId, SkillState>;
-  return {
-    …(unchanged fields)…
-    lifeStartCore: Object.fromEntries(roster.map((s) => [s.id, 0])) as Record<SkillId, number>,
-  };
-}
-```
-
-In `stepQueue` replace `const skill = next.skills[action.verb];` with:
-
-```ts
-  const skill = next.skills[action.verb];
-  // A validated book has a roster entry for every verb (src/data/validate.ts); an unvalidated fixture that lacks one is a bug, not a state.
-  if (skill === undefined) throw new Error(`no skill state for verb "${action.verb}"`);
-```
-
-`src/engine/rebirth.ts`: remove the `SKILL_IDS` import; in `deathSummary`
-and `rebirth` replace `SKILL_IDS` with `Object.keys(dead.skills)` and the
-two `dead.skills[id]` / `dead.lifeStartCore[id]` reads with `!`-asserted
-reads (the keys came from the same object):
-
-```ts
-  const ids = Object.keys(dead.skills);
-  const coreGains = ids
-    .filter((id) => dead.skills[id]!.core.level > (dead.lifeStartCore[id] ?? 0))
-    .map((id) => {
-      const core = dead.skills[id]!.core;
-      return { skill: id, from: dead.lifeStartCore[id] ?? 0, to: core.level, progress: core.exp / expToNextLevel(balance.skills.coreMastery.baseExp, core.level) };
-    });
-```
-
-`rebirth` must not invent roster entries to call `newState`, so the run
-literal moves into a shared helper that takes the two maps. In `queue.ts`,
-replace `newState` with:
-
-```ts
-// src/engine/queue.ts
-/** A fresh run around the given ledgers. newState builds them from a roster; rebirth carries them over. */
-export function blankRun(skills: Readonly<Record<SkillId, SkillState>>, lifeStartCore: Readonly<Record<SkillId, number>>): GameState {
-  return {
-    runTicks: 0, health: balance.health.base, maxHealth: balance.health.base, paused: 'system', dead: false,
-    skills, inventory: {}, foodCooldowns: {}, queue: [], completedOneTime: [], completionCounts: {},
-    decayMultiplier: 1, events: [], life: 1, rebirthBonus: 0, lifeStartCore,
-  };
-}
-
-export function newState(roster: readonly SkillDefinition[]): GameState {
-  return blankRun(
-    Object.fromEntries(roster.map((s) => [s.id, newSkill()])),
-    Object.fromEntries(roster.map((s) => [s.id, 0])),
-  );
-}
-```
-
-and in `rebirth.ts`:
-
-```ts
-  const ids = Object.keys(dead.skills);
-  const skills = Object.fromEntries(ids.map((id) => [id, { core: dead.skills[id]!.core, run: newSkill().run }])) as Record<SkillId, SkillState>;
-  const lifeStartCore = Object.fromEntries(ids.map((id) => [id, skills[id]!.core.level])) as Record<SkillId, number>;
-  return { ...blankRun(skills, lifeStartCore), paused: 'system', life: dead.life + 1, rebirthBonus, maxHealth, health: maxHealth, completionCounts: dead.completionCounts };
-```
-
-(`rebirth.ts` imports `blankRun` instead of `newState`.)
-
-`src/engine/types.ts`: the `coreLevel` event's `skill`, `skills` and
-`lifeStartCore` already use `SkillId`, which is now `string`; no edit unless
-the compiler asks.
-
-`src/state/useGame.ts`: `initial()` becomes a function of `content`:
-
-```ts
-function initial(content: Content): Model {
-  return { state: setPaused(newState(content.roster), 'none'), log: [{ seq: 0, at: 0, event: { type: 'lifeBegins', life: 1 } }], nextSeq: 1 };
-}
-…
-  const [model, dispatch] = useReducer(reduce(content), content, initial);
-```
-
-`src/ui/ActionRow.tsx` and `src/ui/Queue.tsx`: `tickExp(state.skills[action.verb]!)`
-and `tickExp(state.skills[a.verb]!)`.
-
-`src/ui/SkillsBand.tsx`: `state={skills[s.id]!}`.
-
-- [ ] **Step 3: Every test passes a roster**
-
-Rule: `newState()` becomes `newState(<the fixture's roster>)`. In a file with
-a local `content` fixture (engine tests), use `newState(content.roster)`. In
-a file that imports `saltRoad`, use `newState(saltRoad.roster)`. Where a test
-builds neither, add at the top:
-
-```ts
-const roster = [{ id: 'forage', name: 'Forage', icon: 'sprout' }, { id: 'mine', name: 'Mine', icon: 'pickaxe' }, { id: 'build', name: 'Build', icon: 'house' }] as const;
-```
-
-and call `newState(roster)`. Run `grep -rn "newState()" src` until it
-returns nothing.
-
-`src/engine/rebirth.test.ts`: replace `for (const id of SKILL_IDS)` (two
-places) with `for (const id of Object.keys(next.skills))`, and delete the
-`SKILL_IDS` import. The `lifeStartCore.fish` assertion at `:92` becomes
-`expect(next.lifeStartCore.build).toBe(0);` (the fixture's roster has no
-fish; build is the roster skill that did not move).
-
-`src/engine/queue.test.ts:250`: unchanged; `craft` is in that fixture's
-roster from Task 3.
-
-- [ ] **Step 4: Run every gate**
-
-Run: `npm run typecheck && npm run lint && npm test && npm run test:hooks`
-Expected: all green. `playable.test.ts`'s progression assertions
-(`toBeGreaterThan`) are untouched. `grep -rn "SKILL_IDS" src` returns nothing.
-
-- [ ] **Step 5: Docs that this task makes true**
-
-`README.md:16`: replace `the twelve skills` with `the book's three skills
-(forage, mine, build)`. `CLAUDE.md` source layout: under `data/` add
-`— a book is a value of the Book type in types.ts; src/data/validate.ts is
-the only check on it`. In the guard-layer table row for `src/purity.test.ts`
-nothing changes. Update the pointer paragraph at the top of
-`docs/specs/2026-09-22-books-chapters-verbs.md` only if it still says
-"categories as tags" (it should already say the current shape).
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add -A src README.md CLAUDE.md
-git commit -m "engine: the skill id is book data; newState takes the roster"
-```
-
----
-
-### Task 8: Gates, review panel, Chrome
+### Task 8: Gates, the review panel, Chrome, hand-off
 
 **Files:** none new.
 
 - [ ] **Step 1: Every gate, from clean**
 
-Run: `npm run typecheck && npm run lint && npm test && npm run test:hooks && npm run build`
+Run each on its own: `npm run typecheck`, `npm run lint`, `npm test`,
+`npm run test:hooks`, `npm run build`.
 Expected: all green.
 
-- [ ] **Step 2: Chrome**
+- [ ] **Step 2: The code review panel**
+
+Dispatch fresh, in parallel, with no implementation context: `engine-reviewer`;
+`tuning-guard` (it must see the `ticksPerSkillPoint` removal as the intended
+change spec §11 step 1 names, and nothing else moved in `balance.ts`);
+`vacuous-test-hunter` (the validator tests, the mutation check, the round
+trip and the rebirth key-set assertions are its targets); and a general
+reviewer briefed to diff the branch against spec §11 step by step. Loop
+until a clean round. Fix, re-run Step 1.
+
+- [ ] **Step 3: Chrome**
 
 Invoke `/chrome-verify`. Check, with the dev handle and by eye:
-- the band shows three cells, Forage, Mine, Build, in that order, in the layout the user picked in Task 4;
+- the band shows three cells, Forage, Mine, Build, in that order, in the layout picked in Task 1;
 - queue Forage: the Forage cell carries the sheen and its bars move;
-- the death card (use the dev handle's `setHealth`) names Forage or Mine with "core N → M";
+- let Forage run about ten seconds (a core level costs 10 XP at 0.1 a tick), then `setHealth(0)` through the dev handle: the death card names Forage with "core 0 → 1";
 - the log's level-up line reads "Forage reaches Lv 1";
 - the console is clean, including 404s.
 
-- [ ] **Step 3: The code review panel**
+- [ ] **Step 4: Squash the code commits and hand off**
 
-Dispatch fresh, in parallel, with no implementation context: `engine-reviewer`,
-`tuning-guard` (it must see the `ticksPerSkillPoint` removal as intended and
-nothing else changed in `balance.ts`), `vacuous-test-hunter` (the validator
-tests and the round trip are its targets), and a general reviewer briefed to
-diff the branch against spec §11 step by step. Loop until a clean round.
+Squash the **code** commits (Tasks 2–7) into one whose subject reads as what
+shipped, e.g. `feat: books own their skills; the format, the validator, a
+roster of three`. Keep the spec, plan and mockup commits as they are: they
+are the record of the design rounds. Do not FF-merge: the user verifies in
+Chrome first (CLAUDE.md, "user-verify before FF-merge"). Hand over the URL
+and the three things to look at: the band, the death card, the log line.
 
-- [ ] **Step 4: Squash and hand off**
-
-Squash the branch to one commit whose subject reads as what shipped, e.g.
-`feat: books own their skills; the format, the validator, a roster of three`.
-Do not FF-merge: the user verifies in Chrome first (CLAUDE.md, "user-verify
-before FF-merge"). Hand over the URL, the three-cell band, the death card and
-the log line as the things to look at.
+**For the session's wrap-up (GitHub writes, gated mid-session, standing at
+stop time):** close #24 with its answer (keyed per action, book-scoped
+because the state is); file, with no milestone, the items spec §11 lists as
+out of the slice: the headless play (carrying the cycle, cap and
+chapter-order rules dropped from the validator), the `book-author` skill,
+book two, `hurts` and the damage field, badges, the shop, the bookmark map,
+the shelf, finish detection and the finishing screen, the generator, the
+decision #3 carve-out, the ledger rename, the roster cap; and note on #27
+that `rebirth` rebuilds from a state's own keys, so a saved state from
+before a roster change needs a migration.
 
 ---
 
 ## Self-review
 
-- **Spec coverage:** §11 steps 1–5 map to Tasks 1, 2, 3+5, 6, 7; the mockup
-  gate (§2, §12) is Task 4; §10's "when each lands" is satisfied (only the
-  named doc lines change). §3's bookmark map, §6, §8 and §9 are explicitly
-  not in the slice.
-- **Deviation from the spec, recorded:** §11 step 5 says `rebirth(dead, roster)`.
-  This plan keeps `rebirth(dead)` and rebuilds from the dead state's own keys
-  through a shared `blankRun`; the roster is already the keys of a live
-  state, and ten call sites stay untouched. The spec line is amended in the
-  same commit as this plan.
+- **Spec coverage:** §11 steps 1–5 map to Tasks 2, 3, 4+5, 7, 6 (the union
+  drops before the validator lands, which the spec's order allowed either
+  way; the spec's step 4 list is trimmed by the panel and the spec is
+  amended in the same commit). The mockup gate (§2, §12) is Task 1. §10's
+  "when each lands" holds: only the named doc lines change. §3's bookmark
+  map, §6, §8 and §9 are explicitly not in the slice.
 - **Placeholders:** none; every step has its code or its exact command.
 - **Type consistency:** `SkillDefinition`, `Chapter`, `Book`, `Content.roster`,
   `skillOf`, `ICONS`, `ICON_NAMES`, `validateBook`, `blankRun`, `newState(roster)`
-  are used with the same names and shapes in every task that touches them.
-- **Review Focus:** each of the five lines has its test in Task 6 or 7.
+  keep the same names and shapes in every task that touches them.
+- **Review Focus:** each of the five lines has its test in Task 4, 6 or 7.
