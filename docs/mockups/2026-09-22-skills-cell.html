@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: skills-cell</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Skills, live, with the sheen on the running one</h2>
+<p class="subtitle">Live, straight from MECHANICS: 0.1 xp per tick × (1 + core×5%) × (1 + run×1%), ten ticks a second, the same amount into both ledgers; a level costs base × 1.1^level (core base 10, run base 25). Forage is running. Watch a level land: the bar snaps back, the multiplier ticks up, and the next level takes longer.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(80% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); background: var(--bg); color: var(--ink); width: 360px; }
+  .pal .sk { display:grid; grid-template-columns: 1.6em 5em 3.5em 1fr; gap: 3px 8px; align-items:center; padding: 6px 8px; border:1px solid var(--edge); border-radius:5px; background: var(--cell); margin-bottom: 5px; }
+  .pal .sk { position:relative; overflow:hidden; }
+  .pal .sk.on { background: var(--cell-on); border-color: var(--run); }
+  @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .pal .sk.on::after { content:""; position:absolute; inset:0; background: linear-gradient(90deg, transparent 0%, oklch(70% 0.16 45 / .12) 50%, transparent 100%); animation: sheen 2.2s linear infinite; pointer-events:none; }
+  .pal .ic { font-size:15px; text-align:center; line-height:1; grid-row: span 2; }
+  .pal .name { grid-row: span 2; } .pal .name b { font-weight:700; display:block; } .pal .name .m { font-weight:700; font-variant-numeric: tabular-nums; } .pal .name .m.d { color: var(--dim); font-weight:400; }
+  .pal .t { white-space:nowrap; font-variant-numeric: tabular-nums; text-align:right; } .pal .t.d { color: var(--dim); opacity:.7; }
+  .pal .stack { display:flex; flex-direction:column; gap: 2px; }
+  .pal .bar { height:8px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .pal .bar i { position:absolute; left:0; top:0; bottom:0; background: var(--core); }
+  .pal .bar i.run { background: var(--run); }
+  .pal .v { font-size:10px; text-align:center; line-height:1; color: var(--dim); font-variant-numeric: tabular-nums; white-space:nowrap; }
+  .pal .v .up { color: var(--ink); margin-left: 4px; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Skills chunk, Forage running, live</div>
+  <div class="mockup-body">
+    <div class="pal" id="sk"></div>
+  </div>
+</div>
+
+<p class="subtitle">Chop, Cook and Fight are idle and static. A tool multiplier is 1.0 here. Real seconds; a core level at 12 costs 31.4 xp, which at ×1.68 is about 19 seconds.</p>
+
+<script>
+(function(){
+  const CORE_BASE=10, RUN_BASE=25, CURVE=1.1, TICK_XP=0.1, TICKS_PER_S=10;
+  const cost=(base,lvl)=>base*Math.pow(CURVE,lvl);
+  const skills=[
+    {ic:"🌿",name:"Forage",core:12,coreXp:14.6,run:5,runXp:37.6,on:true},
+    {ic:"🪓",name:"Chop",core:9,coreXp:15.1,run:2,runXp:2.6,on:false},
+    {ic:"🍳",name:"Cook",core:11,coreXp:5.0,run:7,runXp:63.1,on:false},
+    {ic:"⚔️",name:"Fight",core:5,coreXp:0.7,run:0,runXp:0,on:false},
+  ];
+  const mult=s=>(1+s.core*0.05)*(1+s.run*0.01);
+  const fmt=n=>n.toFixed(1);
+  const secs=n=>n<60?Math.ceil(n)+"s":Math.floor(n/60)+":"+String(Math.ceil(n%60)).padStart(2,"0");
+  const root=document.getElementById("sk");
+  root.innerHTML=skills.map((s,i)=>`
+    <div class="sk ${s.on?'on':''}" id="s${i}">
+      <div class="ic">${s.ic}</div><div class="name"><b>${s.name}</b><span class="m ${s.on?'':'d'}" id="m${i}"></span></div>
+      <div class="t ${s.on?'':'d'}" id="cl${i}"></div><div class="stack"><div class="bar"><i id="cb${i}"></i></div><div class="v" id="cv${i}"></div></div>
+      <div class="t ${s.on?'':'d'}" id="rl${i}"></div><div class="stack"><div class="bar"><i class="run" id="rb${i}"></i></div><div class="v" id="rv${i}"></div></div>
+    </div>`).join("");
+  function draw(i){
+    const s=skills[i], m=mult(s), perSec=TICK_XP*m*TICKS_PER_S;
+    const cc=cost(CORE_BASE,s.core), rc=cost(RUN_BASE,s.run);
+    document.getElementById("m"+i).textContent="×"+m.toFixed(2);
+    document.getElementById("cl"+i).textContent="Lv "+s.core;
+    document.getElementById("rl"+i).textContent="Lv "+s.run;
+    document.getElementById("cb"+i).style.width=(100*s.coreXp/cc)+"%";
+    document.getElementById("rb"+i).style.width=(100*s.runXp/rc)+"%";
+    document.getElementById("cv"+i).innerHTML=fmt(s.coreXp)+"/"+fmt(cc)+(s.on?` <span class="up">↑ ${secs((cc-s.coreXp)/perSec)}</span>`:"");
+    document.getElementById("rv"+i).innerHTML=fmt(s.runXp)+"/"+fmt(rc)+(s.on?` <span class="up">↑ ${secs((rc-s.runXp)/perSec)}</span>`:"");
+  }
+  skills.forEach((_,i)=>draw(i));
+  setInterval(()=>{
+    skills.forEach((s,i)=>{
+      if(!s.on) return;
+      const gain=TICK_XP*mult(s);           // one tick, same amount to both ledgers
+      s.coreXp+=gain; s.runXp+=gain;
+      while(s.coreXp>=cost(CORE_BASE,s.core)){ s.coreXp-=cost(CORE_BASE,s.core); s.core++; }
+      while(s.runXp>=cost(RUN_BASE,s.run)){ s.runXp-=cost(RUN_BASE,s.run); s.run++; }
+      draw(i);
+    });
+  },1000/TICKS_PER_S);
+})();
+</script>
+
+</body></html>

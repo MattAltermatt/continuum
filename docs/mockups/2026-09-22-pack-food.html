@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: pack-food</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Pack and food: each item its own box</h2>
+<p class="subtitle">No tools in the pack. Each pack row: the item's name on the left, a bar on the right with its count/cap immediately under it. Food is the same with the hp of one bite sitting between the name and the bar stack.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px; display:flex; gap: 14px; align-items:flex-start;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(80% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --warn: oklch(80% 0.15 85); background: var(--bg); color: var(--ink); }
+  .pal .box { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 8px 8px 4px; width: 250px; }
+  .pal h5 { margin:0 0 6px; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color: var(--dim); display:flex; justify-content:space-between; }
+  .pal .dim { color: var(--dim); } .pal .warn { color: var(--warn); } .pal .zero { opacity:.55; }
+  .pal .row { display:grid; grid-template-columns: 1fr 90px; gap: 0 12px; align-items:center; padding: 5px 8px; margin-bottom: 4px; border:1px solid var(--edge); border-radius:4px; background: oklch(22% 0.012 260); font-variant-numeric: tabular-nums; }
+  .pal .row.food { grid-template-columns: 1fr auto 90px; }
+  .pal .stack { display:flex; flex-direction:column; gap: 2px; }
+  .pal .bar { height: 7px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .pal .bar i { position:absolute; left:0; top:0; bottom:0; background: var(--core); }
+  .pal .bar i.full { background: var(--warn); }
+  .pal .ratio { font-size: 10px; color: var(--dim); text-align:center; line-height: 1; }
+  @keyframes cd1 { from { width: 42%; } to { width: 0%; } }
+  @keyframes cd2 { from { width: 80%; } to { width: 0%; } }
+  @keyframes cd3 { from { width: 10%; } to { width: 0%; } }
+  .pal .a i { animation: cd1 2.1s linear infinite; } .pal .b i { animation: cd2 4s linear infinite; } .pal .c i { animation: cd3 .5s linear infinite; }
+  .lbl { font-size: 11px; opacity:.7; margin-bottom: 4px; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Pack and food, matching</div>
+  <div class="mockup-body">
+    <div class="pal">
+
+      <div>
+        <div class="lbl">pack · bar is how full the stack is</div>
+        <div class="box">
+          <h5><span>pack</span></h5>
+          <div class="row"><span>wood</span><div class="stack"><div class="bar"><i style="width:35%"></i></div><div class="ratio">7/20</div></div></div>
+          <div class="row zero"><span>stone</span><div class="stack"><div class="bar"><i style="width:0%"></i></div><div class="ratio">0/20</div></div></div>
+          <div class="row"><span>hide</span><div class="stack"><div class="bar"><i style="width:30%"></i></div><div class="ratio">3/10</div></div></div>
+          <div class="row warn"><span>fish</span><div class="stack"><div class="bar"><i class="full" style="width:100%"></i></div><div class="ratio warn">10/10</div></div></div>
+          <div class="row"><span>rope</span><div class="stack"><div class="bar"><i style="width:20%"></i></div><div class="ratio">1/5</div></div></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="lbl">food · bar is the cooldown to the next bite</div>
+        <div class="box" style="width:290px">
+          <h5><span>food</span></h5>
+          <div class="row food"><span>cooked fish</span><span>+12 hp</span><div class="stack"><div class="bar a"><i></i></div><div class="ratio">3/10</div></div></div>
+          <div class="row food"><span>berries</span><span>+4 hp</span><div class="stack"><div class="bar b"><i></i></div><div class="ratio">6/20</div></div></div>
+          <div class="row food warn"><span>dried meat</span><span>+20 hp</span><div class="stack"><div class="bar c"><i></i></div><div class="ratio warn">5/5</div></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Style rule from here on: if there is a bar, its actual values sit immediately below it, centered. Tools are out of the pack; where carried tools live is open (the skill hover already shows a skill's tool multiplier). The two bars still mean different things, stack versus cooldown, now with the count under each so the ratio is never in doubt.</p>
+
+</body></html>

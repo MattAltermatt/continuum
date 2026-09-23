@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: action-row</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Three chunks: [icon + title] · [in → out] · [info + actions]</h2>
+<p class="subtitle">Left chunk hugs the left edge. Middle chunk is centered in the space between, with inputs right-aligned to the arrow and outputs left-aligned from it. Right chunk hugs the right edge. The three chunks are the same width on every row, so all three spines line up down the chapter.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(66% 0.01 80); --track: oklch(17% 0.01 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --auto: oklch(72% 0.10 235); background: var(--bg); color: var(--ink); max-width: 780px; }
+  .pal .story { color: var(--dim); font-style: italic; margin: 0 0 8px 2px; }
+  .pal .r { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 6px 8px; margin-bottom: 5px; display:grid; grid-template-columns: 15em 1fr auto; align-items:center; gap: 0 10px; }
+  .pal .r.big { border-color: var(--edge-on); box-shadow: 0 0 0 1px var(--edge-on); }
+  .pal .r.locked { opacity:.5; }
+  /* chunk 1 */
+  .pal .c1 { display:grid; grid-template-columns: 1.6em 1fr; gap: 0 8px; align-items:center; white-space:nowrap; overflow:hidden; }
+  .pal .ic { font-size:15px; text-align:center; line-height:1; }
+  .pal .name { overflow:hidden; text-overflow:ellipsis; }
+  .pal .name b { font-weight:700; margin-right:.5em; }
+  /* chunk 2, centered */
+  .pal .c2 { display:grid; grid-template-columns: 9em 1.2em 9em; gap: 0 6px; align-items:center; justify-content:center; }
+  .pal .in { text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric: tabular-nums; }
+  .pal .out { text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pal .arr { color: var(--edge-on); text-align:center; }
+  .pal .need { border:1px solid var(--edge); border-radius:3px; padding: 0 5px; font-size: 11px; color: var(--dim); margin-right: 6px; }
+  .pal .need.unmet { border-color: var(--hurt); color: var(--hurt); }
+  .pal .hurt { color: var(--hurt); }
+  /* chunk 3, right */
+  .pal .c3 { display:grid; grid-template-columns: 4.6em 1.9em 1.9em 3.4em; gap: 0 8px; align-items:center; justify-items:end; }
+  .pal .tx { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .pal .tx small { display:block; color: var(--dim); font-size: 10px; }
+  .pal .btn { width: 1.9em; height: 1.9em; border:1px solid var(--edge-on); border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 11px; }
+  .pal .btn.play { color: var(--run); }
+  .pal .star { color: var(--run); }
+  .pal .au { width: 3.4em; height: 1.9em; border:1px solid var(--edge); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--dim); position:relative; overflow:hidden; }
+  .pal .au.on { border-color: var(--auto); color: var(--auto); font-weight:700; }
+  .pal .au.earn { font-size: 9px; }
+  .pal .au.earn i { position:absolute; left:0; bottom:0; height:2px; background: var(--auto); opacity:.8; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Chapter 2 · The Harbor</div>
+  <div class="mockup-body">
+    <div class="pal">
+      <div class="story">Salt wind. Boats, but nobody will lend one.</div>
+
+      <div class="r"><div class="c1"><div class="ic">🎣</div><div class="name"><b>Fish</b>off the rocks</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div class="out">+1 fish</div></div><div class="c3"><div class="tx">5.1s<small>+5.1 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au on">2</div></div></div>
+      <div class="r"><div class="c1"><div class="ic">🪓</div><div class="name"><b>Chop</b>driftwood</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div class="out">+1 wood</div></div><div class="c3"><div class="tx">6.0s<small>+8.9 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au on">AN</div></div></div>
+      <div class="r"><div class="c1"><div class="ic">🔨</div><div class="name"><b>Craft</b>a rod</div></div><div class="c2"><div class="in">3 wood</div><div class="arr">→</div><div class="out">rod</div></div><div class="c3"><div class="tx">40s<small>+52 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au earn">3 / 5<i style="width:60%"></i></div></div></div>
+      <div class="r"><div class="c1"><div class="ic">🧱</div><div class="name"><b>Build</b>a dock</div></div><div class="c2"><div class="in">20 wood</div><div class="arr">→</div><div class="out">dock</div></div><div class="c3"><div class="tx">3:30<small>+254 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au earn">0 / 5<i style="width:0%"></i></div></div></div>
+      <div class="r"><div class="c1"><div class="ic">🍳</div><div class="name"><b>Cook</b>the fish</div></div><div class="c2"><div class="in">1 fish</div><div class="arr">→</div><div class="out">+1 food</div></div><div class="c3"><div class="tx">3.0s<small>+5.0 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au on">AN</div></div></div>
+      <div class="r locked"><div class="c1"><div class="ic">🔨</div><div class="name"><b>Craft</b>an iron hook</div></div><div class="c2"><div class="in"><span class="need unmet">forge</span>2 ore</div><div class="arr">→</div><div class="out">iron hook</div></div><div class="c3"><div class="tx">1:10<small>+92 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au earn">0 / 5<i style="width:0%"></i></div></div></div>
+      <div class="r"><div class="c1"><div class="ic">💬</div><div class="name"><b>Talk</b>to the harbor master</div></div><div class="c2"><div class="in"><span class="need">5 fish</span></div><div class="arr">→</div><div class="out">a boat</div></div><div class="c3"><div class="tx">45s<small>+50 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au">off</div></div></div>
+      <div class="r"><div class="c1"><div class="ic">🔍</div><div class="name"><b>Search</b>the wreck</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div class="out">the channel markers</div></div><div class="c3"><div class="tx">1:20<small>+92 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au on">4</div></div></div>
+      <div class="r"><div class="c1"><div class="ic">⚔️</div><div class="name"><b>Fight</b>the dock rats</div></div><div class="c2"><div class="in hurt">−1.1 hp/s</div><div class="arr">→</div><div class="out">the dock</div></div><div class="c3"><div class="tx">1:05<small>+81 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au earn">1 / 5<i style="width:20%"></i></div></div></div>
+      <div class="r big"><div class="c1"><div class="ic star">★</div><div class="name"><b>Travel</b>across the bay</div></div><div class="c2"><div class="in"><span class="need">a boat</span></div><div class="arr">→</div><div class="out">The Drowned Library</div></div><div class="c3"><div class="tx">6:00<small>+504 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au earn">0 / 5<i style="width:0%"></i></div></div></div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Widths: chunk 1 is 15em, chunk 3 is whatever its four controls need, chunk 2 takes the rest and centers a fixed 9em → 9em pair inside it. Widen the window and only the gaps grow; the three spines stay put.</p>
+
+</body></html>

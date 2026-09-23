@@ -9,4 +9,16 @@ evidence.
 
 | Date | Topic | Notes |
 |---|---|---|
-| — | — | none yet |
+| 2026-09-22 | [skills-cell](2026-09-22-skills-cell.html) | Skill cell: Lv, bar with XP fraction under it, live MECHANICS math, sheen on the running one |
+| 2026-09-22 | [skills-hover](2026-09-22-skills-hover.html) | Skill hover as a ledger: core, run, tools, multiplier total |
+| 2026-09-22 | [skills-color](2026-09-22-skills-color.html) | Ledger fills: bone and ember (P3) measured against stone and ember |
+| 2026-09-22 | [action-row](2026-09-22-action-row.html) | Action row at rest: three chunks, one grammar, automation control |
+| 2026-09-22 | [action-row-running](2026-09-22-action-row-running.html) | The running row: S3 sheen chosen |
+| 2026-09-22 | [row-shortfall](2026-09-22-row-shortfall.html) | Warning on the row before the click; the click replaces the middle with the instruction |
+| 2026-09-22 | [queue](2026-09-22-queue.html) | Queue: vertical panel, warn triangles, times. Superseded in one respect: the fix buttons were rejected |
+| 2026-09-22 | [health-clock](2026-09-22-health-clock.html) | Health chunk and clock chunk, before rates took the decay line |
+| 2026-09-22 | [rates-food](2026-09-22-rates-food.html) | Rates chunk (decay, drain, heal ceiling, net) and the food chunk with cooldown bars |
+| 2026-09-22 | [pack-food](2026-09-22-pack-food.html) | Pack and food as matching rows: name, bar, value centered under |
+| 2026-09-22 | [header](2026-09-22-header.html) | Running head like a printed book, text tokens at 90 and 80 |
+| 2026-09-22 | [layout](2026-09-22-layout.html) | The whole screen assembled: health top, skills 4x3, chapter / middle / queue |
+| 2026-09-22 | [icons](2026-09-22-icons.html) | Lucide icon picks for the twelve verbs, at 15px and 26px and in the grid |

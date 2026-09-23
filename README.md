@@ -12,8 +12,11 @@ building the right thing early.
 
 Death is the loop, not the failure.
 
-> 🚧 **Early.** The engine design is settled and written down; the game is
-> being built small-first, starting with how a single action feels to queue.
+> 🚧 **Early.** The engine design is settled and written down, and so is the
+> game's shape: books and chapters, twelve verbs, and the one screen, decided
+> in [`docs/specs/2026-09-22-books-chapters-verbs.md`](./docs/specs/2026-09-22-books-chapters-verbs.md)
+> with committed mockups in [`docs/mockups/`](./docs/mockups/). Nothing is
+> built yet; the first slice's plan is in [`docs/plans/`](./docs/plans/).
 
 ## Run it
 

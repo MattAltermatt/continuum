@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: row-shortfall</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Inputs stacked, and the click says what to do</h2>
+<p class="subtitle">Same life 1 scene. Inputs now stack one per line in the middle chunk, on every multi-input row. On click, the whole middle chunk is replaced for a beat by the instruction.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px; max-width: 780px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(66% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --auto: oklch(72% 0.10 235); --warn: oklch(80% 0.15 85); background: var(--bg); color: var(--ink); }
+  .pal .lbl { font-size:11px; color: var(--dim); margin: 10px 0 5px; }
+  .pal .inv { font-size:11px; color: var(--dim); margin: 0 0 6px; display:flex; gap:12px; }
+  .pal .inv b { color: var(--ink); font-weight:400; }
+  .pal .r { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 6px 8px; margin-bottom: 5px; display:grid; grid-template-columns: 15em 1fr auto; align-items:center; gap: 0 10px; position:relative; overflow:hidden; }
+  .pal .c1 { display:grid; grid-template-columns: 1.6em 1fr; gap: 0 8px; align-items:center; white-space:nowrap; }
+  .pal .ic { font-size:15px; text-align:center; line-height:1; }
+  .pal .name b { font-weight:700; margin-right:.5em; }
+  .pal .c2 { display:grid; grid-template-columns: 11em 1.2em 9em; gap: 0 6px; align-items:center; justify-content:center; }
+  .pal .in { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; display:flex; flex-direction:column; gap:1px; }
+  .pal .in .short { color: var(--warn); }
+  .pal .in .have { color: var(--dim); font-size: 10px; margin-left: 6px; }
+  .pal .arr { color: var(--edge-on); text-align:center; }
+  .pal .c3 { display:grid; grid-template-columns: 4.6em 1.9em 1.9em 3.4em; gap: 0 8px; align-items:center; justify-items:end; }
+  .pal .tx { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; line-height:1.2; }
+  .pal .tx small { display:block; color: var(--dim); font-size:10px; }
+  .pal .btn { width: 1.9em; height: 1.9em; border:1px solid var(--edge-on); border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 11px; }
+  .pal .btn.play { color: var(--run); }
+  .pal .btn.hit { background: var(--run); color: var(--bg); border-color: var(--run); }
+  .pal .au { width: 3.4em; height: 1.9em; border:1px solid var(--edge); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size: 9px; color: var(--dim); }
+  .pal .warn { color: var(--warn); }
+  .pal .dim { color: var(--dim); }
+  /* the click: flash, hold the instruction ~2.5s, fade it out over ~1s, back to normal; loops here for the mock */
+  @keyframes ack { 0% { box-shadow: 0 0 0 2px var(--run); background: var(--cell-on); } 15% { box-shadow: 0 0 0 0 transparent; background: var(--cell); } 100% { box-shadow: 0 0 0 0 transparent; background: var(--cell); } }
+  @keyframes sayfade { 0%, 55% { opacity: 1; } 75%, 100% { opacity: 0; } }
+  @keyframes c2fade { 0%, 60% { opacity: 0; } 80%, 100% { opacity: 1; } }
+  .pal .r.ack { animation: ack 5s ease-out infinite; }
+  .pal .r.ack .mid { position:relative; }
+  .pal .r.ack .say { animation: sayfade 5s linear infinite; }
+  .pal .r.ack .c2 { position:absolute; inset:0; animation: c2fade 5s linear infinite; }
+  /* the instruction replacing the middle chunk */
+  .pal .say { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; text-align:center; }
+  .pal .say div { color: var(--warn); }
+  .pal .say div b { color: var(--ink); font-weight:700; }
+  /* queue entry */
+  .pal .e { border:1px solid var(--edge); border-style: dashed; background: var(--cell); border-radius:5px; padding: 6px 8px; display:grid; grid-template-columns: 1.6em 1fr auto 1.6em; gap: 3px 8px; align-items:center; width: 400px; }
+  .pal .e .bar { grid-column: 1 / -1; height:12px; border:1px solid var(--track-edge); border-radius:3px; background: var(--track); }
+  .pal .e .sub { grid-column: 2 / -1; display:flex; justify-content:space-between; font-size:11px; font-variant-numeric: tabular-nums; }
+  .pal .e .ins { display:flex; flex-direction:column; gap:1px; }
+  .pal .e .cnt { border:1px solid var(--edge); border-radius:3px; padding:0 5px; font-size:11px; color: var(--dim); }
+  .pal .e .x { width:1.6em; height:1.6em; border:1px solid var(--edge); border-radius:3px; display:flex; align-items:center; justify-content:center; color: var(--dim); font-size:11px; }
+  .pal .e b { font-weight:700; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Chapter 1 · The Scrub · life 1</div>
+  <div class="mockup-body">
+    <div class="pal">
+      <div class="inv"><span>wood <b>0</b></span><span>stone <b>0</b></span><span>hide <b>3</b></span></div>
+
+      <div class="lbl">1 · at rest. Inputs stack. Short ones are warn with "have n"; covered ones are plain.</div>
+      <div class="r"><div class="c1"><div class="ic">🪓</div><div class="name"><b>Chop</b>scrub wood</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div>+1 wood</div></div><div class="c3"><div class="tx">6.0s<small>+6.0 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au">0/200</div></div></div>
+      <div class="r"><div class="c1"><div class="ic">🔨</div><div class="name"><b>Craft</b>a sling</div></div><div class="c2"><div class="in"><span class="short">⚠ 2 wood<span class="have">have 0</span></span><span>1 hide</span></div><div class="arr">→</div><div>sling</div></div><div class="c3"><div class="tx">20s<small>+20 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au">0/5</div></div></div>
+      <div class="r"><div class="c1"><div class="ic">🧱</div><div class="name"><b>Build</b>a log house</div></div><div class="c2"><div class="in"><span class="short">⚠ 12 wood<span class="have">have 0</span></span><span class="short">⚠ 4 stone<span class="have">have 0</span></span></div><div class="arr">→</div><div>log house</div></div><div class="c3"><div class="tx">3:00<small>+180 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au">0/5</div></div></div>
+
+      <div class="lbl">2 · the click. The middle chunk is replaced by exactly what to do, one line per missing thing. It holds a few seconds, then fades back to the normal row. (Loops here.)</div>
+      <div class="r ack"><div class="c1"><div class="ic">🧱</div><div class="name"><b>Build</b>a log house</div></div><div class="mid"><div class="say"><div>missing 12 wood · <b>Chop some!</b></div><div>missing 4 stone · <b>Mine some!</b></div></div><div class="c2"><div class="in"><span class="short">⚠ 12 wood<span class="have">have 0</span></span><span class="short">⚠ 4 stone<span class="have">have 0</span></span></div><div class="arr">→</div><div>log house</div></div></div><div class="c3"><div class="tx">3:00<small>+180 xp</small></div><div class="btn play">▶</div><div class="btn hit">+</div><div class="au">0/5</div></div></div>
+
+      <div class="lbl">3 · in the queue, stacked the same way.</div>
+      <div class="e">
+        <div>🧱</div><div><b>Build</b> a log house</div><div class="cnt">1</div><div class="x">×</div>
+        <div class="bar"></div>
+        <div class="sub"><span class="ins"><span><span class="warn">⚠</span> wood 0/12</span><span><span class="warn">⚠</span> stone 0/4</span></span><span class="dim">3:00</span></div>
+      </div>
+
+      <div class="lbl">The verb in the instruction is the Harvest verb that makes the thing: wood → Chop, stone → Mine, hide → Shoot, fish → Fish, berries → Forage. If the thing is made by Craft instead (rope), it says "Craft some!".</div>
+    </div>
+  </div>
+</div>
+
+</body></html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: skills-hover</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Hover as a ledger, v4 (final)</h2>
+<p class="subtitle">Left side is the ledger, one section per thing that feeds the multiplier: core, run, tools. Right side is a single column of the factor each one contributes, and the last row multiplies them. The per-level bonus moved into the section header. "Survives death" and "each level" rows are gone.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px; position:relative; min-height: 420px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(68% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); background: var(--bg); color: var(--ink); }
+  .pal .cell { display:grid; grid-template-columns: 1.6em 5em 1fr 7.5em; align-items:center; gap:3px 8px; padding:6px 8px; border-radius:5px; border:1px solid var(--edge); background: var(--cell); width: 380px; }
+  .pal .cell.on { background: var(--cell-on); border-color: var(--edge-on); box-shadow: 0 0 0 1px var(--edge-on); }
+  .pal .ic { font-size:15px; text-align:center; line-height:1; }
+  .pal .name { font-weight:700; white-space:nowrap; }
+  .pal .mult { white-space:nowrap; font-variant-numeric: tabular-nums; font-weight:700; }
+  .pal .bar { height:8px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .pal .bar i { position:absolute; left:0; top:0; bottom:0; background: var(--core); }
+  .pal .bar i.run { background: var(--run); }
+  .pal .t { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; }
+  @keyframes fillA { from { width: 34%; } to { width: 100%; } }
+  @keyframes fillB { from { width: 58%; } to { width: 72%; } }
+  .pal .on .core i { animation: fillA 6s linear infinite; }
+  .pal .on .runb i { animation: fillB 6s linear infinite; }
+
+  .pop { position:absolute; left: 300px; top: 30px; width: 440px; background: oklch(26% 0.014 260); border:1px solid var(--edge-on); border-radius:6px; padding:10px 12px; box-shadow: 0 8px 24px #0008; font-variant-numeric: tabular-nums; }
+  .pop h4 { margin:0 0 8px; font-size:13px; display:flex; gap:8px; align-items:baseline; }
+  .pop h4 small { font-weight:400; color: var(--dim); font-size:11px; }
+
+  /* the ledger grid: left content column, right factor column */
+  .led { display:grid; grid-template-columns: 1fr 5.5em; column-gap: 14px; row-gap: 0; align-items:end; }
+  .led .l { border-top: 1px solid var(--edge); padding-top: 6px; margin-top: 6px; }
+  .led .r { border-top: 1px solid var(--edge); padding-top: 6px; margin-top: 6px; text-align:right; align-self:stretch; display:flex; flex-direction:column; justify-content:flex-start; }
+  .led .l.first, .led .r.first { border-top:0; padding-top:0; margin-top:0; }
+  .led h5 { margin:0 0 4px; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color: var(--dim); display:flex; justify-content:space-between; }
+  .led h5 b { color: var(--ink); font-weight:700; }
+  .led .kv { display:grid; grid-template-columns: auto 1fr; gap: 1px 12px; }
+  .led .kv span:nth-child(even) { text-align:right; }
+  .led .kv .d { color: var(--dim); }
+  .led .sw { display:inline-block; width:9px; height:9px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+  .led .bar { margin: 3px 0 5px; }
+  .led .fac { font-size:15px; font-weight:700; }
+  .led .fac.dim { color: var(--dim); font-weight:400; font-size:12px; }
+  .led .sub { font-size:10px; color: var(--dim); margin-top:2px; }
+  .led .total-l, .led .total-r { border-top: 2px solid var(--edge-on); margin-top: 8px; padding-top: 6px; }
+  .led .total-l { color: var(--dim); font-size:10px; letter-spacing:.12em; text-transform:uppercase; align-self:center; }
+  .led .total-r { text-align:right; font-size:17px; font-weight:700; }
+
+  .pop .after { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--edge); display:grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  .pop .after h5 { margin:0 0 3px; font-size:9px; letter-spacing:.12em; text-transform:uppercase; color: var(--dim); }
+  .pop .after .kv { display:grid; grid-template-columns: auto 1fr; gap: 1px 10px; font-size:11px; }
+  .pop .after .kv span:nth-child(even) { text-align:right; }
+  .pop .after .kv .d { color: var(--dim); }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Hovering Forage</div>
+  <div class="mockup-body">
+    <div class="pal">
+      <div class="cell on">
+        <div class="ic">🌿</div><div class="name">Forage</div><div class="bar core"><i style="width:34%"></i></div><div class="t">→ 13 in 7s</div>
+        <div></div><div class="mult">×1.68</div><div class="bar runb"><i class="run" style="width:58%"></i></div><div class="t">→ 6 in 17s</div>
+      </div>
+      <div class="cell" style="margin-top:6px">
+        <div class="ic">🪓</div><div class="name">Chop</div><div class="bar"><i style="width:80%"></i></div><div class="t" style="opacity:.45">→ 10 —</div>
+        <div></div><div class="mult" style="opacity:.55;font-weight:400">×1.48</div><div class="bar"><i class="run" style="width:10%"></i></div><div class="t" style="opacity:.45">→ 3 —</div>
+      </div>
+
+      <div class="pop">
+        <h4>🌿 Forage <small>Harvest · plants, berries</small></h4>
+
+        <div class="led">
+
+          <div class="l first">
+            <h5><span><i class="sw" style="background:var(--core)"></i>core · permanent · +5% / level</span><b>level 12</b></h5>
+            <div class="bar core"><i style="width:34%"></i></div>
+            <div class="kv"><span class="d">to level 13</span><span>14.6 / 25.9 xp · 7s</span></div>
+          </div>
+          <div class="r first">
+            <div class="fac">×1.60</div>
+            <div class="sub">1 + 12 × 5%</div>
+          </div>
+
+          <div class="l">
+            <h5><span><i class="sw" style="background:var(--run)"></i>run · this life · +1% / level</span><b>level 5</b></h5>
+            <div class="bar runb"><i class="run" style="width:58%"></i></div>
+            <div class="kv"><span class="d">to level 6</span><span>37.6 / 64.8 xp · 17s</span><span class="d">best ever</span><span>9</span></div>
+          </div>
+          <div class="r">
+            <div class="fac">×1.05</div>
+            <div class="sub">1 + 5 × 1%</div>
+          </div>
+
+          <div class="l">
+            <h5><span>tools</span><b>none</b></h5>
+          </div>
+          <div class="r">
+            <div class="fac dim">×1.00</div>
+          </div>
+
+          <div class="total-l">multiplier</div>
+          <div class="total-r">×1.68</div>
+
+        </div>
+
+        <div class="after">
+          <div>
+            <h5>right now</h5>
+            <div class="kv">
+              <span class="d">action</span><span>berries · 2 of 3</span>
+              <span class="d">earning</span><span>1.58 xp/s</span>
+              <span class="d">rate</span><span>1 food / 4.2s</span>
+            </div>
+          </div>
+          <div>
+            <h5>lifetime · 7 lives</h5>
+            <div class="kv">
+              <span class="d">xp</span><span>3,412</span>
+              <span class="d">time</span><span>1h 04m</span>
+              <span class="d">done</span><span>911</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">The factor column shows each term's arithmetic under it. Nothing from the future. The total row is the only number that also appears on the row itself.</p>
+
+</body></html>

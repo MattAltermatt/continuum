@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: skills-color</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Contrast, measured: P1 re-tuned against P3</h2>
+<p class="subtitle">The first P1 had the two fills at nearly the same lightness (1.09:1 against each other), so it relied on hue alone. That breaks the rule stated on the last screen. Here it is re-tuned: stone darker, ember lighter. P3 unchanged for comparison.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px; display:grid; gap:6px; }
+  .pal .cell { display:grid; grid-template-columns: 1.6em 5em 1fr 7.5em; align-items:center; gap:3px 8px; padding:6px 8px; border-radius:5px; border:1px solid var(--edge); background: var(--cell); color: var(--ink); }
+  .pal .cell.on { background: var(--cell-on); border-color: var(--edge-on); box-shadow: 0 0 0 1px var(--edge-on); }
+  .pal .ic { font-size:15px; text-align:center; line-height:1; }
+  .pal .name { font-weight:700; white-space:nowrap; }
+  .pal .mult { white-space:nowrap; font-variant-numeric: tabular-nums; font-weight:700; }
+  .pal .mult.dim { opacity:.55; font-weight:400; }
+  .pal .bar { height:8px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .pal .bar i { position:absolute; left:0; top:0; bottom:0; background: var(--core); }
+  .pal .bar i.run { background: var(--run); }
+  .pal .t { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; }
+  .pal .t.dim { opacity:.45; }
+  .pal .sw { display:flex; gap:10px; align-items:center; font-size:11px; opacity:.85; padding: 2px 0 4px; color: var(--ink); }
+  .pal .sw b { display:inline-block; width:14px; height:14px; border-radius:3px; vertical-align:middle; margin-right:4px; }
+  .pal .gray { filter: grayscale(1); }
+  @keyframes fillA { from { width: 34%; } to { width: 100%; } }
+  @keyframes fillB { from { width: 58%; } to { width: 72%; } }
+  .pal .on .core i { animation: fillA 6s linear infinite; }
+  .pal .on .runb i { animation: fillB 6s linear infinite; }
+  .pal { --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260); background: var(--bg); }
+  .p1b { --core: oklch(58% 0.11 235); --run: oklch(82% 0.15 75); }
+  .p3  { --core: oklch(84% 0.02 80);  --run: oklch(70% 0.16 45); }
+  .pair { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  .lbl { font-size:10px; letter-spacing:.1em; text-transform:uppercase; opacity:.6; margin: 0 0 4px; }
+</style>
+
+<div class="options">
+
+  <div class="option" data-choice="p1b" onclick="toggleSelect(this)">
+    <div class="letter">P1b</div>
+    <div class="content">
+      <h3>Stone and ember, re-tuned</h3>
+      <p>Core stone at 58% lightness, run ember at 82%. Fill-to-fill 2.36:1, and both still clear the track by a wide margin. Right side is the same cells in grayscale: the two bars must still be tellable apart there.</p>
+      <div class="pair">
+        <div class="pal p1b">
+          <div class="lbl">color</div>
+          <div class="cell on">
+            <div class="ic">🌿</div><div class="name">Forage</div><div class="bar core"><i style="width:34%"></i></div><div class="t">→ 13 in 7s</div>
+            <div></div><div class="mult">×1.68</div><div class="bar runb"><i class="run" style="width:58%"></i></div><div class="t">→ 6 in 17s</div>
+          </div>
+          <div class="cell">
+            <div class="ic">🪓</div><div class="name">Chop</div><div class="bar"><i style="width:80%"></i></div><div class="t dim">→ 10 —</div>
+            <div></div><div class="mult dim">×1.48</div><div class="bar"><i class="run" style="width:10%"></i></div><div class="t dim">→ 3 —</div>
+          </div>
+        </div>
+        <div class="pal p1b gray">
+          <div class="lbl">grayscale</div>
+          <div class="cell on">
+            <div class="ic">🌿</div><div class="name">Forage</div><div class="bar core"><i style="width:34%"></i></div><div class="t">→ 13 in 7s</div>
+            <div></div><div class="mult">×1.68</div><div class="bar runb"><i class="run" style="width:58%"></i></div><div class="t">→ 6 in 17s</div>
+          </div>
+          <div class="cell">
+            <div class="ic">🪓</div><div class="name">Chop</div><div class="bar"><i style="width:80%"></i></div><div class="t dim">→ 10 —</div>
+            <div></div><div class="mult dim">×1.48</div><div class="bar"><i class="run" style="width:10%"></i></div><div class="t dim">→ 3 —</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="p3" onclick="toggleSelect(this)">
+    <div class="letter">P3</div>
+    <div class="content">
+      <h3>Bone and ember, unchanged</h3>
+      <p>Core bone at 84%, run ember at 70%. Fill-to-fill 1.73:1. The widest raw luminance gap of the original three, but note the bone core is lighter than the run, the reverse of P1b, so "the bright one" means the permanent ledger here.</p>
+      <div class="pair">
+        <div class="pal p3">
+          <div class="lbl">color</div>
+          <div class="cell on">
+            <div class="ic">🌿</div><div class="name">Forage</div><div class="bar core"><i style="width:34%"></i></div><div class="t">→ 13 in 7s</div>
+            <div></div><div class="mult">×1.68</div><div class="bar runb"><i class="run" style="width:58%"></i></div><div class="t">→ 6 in 17s</div>
+          </div>
+          <div class="cell">
+            <div class="ic">🪓</div><div class="name">Chop</div><div class="bar"><i style="width:80%"></i></div><div class="t dim">→ 10 —</div>
+            <div></div><div class="mult dim">×1.48</div><div class="bar"><i class="run" style="width:10%"></i></div><div class="t dim">→ 3 —</div>
+          </div>
+        </div>
+        <div class="pal p3 gray">
+          <div class="lbl">grayscale</div>
+          <div class="cell on">
+            <div class="ic">🌿</div><div class="name">Forage</div><div class="bar core"><i style="width:34%"></i></div><div class="t">→ 13 in 7s</div>
+            <div></div><div class="mult">×1.68</div><div class="bar runb"><i class="run" style="width:58%"></i></div><div class="t">→ 6 in 17s</div>
+          </div>
+          <div class="cell">
+            <div class="ic">🪓</div><div class="name">Chop</div><div class="bar"><i style="width:80%"></i></div><div class="t dim">→ 10 —</div>
+            <div></div><div class="mult dim">×1.48</div><div class="bar"><i class="run" style="width:10%"></i></div><div class="t dim">→ 3 —</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body></html>

@@ -9,4 +9,4 @@ rejected, and why. What is queued lives in
 
 | Date | Topic |
 |---|---|
-| — | none yet |
+| 2026-09-22 | [Books, chapters, verbs, and the one screen](2026-09-22-books-chapters-verbs.md) — the game's shape, the wall rule, the twelve verbs and why, and every chunk of the one screen with its mockup |

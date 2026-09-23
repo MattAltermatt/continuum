@@ -6,3 +6,6 @@ coverage/
 .DS_Store
 .remember/
 .claude/settings.local.json
+
+# visual-companion brainstorm sessions (ephemeral; kept mockups go to docs/mockups/)
+.superpowers/

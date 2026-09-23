@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: action-row-running</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>The row that is being worked on</h2>
+<p class="subtitle">Chop driftwood is running. Three ways to make it the obvious one without putting progress on the row (progress and status may move somewhere central later). Fish is queued next in all three, unmarked for now.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(66% 0.01 80); --track: oklch(17% 0.01 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --auto: oklch(72% 0.10 235); background: var(--bg); color: var(--ink); max-width: 780px; }
+  .pal .r { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 6px 8px; margin-bottom: 5px; display:grid; grid-template-columns: 15em 1fr auto; align-items:center; gap: 0 10px; position:relative; overflow:hidden; }
+  .pal .c1 { display:grid; grid-template-columns: 1.6em 1fr; gap: 0 8px; align-items:center; white-space:nowrap; overflow:hidden; }
+  .pal .ic { font-size:15px; text-align:center; line-height:1; }
+  .pal .name b { font-weight:700; margin-right:.5em; }
+  .pal .c2 { display:grid; grid-template-columns: 9em 1.2em 9em; gap: 0 6px; align-items:center; justify-content:center; }
+  .pal .in { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; }
+  .pal .arr { color: var(--edge-on); text-align:center; }
+  .pal .c3 { display:grid; grid-template-columns: 4.6em 1.9em 1.9em 3.4em; gap: 0 8px; align-items:center; justify-items:end; }
+  .pal .tx { text-align:right; white-space:nowrap; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .pal .tx small { display:block; color: var(--dim); font-size: 10px; }
+  .pal .btn { width: 1.9em; height: 1.9em; border:1px solid var(--edge-on); border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 11px; }
+  .pal .btn.play { color: var(--run); }
+  .pal .btn.stop { color: var(--run); background: var(--run); color: var(--bg); border-color: var(--run); }
+  .pal .au { width: 3.4em; height: 1.9em; border:1px solid var(--edge); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size: 11px; color: var(--dim); }
+  .pal .au.on { border-color: var(--auto); color: var(--auto); font-weight:700; }
+
+  /* S1 pulse the edge */
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 1px var(--run), 0 0 0 0 oklch(70% 0.16 45 / 0); } 50% { box-shadow: 0 0 0 1px var(--run), 0 0 10px 2px oklch(70% 0.16 45 / .45); } }
+  .s1 .r.on { border-color: var(--run); animation: pulse 1.6s ease-in-out infinite; background: var(--cell-on); }
+
+  /* S2 ember bar on the left, breathing */
+  @keyframes breathe { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  .s2 .r.on { background: var(--cell-on); border-color: var(--edge-on); }
+  .s2 .r.on::before { content:""; position:absolute; left:0; top:0; bottom:0; width: 4px; background: var(--run); animation: breathe 1.6s ease-in-out infinite; }
+  .s2 .r.on .ic { animation: breathe 1.6s ease-in-out infinite; }
+
+  /* S3 a moving sheen across the row */
+  @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .s3 .r.on { background: var(--cell-on); border-color: var(--run); }
+  .s3 .r.on::after { content:""; position:absolute; inset:0; background: linear-gradient(90deg, transparent 0%, oklch(70% 0.16 45 / .12) 50%, transparent 100%); animation: sheen 2.2s linear infinite; pointer-events:none; }
+</style>
+
+<div class="options">
+
+  <div class="option" data-choice="s1" onclick="toggleSelect(this)">
+    <div class="letter">S1</div>
+    <div class="content">
+      <h3>The edge pulses</h3>
+      <p>Border turns ember and breathes a soft glow. The ▶ becomes a filled ■ (stop). Nothing inside the row changes.</p>
+      <div class="pal s1">
+        <div class="r"><div class="c1"><div class="ic">🎣</div><div class="name"><b>Fish</b>off the rocks</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div>+1 fish</div></div><div class="c3"><div class="tx">5.1s<small>+5.1 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au on">2</div></div></div>
+        <div class="r on"><div class="c1"><div class="ic">🪓</div><div class="name"><b>Chop</b>driftwood</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div>+1 wood</div></div><div class="c3"><div class="tx">6.0s<small>+8.9 xp</small></div><div class="btn stop">■</div><div class="btn">+</div><div class="au on">AN</div></div></div>
+        <div class="r"><div class="c1"><div class="ic">🔨</div><div class="name"><b>Craft</b>a rod</div></div><div class="c2"><div class="in">3 wood</div><div class="arr">→</div><div>rod</div></div><div class="c3"><div class="tx">40s<small>+52 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au">3 / 5</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="s2" onclick="toggleSelect(this)">
+    <div class="letter">S2</div>
+    <div class="content">
+      <h3>An ember bar down the left, breathing</h3>
+      <p>A 4px ember stripe on the row's left edge, fading in and out, and the icon breathes with it. The border stays calm. ▶ becomes ■. Quietest of the three, but the stripe is a fixed place the eye can go to.</p>
+      <div class="pal s2">
+        <div class="r"><div class="c1"><div class="ic">🎣</div><div class="name"><b>Fish</b>off the rocks</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div>+1 fish</div></div><div class="c3"><div class="tx">5.1s<small>+5.1 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au on">2</div></div></div>
+        <div class="r on"><div class="c1"><div class="ic">🪓</div><div class="name"><b>Chop</b>driftwood</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div>+1 wood</div></div><div class="c3"><div class="tx">6.0s<small>+8.9 xp</small></div><div class="btn stop">■</div><div class="btn">+</div><div class="au on">AN</div></div></div>
+        <div class="r"><div class="c1"><div class="ic">🔨</div><div class="name"><b>Craft</b>a rod</div></div><div class="c2"><div class="in">3 wood</div><div class="arr">→</div><div>rod</div></div><div class="c3"><div class="tx">40s<small>+52 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au">3 / 5</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="s3" onclick="toggleSelect(this)">
+    <div class="letter">S3</div>
+    <div class="content">
+      <h3>A sheen moves across it</h3>
+      <p>Ember border, and a faint band of light sweeps left to right on a loop. Reads as "work is happening" rather than "look here". Most motion of the three.</p>
+      <div class="pal s3">
+        <div class="r"><div class="c1"><div class="ic">🎣</div><div class="name"><b>Fish</b>off the rocks</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div>+1 fish</div></div><div class="c3"><div class="tx">5.1s<small>+5.1 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au on">2</div></div></div>
+        <div class="r on"><div class="c1"><div class="ic">🪓</div><div class="name"><b>Chop</b>driftwood</div></div><div class="c2"><div class="in"></div><div class="arr">→</div><div>+1 wood</div></div><div class="c3"><div class="tx">6.0s<small>+8.9 xp</small></div><div class="btn stop">■</div><div class="btn">+</div><div class="au on">AN</div></div></div>
+        <div class="r"><div class="c1"><div class="ic">🔨</div><div class="name"><b>Craft</b>a rod</div></div><div class="c2"><div class="in">3 wood</div><div class="arr">→</div><div>rod</div></div><div class="c3"><div class="tx">40s<small>+52 xp</small></div><div class="btn play">▶</div><div class="btn">+</div><div class="au">3 / 5</div></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle">In all three the ▶ becomes a filled ■ on the running row, so the button that started it is the button that stops it, in the same place. Ember is used because it already means "this life, right now" on the skills chunk.</p>
+
+</body></html>

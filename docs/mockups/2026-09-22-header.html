@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: header</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>K3, header brighter than the body</h2>
+<p class="subtitle">B with the values swapped: the running head is full ink (90%, 12.2:1) and the story line is the secondary token (80%, 8.8:1). Previous B underneath for comparison.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px; width: 520px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --edge: oklch(34% 0.012 260); --ink: oklch(90% 0.01 80); background: var(--bg); color: var(--ink); }
+  .pal .box { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 8px 10px; }
+  .pal .caps { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+  .pal .rule { border-top:1px solid var(--edge); margin:5px 0; }
+  .pal .story { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 13px; }
+  .old { --dim: oklch(66% 0.01 80); }
+  .old .story { color: var(--dim); }
+  .swap { --dim: oklch(90% 0.01 80); }
+  .swap .story { color: oklch(80% 0.01 80); }
+  .c80 { --dim: oklch(80% 0.01 80); }
+  .lbl { font-size: 11px; opacity: .7; margin: 8px 0 4px; }
+</style>
+
+
+<div class="options">
+  <div class="option" data-choice="swap" onclick="toggleSelect(this)"><div class="letter">A</div><div class="content">
+    <h3>Swapped: head at 90%, story at 80%</h3>
+    <div class="pal swap"><div class="box">
+      <div style="display:flex;justify-content:space-between"><span class="caps">The Salt Road</span><span class="caps">II · The Flats</span></div>
+      <div class="rule"></div>
+      <div class="story">White ground to the horizon. Nothing to burn, nothing to drink.</div>
+    </div></div>
+  </div></div>
+  <div class="option" data-choice="c80" onclick="toggleSelect(this)"><div class="letter">B</div><div class="content">
+    <h3>Previous B: head at 80%, story at 90%</h3>
+    <div class="pal c80"><div class="box">
+      <div style="display:flex;justify-content:space-between"><span class="caps">The Salt Road</span><span class="caps">II · The Flats</span></div>
+      <div class="rule"></div>
+      <div class="story">White ground to the horizon. Nothing to burn, nothing to drink.</div>
+    </div></div>
+  </div></div>
+</div>
+
+<p class="subtitle">Tokens after the swap: primary text 90%, secondary text 80%. The running head uses primary; the story line, "have 0", xp-under-time, the "run" tag and zero counts use secondary.</p>
+
+</body></html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: health-clock</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Health as its own chunk, clock as its own chunk</h2>
+<p class="subtitle">"Dead in" is gone: a number that a feral groundhog can make wrong by ten seconds is not a number to show. "Life 7" is gone. The clock is its own chunk and literally shows the time. Health is the tall bar, hp under it on the left, decay bottom right.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(66% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --hurt: oklch(66% 0.18 25); background: var(--bg); color: var(--ink); display:flex; gap: 10px; align-items:flex-start; }
+  .pal .box { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 8px 10px; }
+  .pal .bar { height:20px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .pal .bar i { position:absolute; left:0; top:0; bottom:0; background: var(--hurt); }
+  .pal .hurt { color: var(--hurt); }
+  .pal .dim { color: var(--dim); }
+  .pal .num { font-variant-numeric: tabular-nums; }
+  .pal .hp { font-size: 16px; font-weight: 700; line-height: 1; }
+  .pal .hp small { font-size: 11px; font-weight: 400; color: var(--dim); }
+  .pal .under { display:flex; justify-content:space-between; align-items:flex-end; margin-top: 5px; }
+  .pal .clock { font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: .02em; }
+  @keyframes tick { from { width: 71%; } to { width: 60%; } }
+  .pal .live i { animation: tick 12s linear infinite; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Two chunks</div>
+  <div class="mockup-body">
+    <div class="pal">
+      <div class="box" style="width: 300px">
+        <div class="bar live"><i style="width:71%"></i></div>
+        <div class="under num">
+          <div class="hp">71 <small>/ 100</small></div>
+          <div class="hurt">−24 hp/min ▲</div>
+        </div>
+      </div>
+      <div class="box num" style="width: 110px; text-align:center">
+        <div class="clock">06:12</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Health: 20px bar, nothing written on it. Clock: the run time, and nothing else; it resets to 00:00 on death. The ▲ stays because the rate is accelerating and that is a fact, not a forecast.</p>
+
+</body></html>

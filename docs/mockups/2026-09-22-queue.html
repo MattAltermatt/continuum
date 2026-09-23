@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: queue</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Queue, combined: warnings, slashes, time on every entry</h2>
+<p class="subtitle">Carrying: wood 2 · stone 0 · hide 5 · rope 1. Chop is running for the boat. Every fraction is "a/b". Every entry shows its own time left, and the footer sums them. A ⚠ sits beside any input that is short <i>right now</i>, on entries that are not the running one.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px; width: 420px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(66% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --warn: oklch(80% 0.15 85); background: var(--bg); color: var(--ink); }
+  .pal h5 { margin:0 0 6px; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color: var(--dim); display:flex; justify-content:space-between; }
+  .pal .bar { height:12px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .pal .bar i { position:absolute; left:0; top:0; bottom:0; background: var(--run); }
+  .pal .dim { color: var(--dim); }
+  .pal .hurt { color: var(--hurt); }
+  .pal .warn { color: var(--warn); }
+  .pal .x { width:1.6em; height:1.6em; border:1px solid var(--edge); border-radius:3px; display:flex; align-items:center; justify-content:center; color: var(--dim); font-size:11px; }
+  .pal .cnt { border:1px solid var(--edge); border-radius:3px; padding:0 5px; font-size:11px; color: var(--dim); font-variant-numeric: tabular-nums; white-space:nowrap; }
+  @keyframes fill { from { width: 55%; } to { width: 100%; } }
+  .pal .live i { animation: fill 3s linear infinite; }
+  @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .pal .front::after { content:""; position:absolute; inset:0; background: linear-gradient(90deg, transparent 0%, oklch(70% 0.16 45 / .12) 50%, transparent 100%); animation: sheen 2.2s linear infinite; pointer-events:none; }
+  .pal .e { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 6px 8px; margin-bottom: 5px; display:grid; grid-template-columns: 1.6em 1fr auto 1.6em; gap: 3px 8px; align-items:center; position:relative; overflow:hidden; }
+  .pal .e.front { border-color: var(--run); background: var(--cell-on); }
+  .pal .e.stall { border-style: dashed; }
+  .pal .e .full { grid-column: 1 / -1; }
+  .pal .e .sub { grid-column: 2 / -1; display:flex; justify-content:space-between; font-size:11px; font-variant-numeric: tabular-nums; gap: 8px; }
+  .pal .e .sub .ins { display:flex; gap: 10px; flex-wrap:wrap; }
+  .pal .e b { font-weight:700; }
+  .pal .e .t { white-space:nowrap; }
+  .pal .fix { grid-column: 2 / -1; display:flex; align-items:center; gap:8px; font-size:11px; margin-top:2px; }
+  .pal .fix .go { border:1px solid var(--run); color: var(--run); border-radius:4px; padding: 1px 7px; font-weight:700; white-space:nowrap; }
+  .pal .foot { display:flex; justify-content:space-between; font-size:11px; color: var(--dim); padding: 4px 8px 0; border-top: 1px solid var(--edge); margin-top: 4px; }
+  .pal .foot b { color: var(--ink); font-weight:400; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Queue · carrying wood 2 · stone 0 · hide 5 · rope 1</div>
+  <div class="mockup-body">
+    <div class="pal">
+      <h5><span>queue · 4</span><span>≈ 6:05</span></h5>
+
+      <div class="e front">
+        <div>🪓</div><div><b>Chop</b> driftwood</div><div class="cnt">2/4</div><div class="x">×</div>
+        <div class="full bar live"><i style="width:55%"></i></div>
+        <div class="sub"><span class="dim">for the boat</span><span class="t">14s</span></div>
+      </div>
+
+      <div class="e stall">
+        <div>🔨</div><div><b>Craft</b> a boat</div><div class="cnt">1</div><div class="x">×</div>
+        <div class="full bar"><i style="width:67%; background: var(--dim)"></i></div>
+        <div class="sub"><span class="ins"><span><span class="warn">⚠</span> wood 8/12</span><span class="dim">hide 3/4</span><span class="dim">rope 1/2</span></span><span class="t dim">24s</span></div>
+        <div class="sub"><span class="dim">waiting on wood · 67% kept</span></div>
+      </div>
+
+      <div class="e">
+        <div>🧱</div><div><b>Build</b> a smokehouse</div><div class="cnt">1</div><div class="x">×</div>
+        <div class="sub"><span class="ins"><span><span class="warn">⚠</span> wood 0/10</span><span><span class="warn">⚠</span> stone 0/6</span><span class="dim">hide 0/2</span></span><span class="t dim">2:40</span></div>
+        <div class="fix"><span class="dim">nothing queued makes stone</span><span class="go">▶ Mine stone ×6</span></div>
+      </div>
+
+      <div class="e">
+        <div>⚔️</div><div><b>Fight</b> the dock rats</div><div class="cnt">1</div><div class="x">×</div>
+        <div class="sub"><span class="hurt">−1.1 hp/s</span><span class="t dim">1:05</span></div>
+      </div>
+
+      <div class="foot"><span>work queued</span><span><b>≈ 6:05</b> · plus whatever the ⚠ cost</span></div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Rules in this mock: (1) fractions are always a/b, no spaces. (2) Every entry shows the time its remaining work takes at the current rate; the header and footer sum them. Waiting time is not in the sum, hence "plus whatever the ⚠ cost". (3) ⚠ beside an input means "right now the pack does not hold what this still needs", on any entry that is not running; the running entry says it in words instead. (4) The fix button appears only when nothing ahead in the queue makes the missing thing. The boat has no button because Chop is already in front of it; the smokehouse has one for stone because nothing queued makes stone. The warn hue is a straw yellow, distinct from ember and from hurt.</p>
+
+</body></html>

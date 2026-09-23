@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: layout</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>Health owns the top row; the clock and a gear tuck into its corner</h2>
+<p class="subtitle">Top row: health · rates · clock. Skills at four across, three rows in both. Only the top row differs. Below that, three columns: the chapter on the left, food and pack in the middle, the queue on the right.</p>
+
+<style>
+  .scr { font-family: ui-monospace, Menlo, monospace; font-size: 11px; padding: 10px; border-radius: 8px; width: 1100px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --item: oklch(22% 0.012 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(80% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --auto: oklch(72% 0.10 235); --warn: oklch(80% 0.15 85); --good: oklch(78% 0.12 150); background: var(--bg); color: var(--ink); }
+  .scr .box { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 6px 8px; }
+  .scr h5 { margin:0 0 4px; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color: var(--dim); display:flex; justify-content:space-between; }
+  .scr .dim { color: var(--dim); } .scr .hurt { color: var(--hurt); } .scr .warn { color: var(--warn); } .scr .good { color: var(--good); }
+  .scr .num { font-variant-numeric: tabular-nums; }
+  .scr .bar { height:7px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .scr .bar i { position:absolute; left:0; top:0; bottom:0; background: var(--core); }
+  .scr .bar i.run { background: var(--run); } .scr .bar i.hp { background: var(--hurt); } .scr .bar i.full { background: var(--warn); }
+  .scr .v { font-size:9px; text-align:center; color: var(--dim); line-height:1; margin-top:2px; }
+  .scr .kv { display:grid; grid-template-columns: 1fr auto; gap: 1px 8px; } .scr .kv .r { text-align:right; }
+  @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .scr .sheen { position:relative; overflow:hidden; }
+  .scr .sheen::after { content:""; position:absolute; inset:0; background: linear-gradient(90deg, transparent, oklch(70% 0.16 45 / .12), transparent); animation: sheen 2.2s linear infinite; pointer-events:none; }
+  /* header */
+  .scr .head { display:flex; justify-content:space-between; font-size:9px; letter-spacing:.14em; text-transform:uppercase; }
+  .scr .story { font-family: Georgia, serif; font-style: italic; color: var(--dim); font-size: 12px; border-top:1px solid var(--edge); margin-top:4px; padding-top:4px; }
+  /* skills */
+  .scr .sk { display:grid; grid-template-columns: 1.3em 4.2em 3em 1fr; gap: 2px 6px; align-items:center; padding: 4px 6px; border:1px solid var(--edge); border-radius:4px; background: var(--item); margin-bottom: 4px; }
+  .scr .sk.on { background: var(--cell-on); border-color: var(--run); }
+  .scr .sk .ic, .scr .sk .nm { grid-row: span 2; } .scr .sk .nm b { display:block; font-weight:700; } .scr .sk .nm span { color: var(--dim); }
+  .scr .sk .nm.on span { color: var(--ink); font-weight:700; }
+  .scr .sk .lv { text-align:right; white-space:nowrap; } .scr .sk .lv.d { color: var(--dim); }
+  .scr .sk .v .up { color: var(--ink); margin-left: 3px; }
+  /* rows */
+  .scr .r { border:1px solid var(--edge); background: var(--cell); border-radius:4px; padding: 4px 7px; margin-bottom: 4px; display:grid; grid-template-columns: 11em 1fr auto; align-items:center; gap: 0 8px; }
+  .scr .r.big { border-color: var(--edge-on); box-shadow: 0 0 0 1px var(--edge-on); }
+  .scr .r.on { background: var(--cell-on); border-color: var(--run); }
+  .scr .c1 { display:grid; grid-template-columns: 1.3em 1fr; gap: 0 6px; white-space:nowrap; } .scr .c1 b { font-weight:700; margin-right:.4em; }
+  .scr .c2 { display:grid; grid-template-columns: 6.5em 1em 6.5em; gap: 0 4px; justify-content:center; align-items:center; }
+  .scr .c2 .in { text-align:right; display:flex; flex-direction:column; } .scr .c2 .arr { color: var(--edge-on); text-align:center; }
+  .scr .c3 { display:grid; grid-template-columns: 3.6em 1.6em 1.6em 2.8em; gap: 0 5px; align-items:center; justify-items:end; }
+  .scr .tx { text-align:right; line-height:1.15; } .scr .tx small { display:block; color: var(--dim); font-size: 9px; }
+  .scr .btn { width:1.6em; height:1.6em; border:1px solid var(--edge-on); border-radius:3px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:10px; }
+  .scr .btn.play { color: var(--run); } .scr .btn.stop { background: var(--run); color: var(--bg); border-color: var(--run); }
+  .scr .au { width:2.8em; height:1.6em; border:1px solid var(--edge); border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:9px; color: var(--dim); }
+  .scr .au.on { border-color: var(--auto); color: var(--auto); font-weight:700; }
+  /* queue */
+  .scr .e { border:1px solid var(--edge); background: var(--cell); border-radius:4px; padding: 4px 7px; margin-bottom: 4px; display:grid; grid-template-columns: 1.3em 1fr 1.4em; gap: 2px 6px; align-items:center; }
+  .scr .e.front { border-color: var(--run); background: var(--cell-on); } .scr .e.stall { border-style: dashed; }
+  .scr .e .full { grid-column: 1 / -1; } .scr .e .sub { grid-column: 2 / -1; display:flex; justify-content:space-between; font-size:10px; }
+  .scr .e .x { width:1.4em; height:1.4em; border:1px solid var(--edge); border-radius:3px; display:flex; align-items:center; justify-content:center; color: var(--dim); font-size:10px; }
+  /* items (food, pack) */
+  .scr .it { display:grid; grid-template-columns: 1fr auto 62px; gap: 0 8px; align-items:center; padding: 3px 6px; margin-bottom: 3px; border:1px solid var(--edge); border-radius:4px; background: var(--item); }
+  .scr .it.p { grid-template-columns: 1fr 62px; }
+  .scr .it .stack { display:flex; flex-direction:column; }
+  .scr .net { border-top: 2px solid var(--edge-on); margin-top: 3px; padding-top: 2px; display:flex; justify-content:space-between; }
+  .scr .clock { font-size: 18px; font-weight: 700; text-align:center; line-height:1; }
+  .scr .hpv { text-align:center; font-weight:700; font-size: 12px; margin-top: 3px; } .scr .hpv small { font-weight: 400; color: var(--dim); }
+  /* layouts */
+  .A1 { display:grid; grid-template-columns: 1fr 250px 280px; grid-template-rows: auto auto 1fr; gap: 8px; }
+  .A1 .strip { grid-column: 1 / -1; display:grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .A1.h .band { grid-template-columns: 1fr auto; align-items:stretch; }
+  .scr .corner { display:flex; flex-direction:column; align-items:flex-end; justify-content:space-between; font-size: 10px; color: var(--dim); padding: 2px 0; }
+  .scr .corner .gear { font-size: 12px; opacity:.7; }
+  .A1.h .band .bar { height: 18px; }
+  .scr .headbar { display:flex; align-items:center; justify-content:space-between; }
+  .scr .headbar .story { border:0; margin:0; padding:0 0 0 14px; }
+  .A1 .band { grid-column: 1 / -1; display:grid; grid-template-columns: 1.4fr 1.2fr .5fr; gap: 8px; }
+  .A2 { display:grid; grid-template-columns: 1fr 280px; grid-template-rows: auto 1fr auto; gap: 8px; }
+  .A2 .band { grid-column: 1 / -1; display:grid; grid-template-columns: 1.4fr 1.2fr .5fr; gap: 8px; }
+  .A2 .strip { grid-column: 1 / -1; display:grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .A3 { display:grid; grid-template-columns: 225px 1fr 280px; gap: 8px; }
+  .A3 .mid .band { display:grid; grid-template-columns: 1.4fr 1.2fr .5fr; gap: 8px; margin-bottom: 8px; }
+  .stack8 > * + * { margin-top: 8px; }
+</style>
+
+<div class="mockup"><div class="mockup-header">The screen</div><div class="mockup-body"><div class="scr A1 h" id="a1"></div></div></div>
+
+<script>
+(function(){
+const skills=[["🌿","Forage",12,34,"14.6/25.9",5,58,"37.6/64.8","×1.68",true],["🪓","Chop",9,80,"15.1/18.9",2,10,"2.6/26.5","×1.48",false],["⛏️","Mine",2,44,"5.3/12.1",0,0,"0/25","×1.10",false],["🎣","Fish",0,0,"0/10",0,0,"0/25","×1.00",false],["🏹","Shoot",4,61,"8.9/14.6",1,30,"8.3/27.5","×1.22",false],["🔨","Craft",6,15,"2.7/17.7",1,66,"18.2/27.5","×1.31",false],["🧱","Build",3,52,"6.9/13.3",0,0,"0/25","×1.15",false],["🍳","Cook",11,22,"6.3/28.5",7,91,"44.3/48.7","×1.66",true],["⚔️","Fight",5,5,"0.8/16.1",0,0,"0/25","×1.25",false],["🧭","Travel",7,73,"14.2/19.5",3,48,"16.0/33.3","×1.39",false],["💬","Talk",1,28,"3.1/11.0",0,0,"0/25","×1.05",false],["🔍","Search",2,9,"1.1/12.1",1,82,"22.6/27.5","×1.12",false]];
+const sk=s=>`<div class="sk ${s[9]?'on sheen':''}"><div class="ic">${s[0]}</div><div class="nm ${s[9]?'on':''}"><b>${s[1]}</b><span>${s[8]}</span></div><div class="lv ${s[9]?'':'d'}">Lv ${s[2]}</div><div><div class="bar"><i style="width:${s[3]}%"></i></div><div class="v">${s[4]}${s[9]?' <span class="up">↑ 7s</span>':''}</div></div><div class="lv ${s[9]?'':'d'}">Lv ${s[5]}</div><div><div class="bar"><i class="run" style="width:${s[6]}%"></i></div><div class="v">${s[7]}${s[9]?' <span class="up">↑ 17s</span>':''}</div></div></div>`;
+const skillsHtml=skills.map(sk).join('');
+const head=`<div class="box"><div class="head"><span>The Salt Road</span><span>II · The Flats</span></div><div class="story">White ground to the horizon. Nothing to burn, nothing to drink.</div></div>`;
+const row=(ic,v,n,ins,out,t,xp,au,auOn,big,on)=>`<div class="r ${big?'big':''} ${on?'on sheen':''}"><div class="c1"><div>${ic}</div><div><b>${v}</b>${n}</div></div><div class="c2"><div class="in">${ins}</div><div class="arr">→</div><div>${out}</div></div><div class="c3"><div class="tx num">${t}<small>+${xp} xp</small></div><div class="btn ${on?'stop':'play'}">${on?'■':'▶'}</div><div class="btn">+</div><div class="au ${auOn?'on':''}">${au}</div></div></div>`;
+const rows=[row("🌿","Forage","salt scrub","","+1 berries","4.2s","5.0","2",true,false,true),row("🪓","Chop","salt cedar","","+1 wood","6.0s","8.9","AN",true,false,false),row("🔨","Craft","a sled","<span>6 wood</span><span>2 hide</span>","sled","48s","63","3/5",false,false,false),row("🍳","Cook","the berries","<span>1 berries</span>","+1 food","3.0s","5.0","AN",true,false,false),row("🔍","Search","the salt pans","","the old road","1:10","78","off",false,false,false),row("🧭","Travel","the salt flats","<span>needs sled</span>","The Fort","6:00","500","0/5",false,true,false)].join('');
+const chapter=`<div>${head}<div style="margin-top:8px">${rows}</div></div>`;
+const chapterNoHead=`<div><div class="box"><div class="story" style="border:0;margin:0;padding:0">White ground to the horizon. Nothing to burn, nothing to drink.</div></div><div style="margin-top:8px">${rows}</div></div>`;
+const headbar=`<div class="box headbar"><div class="head" style="gap:14px"><span>The Salt Road</span><span>II · The Flats</span></div></div>`;
+const health=`<div class="box"><div class="bar" style="height:14px"><i class="hp" style="width:71%"></i></div><div class="hpv num">71 <small>/ 100</small></div></div>`;
+const clock=`<div class="box"><div class="clock num">06:12</div></div>`;
+const corner=`<div class="corner"><span class="gear">⚙</span><span class="num">06:12</span></div>`;
+const rates=`<div class="box num"><div class="kv"><span class="dim">decay</span><span class="r hurt">−0.4 hp/s ▲</span><span class="dim">food, up to</span><span class="r good">+7.2 hp/s</span></div><div class="net"><span class="dim">net</span><b class="good">+6.8 hp/s</b></div></div>`;
+const food=`<div class="box num"><h5><span>food</span></h5><div class="it"><span>cooked fish</span><span>+12 hp</span><div class="stack"><div class="bar"><i style="width:42%"></i></div><div class="v">3/10</div></div></div><div class="it"><span>berries</span><span>+4 hp</span><div class="stack"><div class="bar"><i style="width:80%"></i></div><div class="v">6/20</div></div></div><div class="it warn"><span>dried meat</span><span>+20 hp</span><div class="stack"><div class="bar"><i style="width:10%"></i></div><div class="v warn">5/5</div></div></div></div>`;
+const pack=`<div class="box num"><h5><span>pack</span></h5><div class="it p"><span>wood</span><div class="stack"><div class="bar"><i style="width:35%"></i></div><div class="v">7/20</div></div></div><div class="it p dim"><span>stone</span><div class="stack"><div class="bar"><i style="width:0%"></i></div><div class="v">0/20</div></div></div><div class="it p"><span>hide</span><div class="stack"><div class="bar"><i style="width:30%"></i></div><div class="v">3/10</div></div></div><div class="it p"><span>salt</span><div class="stack"><div class="bar"><i style="width:40%"></i></div><div class="v">4/10</div></div></div></div>`;
+const queue=`<div><h5><span>queue · 3</span><span>≈ 1:20</span></h5><div class="e front sheen"><div>🌿</div><div><b>Forage</b> salt scrub</div><div class="x">×</div><div class="full"><div class="bar" style="height:10px"><i class="run" style="width:55%"></i></div><div class="v">2/6 · 17s</div></div></div><div class="e"><div>🔨</div><div><b>Craft</b> a sled</div><div class="x">×</div><div class="sub"><span><span class="warn">⚠</span> wood 0/6 · hide 0/2</span><span class="num">48s</span></div></div><div class="e"><div>🧭</div><div><b>Travel</b> the salt flats</div><div class="x">×</div><div class="sub"><span><span class="warn">⚠</span> needs sled</span><span class="num">6:00</span></div></div></div>`;
+const screen=`<div class="band">${health}${rates}${clock}</div><div class="strip">${skillsHtml}</div>${chapter}<div class="stack8">${food}${pack}</div><div>${queue}</div>`;
+document.getElementById('a1').innerHTML=`<div class="band">${health}${corner}</div><div class="strip">${skillsHtml}</div>${chapter}<div class="stack8">${rates}${food}${pack}</div><div>${queue}</div>`;
+})();
+</script>
+
+</body></html>

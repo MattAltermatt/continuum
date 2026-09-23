@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-22: rates-food</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 0 0 6px; font-size: 14px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 18px; }
+  .option { display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .option .letter { width: 30px; height: 30px; border-radius: 15px; border: 1px solid #555; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .option .content > p { color: #9a9a9a; font-size: 13px; margin: 0 0 10px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+</style>
+<script>function toggleSelect(){}</script>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-22. Part of docs/specs/2026-09-22-books-chapters-verbs.md. Emoji stand in for icons except on the icons page.</p>
+<h2>A rates chunk, and food without the math</h2>
+<p class="subtitle">Left: the new chunk. Everything that moves the health bar per second, in one column, with the net at the bottom. Right: food redone. No "worth", no "/ 5s". Each food shows what one bite heals and a cooldown bar that drains until that food can be eaten again; the bite happens when the bar empties.</p>
+
+<style>
+  .pal { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 12px; border-radius: 8px; display:flex; gap: 14px; align-items:flex-start;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(80% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --warn: oklch(80% 0.15 85); --good: oklch(78% 0.12 150); background: var(--bg); color: var(--ink); }
+  .pal .box { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 8px 10px; }
+  .pal h5 { margin:0 0 5px; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color: var(--dim); display:flex; justify-content:space-between; }
+  .pal .dim { color: var(--dim); }
+  .pal .warn { color: var(--warn); }
+  .pal .hurt { color: var(--hurt); }
+  .pal .good { color: var(--good); }
+  .pal .kv { display:grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-variant-numeric: tabular-nums; }
+  .pal .kv .r { text-align:right; }
+  .pal .net { border-top: 2px solid var(--edge-on); margin-top: 6px; padding-top: 5px; display:flex; justify-content:space-between; font-variant-numeric: tabular-nums; }
+  .pal .net b { font-size: 15px; }
+  .pal .lbl { font-size: 11px; opacity:.7; margin-bottom: 4px; }
+  /* food rows */
+  .pal .frow { display:grid; grid-template-columns: 1fr auto auto; gap: 0 10px; align-items:center; font-variant-numeric: tabular-nums; padding: 2px 0; }
+  .pal .cd { width: 70px; height: 6px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .pal .cd i { position:absolute; left:0; top:0; bottom:0; background: var(--core); }
+  @keyframes cd1 { from { width: 42%; } to { width: 0%; } }
+  @keyframes cd2 { from { width: 80%; } to { width: 0%; } }
+  @keyframes cd3 { from { width: 10%; } to { width: 0%; } }
+  .pal .cd.a i { animation: cd1 2.1s linear infinite; }
+  .pal .cd.b i { animation: cd2 4.0s linear infinite; }
+  .pal .cd.c i { animation: cd3 0.5s linear infinite; }
+  .pal .zero { opacity:.55; }
+</style>
+
+<div class="mockup">
+  <div class="mockup-header">Two chunks: rates, and food</div>
+  <div class="mockup-body">
+    <div class="pal">
+
+      <div>
+        <div class="lbl">rates · the one place to see if you are going to make it</div>
+        <div class="box" style="width: 250px">
+          <div class="kv">
+            <span class="dim">decay</span><span class="r hurt">−0.4 hp/s ▲</span>
+            <span class="dim">fighting the warden</span><span class="r hurt">−6.9 hp/s</span>
+            <span class="dim">food, up to</span><span class="r good">+7.2 hp/s</span>
+          </div>
+          <div class="net"><span class="dim">net</span><b class="hurt">−0.1 hp/s</b></div>
+        </div>
+        <div class="lbl" style="margin-top:10px">same chunk, not fighting</div>
+        <div class="box" style="width: 250px">
+          <div class="kv">
+            <span class="dim">decay</span><span class="r hurt">−0.4 hp/s ▲</span>
+            <span class="dim">food, up to</span><span class="r good">+7.2 hp/s</span>
+          </div>
+          <div class="net"><span class="dim">net</span><b class="good">+6.8 hp/s</b></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="lbl">food · what one bite heals, and when the next one comes</div>
+        <div class="box" style="width: 280px">
+          <h5><span>food</span></h5>
+          <div class="frow"><span>cooked fish <span class="dim">3/10</span></span><span>+12 hp</span><div class="cd a"><i></i></div></div>
+          <div class="frow"><span>berries <span class="dim">6/20</span></span><span>+4 hp</span><div class="cd b"><i></i></div></div>
+          <div class="frow warn"><span>dried meat <span class="dim">5/5</span></span><span>+20 hp</span><div class="cd c"><i></i></div></div>
+        </div>
+        <div class="lbl" style="margin-top:10px">zero food</div>
+        <div class="box" style="width: 280px; border-color: var(--hurt)">
+          <h5><span>food</span><span class="hurt">nothing to eat</span></h5>
+          <div class="frow zero"><span>cooked fish <span class="dim">0/10</span></span><span>+12 hp</span><div class="cd"><i style="width:0"></i></div></div>
+          <div class="frow zero"><span>berries <span class="dim">0/20</span></span><span>+4 hp</span><div class="cd"><i style="width:0"></i></div></div>
+          <div class="frow zero"><span>dried meat <span class="dim">0/5</span></span><span>+20 hp</span><div class="cd"><i style="width:0"></i></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Every line in the rates chunk is a rate that is true this second: decay from the curve, the running action's drain if it has one, and the larder's ceiling from its cooldowns. Net is their sum. It is red when hp is falling and green when the larder can more than cover it; it is not a prediction of anything. The health chunk keeps only the bar and 71 / 100; its decay line moves here. In the food chunk the cooldown bars are the "next bite" for each food, so no number needs dividing.</p>
+
+</body></html>
