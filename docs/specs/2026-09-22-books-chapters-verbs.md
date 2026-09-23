@@ -16,10 +16,11 @@ first plan drawn from it is the v0.1 slice in §11.
 This spec sits on top of [`VISION.md`](../../VISION.md) and
 [`MECHANICS.md`](../../MECHANICS.md). Where it changes them, it says so.
 
-**Amended 2026-09-23:** [Cores, books, and the shelf](2026-09-23-cores-books-and-the-shelf.md)
+**Amended 2026-09-23:** [Categories, books, and the shelf](2026-09-23-cores-books-and-the-shelf.md)
 supersedes §1's "books are places within a life" and the global restart,
-turns §5–7's twelve verbs into book one's roster under six cores, and removes
-§9's skill points. Its §11 lists every change. The rest stands.
+turns §5–7's twelve verbs into book one's roster with six categories as tags,
+and removes §9's skill points and `templateKey`. Its §11 lists every change.
+The rest stands.
 
 ---
 
