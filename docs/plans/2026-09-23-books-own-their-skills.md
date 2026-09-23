@@ -1204,8 +1204,9 @@ describe('validateBook', () => {
     expect(validateBook(b)).toContainEqual(expect.stringMatching(/costs "constructor"/));
     const c = withActions({ ...good.actions, forage: { ...good.actions.forage!, producedItem: 'toString' } });
     expect(validateBook(c)).toContainEqual(expect.stringMatching(/produces "toString"/));
-    expect(() => validateBook(withActions(good.actions, ['forage', 'hut', 'toString']))).not.toThrow();
-    expect(validateBook(withActions(good.actions, ['forage', 'hut', 'toString']))).toContainEqual(expect.stringMatching(/toString/));
+    // toString FIRST, so the first-chapter rule reaches it: with it last, `.some` stops at forage and the guard is never exercised.
+    expect(() => validateBook(withActions(good.actions, ['toString', 'forage', 'hut']))).not.toThrow();
+    expect(validateBook(withActions(good.actions, ['toString', 'forage', 'hut']))).toContainEqual(expect.stringMatching(/toString/));
   });
   it('rejects an empty book: no chapters means no first chapter', () => {
     const b: Book = { id: 'empty', name: 'Empty', roster: [], chapters: [], items: {}, actions: {} };
@@ -1242,7 +1243,9 @@ Expected: `validate.test` fails to load (`./validate` not found).
  * time, and nothing about play. Whether a book can be finished is the headless
  * play's question (spec section 9). Returns every problem found; an empty list
  * is a valid book. Own-property checks throughout, so a key like "constructor"
- * is not mistaken for a definition.
+ * is not mistaken for a definition. Assumes the value has the Book type's
+ * shape; a JSON book needs a shape check ahead of this (filed with the
+ * generator).
  */
 import { ICON_NAMES } from './icons';
 import type { ActionId, Book } from './types';
@@ -1299,9 +1302,11 @@ export function validateBook(book: Book): readonly string[] {
 - [ ] **Step 4: Run the suite to verify it passes**
 
 Run: `npm test`
-Expected: PASS, all thirteen `validateBook` tests. (Round two's naysayer
-automated a mutation loop over this file: every `problems.push` removal and
-both condition flips now turn at least one test red.)
+Expected: PASS, all thirteen `validateBook` tests. The tests are the check:
+round three's naysayer ran a 34-mutant loop over this exact file (every
+`problems.push` removed, every condition flipped) and every mutant `tsc`
+does not catch is killed by one of them, once the `toString` id sits first
+in its order.
 
 - [ ] **Step 5: The books index, and the round trip**
 
@@ -1311,7 +1316,7 @@ Create `src/data/books.ts`:
 import { saltRoad } from './salt-road';
 import type { Book } from './types';
 
-/** Every book the game ships, in shelf order. A book that is not here is not in the game. */
+/** Every book the game ships. Its test validates each one; which book opens is the shelf slice's question. */
 export const BOOKS: readonly Book[] = [saltRoad];
 ```
 
@@ -1322,8 +1327,8 @@ import { describe, expect, it } from 'vitest';
 import { BOOKS } from './books';
 import { validateBook } from './validate';
 
-describe('the shelf', () => {
-  it('holds only valid books, with distinct ids', () => {
+describe('every shipped book', () => {
+  it('is valid, and ids are distinct', () => {
     for (const b of BOOKS) expect(validateBook(b)).toEqual([]);
     expect(new Set(BOOKS.map((b) => b.id)).size).toBe(BOOKS.length);
   });
@@ -1356,7 +1361,7 @@ imports only `./icons` and `./types`).
 
 ```bash
 git add src/data CLAUDE.md
-git commit -m "data: a static book validator and the shelf; The Salt Road passes and round-trips"
+git commit -m "data: a static book validator; every shipped book passes; the round trip"
 ```
 
 ---
@@ -1376,8 +1381,10 @@ Expected: all green.
 Dispatch fresh, in parallel, with no implementation context: `engine-reviewer`;
 `tuning-guard` (it must see the `ticksPerSkillPoint` removal as the intended
 change spec §11 step 1 names, and nothing else moved in `balance.ts`);
-`vacuous-test-hunter` (the validator tests, the mutation check, the round
-trip and the rebirth key-set assertions are its targets); and a general
+`vacuous-test-hunter` (the validator tests, the books index test, the round
+trip and the rebirth key-set assertions are its targets; it may rerun the
+naysayer's mutation loop, `scratchpad/plan-nay3/mutate.py` in the planning
+session's scratch, if it survives); and a general
 reviewer briefed to diff the branch against spec §11 step by step. Loop
 until a clean round. Fix, re-run Step 1.
 

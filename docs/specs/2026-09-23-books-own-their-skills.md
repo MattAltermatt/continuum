@@ -418,7 +418,7 @@ what crosses books land with the shop.
 *(panel)* It is a re-key with one consumer, the second book, which is the
 next slice and the thing that produces every number §6 and §12 defer.
 Behaviour is preserved across a medium-sized mechanical refactor; the one
-visible change is three skill cells instead of twelve. *(plan panel)* Six
+visible change is three skill cells instead of twelve. *(plan panel)* Five
 tests change an asserted value, all intended and listed in the plan; the
 mockup and the user's pick come first, so the run's one hard stop is at
 its front.
@@ -449,8 +449,9 @@ its front.
    all twelve" and `icons.test`'s union check are replaced. A mockup of the
    three-cell band is committed and the 🎨 pick made before this step's UI
    lands (decision #31).
-4. **The validator**, static, in `src/data/`, with a test per rule and a
-   mutation check that every rule has one: every row's verb is in the
+4. **The validator**, static, in `src/data/`, with a test per rule (the
+   plan panel ran a mutation loop over the plan's file; the tests are the
+   check): every row's verb is in the
    roster; every roster skill has at least one row; no roster id is declared
    twice; every icon name is in the vocabulary; every item a row produces
    or costs exists; every record key equals its entry's id; every chapter
@@ -489,7 +490,7 @@ carve-out, the ledger rename, the roster cap, and the skill grid at larger
 N (#46).
 
 **Tests the slice ends on** *(panel: "green" means edited mechanically, with
-no tuning literal changed; the six tests whose asserted value changes are
+no tuning literal changed; the five tests whose asserted value changes are
 listed in the plan)*:
 every existing engine and component test, including `playable.test.ts`'s
 progression across lives, with the roster order and every number preserved;
