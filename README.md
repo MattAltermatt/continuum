@@ -19,10 +19,13 @@ Death is the loop, not the failure.
 > and a log. Time passes only while work happens. v0.2 closes the loop: a run
 > dies to a death card that shows what the life bought, the next life keeps
 > core mastery and a larger maximum health, and the HUD shows decay beside the
-> food ceiling, green when the larder covers it. What is next lives in
+> food ceiling, green when the larder covers it. Since then each book declares
+> its own skills (The Salt Road has three) and passes a static validator, and
+> the page folds to fit narrower windows down to 732px. What is next lives in
 > [the milestones](https://github.com/MattAltermatt/continuum/milestones). The design is
-> [`docs/specs/2026-09-22-books-chapters-verbs.md`](./docs/specs/2026-09-22-books-chapters-verbs.md)
-> and [`docs/specs/2026-09-23-v0-2-a-run-you-can-lose.md`](./docs/specs/2026-09-23-v0-2-a-run-you-can-lose.md),
+> [`docs/specs/2026-09-22-books-chapters-verbs.md`](./docs/specs/2026-09-22-books-chapters-verbs.md),
+> [`docs/specs/2026-09-23-v0-2-a-run-you-can-lose.md`](./docs/specs/2026-09-23-v0-2-a-run-you-can-lose.md)
+> and [`docs/specs/2026-09-23-books-own-their-skills.md`](./docs/specs/2026-09-23-books-own-their-skills.md),
 > with mockups in [`docs/mockups/`](./docs/mockups/) and plans in
 > [`docs/plans/`](./docs/plans/).
 
