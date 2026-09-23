@@ -26,3 +26,4 @@ evidence.
 | 2026-09-23 | [death-card](2026-09-23-death-card.html) | v0.2 death card: gains only (core levels, max health with its formula), reset already done behind it, Begin life N |
 | 2026-09-23 | [v0-2-death-card.png](2026-09-23-v0-2-death-card.png) | The built death card in Chrome: a 30 s life, Begin focused, the next life behind it |
 | 2026-09-23 | [food-cooldown](2026-09-23-food-cooldown.html) | Food chunk cooldown, animated: today vs A (stack bar + cooldown line) vs B (cooldown as text) vs C (ember cooldown bar) |
+| 2026-09-23 | [three-cell-band](2026-09-23-three-cell-band.html) | the real band at a three-skill roster: A empty fourth slot, B stretched to three across |
