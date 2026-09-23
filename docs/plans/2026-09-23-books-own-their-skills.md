@@ -6,6 +6,14 @@ validator with real books and built the revised order). To be executed in a
 later session on `feature/cores-books-and-the-shelf`, the branch that
 carries the spec.
 
+**Task 1 pick (2026-09-23): neither A nor B.** Shown both, the user chose a
+third layout: skill cells at a fixed **360px**, filling left to right and
+wrapping by window width (three to a row at 1280, five at 1920; one cell to a
+phone's width). Mockups `docs/mockups/2026-09-23-wrapping-band.html` (chosen)
+and `2026-09-23-skills-column.html` (a right-hand column, rejected). Health on
+top and a bottom bar for clock, gear and pause were picked in the same pass;
+they belong to #46 and are not in this slice. A phone layout is #62.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every book declares its own skills. The fixed twelve-verb union
@@ -729,7 +737,7 @@ holds twelve keys, so `skills[s.id]!` is defined for every roster entry.
 - Modify: `src/ui/DeathCard.tsx` (takes `content`), `src/ui/DeathCard.test.tsx`
 - Modify: `src/ui/narrate.ts`
 - Modify: `src/ui/App.tsx` (passes `content` to the band and the card)
-- Modify: `src/styles.css:73` (per the Task 1 pick)
+- Modify: `src/styles.css:73` (the Task 1 pick: 360px cells that wrap)
 - Delete: `src/data/skills.ts`
 
 **Interfaces:**
@@ -854,10 +862,15 @@ export function SkillCell({ skill, state, running }: { skill: SkillDefinition; s
 
 (the rest unchanged).
 
-`src/styles.css:73`, per the Task 1 pick. If **A**, leave the rule and add
-above it `/* four across; a three-skill roster leaves the fourth slot empty (mockup 2026-09-23-three-cell-band, pick A) */`.
-If **B**, change it to `.skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }`
-with `/* one column per roster entry (mockup 2026-09-23-three-cell-band, pick B); #46 revisits the band at N */`.
+`src/styles.css:73`, per the Task 1 pick: change the rule to
+
+```css
+/* Fixed-width cells that wrap by window width; the player's window decides how many per row (mockup 2026-09-23-wrapping-band). */
+.skills { display: grid; grid-template-columns: repeat(auto-fill, 360px); gap: 4px; }
+```
+
+At the 1280px minimum the page's content is 1260px wide, so three cells sit
+on a row (1088px) and the rest of the band is empty on the right.
 
 - [ ] **Step 5: The row, the queue, the card, the log**
 
@@ -1391,7 +1404,7 @@ until a clean round. Fix, re-run Step 1.
 - [ ] **Step 3: Chrome**
 
 Invoke `/chrome-verify`. Check, with the dev handle and by eye:
-- the band shows three cells, Forage, Mine, Build, in that order, in the layout picked in Task 1;
+- the band shows three cells, Forage, Mine, Build, in that order, each 360px wide on one row at 1280; at 1920 still one row of three, left-aligned;
 - queue Forage: the Forage cell carries the sheen and its bars move;
 - let Forage run about ten seconds (a core level costs 10 XP at 0.1 a tick), then `setHealth(0)` through the dev handle: the death card names Forage with "core 0 → 1";
 - the log's level-up line reads "Forage reaches Lv 1";

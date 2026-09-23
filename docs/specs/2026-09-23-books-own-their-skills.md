@@ -499,10 +499,10 @@ the round trip; the hooks suite.
 
 ## 12. Open, each with a home
 
-- 🎨 **Three cells in a four-column grid**: an empty fourth slot, or the
-  band stretched to three across. A mockup at step 3, the user picks.
+- 🎨 ~~**Three cells in a four-column grid**~~ **Settled 2026-09-23:** cells at a
+  fixed 360px that wrap by window width (mockup `2026-09-23-wrapping-band`).
 - 🎨 The two ledgers' player-facing names. *(user)* Later; filed.
-- 🎨 The skill grid at larger N. #46.
+- 🎨 The skill grid at larger N: the same wrap rule; the rest of the screen pass is #46.
 - 🎨 The finishing screen and the shelf. After the second book.
 - 🎚️ Badge definitions, shop items, prices, a badge sink, what the meta is.
   Later, on book two's numbers (§6).
