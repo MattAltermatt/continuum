@@ -110,7 +110,8 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .auto { width: calc(7ch + 8px); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 9px; position: relative; overflow: hidden; box-sizing: border-box; }
 .auto i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--auto); }
 
-.screen { display: grid; gap: 8px; padding: 10px; min-width: 1280px; }
+/* The floor is the action row, which cannot shrink below 712px, plus the page padding. Below it the page scrolls sideways; a phone layout is #62. */
+.screen { display: grid; gap: 8px; padding: 10px; min-width: 732px; container-type: inline-size; }
 .top { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
 .corner { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; font-size: 10px; color: var(--ink-2); gap: 4px; width: 14ch; }   /* pinned: "00:00 waiting" must not resize the health bar */
 .corner__gear { width: 14px; height: 14px; }
@@ -119,6 +120,19 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .columns { display: grid; grid-template-columns: 1fr 250px 280px; gap: 8px; align-items: start; }
 .middle { display: grid; gap: 8px; }
 .queue { display: grid; gap: 5px; align-content: start; }
+/* Narrower windows fold the columns rather than scroll (2026-09-23). Container queries on .screen measure the content box, so a classic scrollbar cannot push the page a few pixels past a breakpoint. 1258 = chapter floor 712 + 250 + 280 + two 8px gaps; 1000 = 712 + 280 + one gap. Below 1258 the queue sits in the second column above the middle one: the middle grows as the log fills, the queue grows at its own bottom, so the queue's buttons never move under the cursor. Below 1000 the chapter takes the full width and queue and middle sit side by side under it. */
+@container (max-width: 1257px) {
+  .columns { grid-template-columns: 1fr 280px; }
+  .columns__chapter { grid-column: 1; grid-row: 1 / span 2; }
+  .queue { grid-column: 2; grid-row: 1; }
+  .middle { grid-column: 2; grid-row: 2; }
+}
+@container (max-width: 999px) {
+  .columns { grid-template-columns: 1fr 1fr; }
+  .columns__chapter { grid-column: 1 / -1; grid-row: 1; }
+  .middle { grid-column: 1; grid-row: 2; }
+  .queue { grid-column: 2; grid-row: 2; }
+}
 .entry { display: grid; grid-template-columns: 1.4em 1fr var(--control); gap: 3px 6px; align-items: center; padding: 6px 8px; }
 .entry svg { width: 15px; height: 15px; }
 .entry--on { background: var(--cell-on); }

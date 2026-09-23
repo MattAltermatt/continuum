@@ -249,10 +249,16 @@ unsubscribed event) ship without asking.
   under `src/engine/`.
 - **Ten additions of `0.1` are `0.9999…`.** A test that counts ticks to a
   completion uses `floor(expCost / baseTickExp) + 1`, not `ceil`.
-- **The layout has a 1280px minimum; only the skills band reflows.** Its cells
-  are a fixed 360px and wrap by window width (mockup 2026-09-23-wrapping-band).
-  Nothing else reflows: desktop target, accepted (audit 2026-09-22); a phone
-  layout is #62.
+- **The layout folds rather than scrolls, down to 732px.** The skills band's
+  cells are a fixed 360px and wrap by window width (mockup
+  2026-09-23-wrapping-band). Below 1280 the queue moves into the second
+  column *above* the middle one (the middle grows as the log fills; above it,
+  the queue's buttons stay put); below 1020 the chapter takes the full width
+  with middle and queue side by side under it (`src/styles.css`, two
+  `@container` queries on `.screen`, which measure the content box so a
+  classic scrollbar cannot tip a breakpoint; mockup 2026-09-23-fold). The floor is the action row, which cannot shrink below
+  712px; under 732 (747 with a classic 15px scrollbar showing) the page
+  scrolls sideways. A phone layout is #62.
 - **`step()` returns the same object when nothing happened.** React skips
   the render on an idle tick, and `useGame` only logs a state that is new. A
   change that spreads the state on every tick breaks both silently.

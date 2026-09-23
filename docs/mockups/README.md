@@ -29,4 +29,4 @@ evidence.
 | 2026-09-23 | [three-cell-band](2026-09-23-three-cell-band.html) | the real band at a three-skill roster: A empty fourth slot, B stretched to three across |
 | 2026-09-23 | [skills-column](2026-09-23-skills-column.html) | health on top, clock/pause/settings bottom row, skills as a scrolling right column: A four columns (rows clip), B queue under middle |
 | 2026-09-23 | [wrapping-band](2026-09-23-wrapping-band.html) | skills band at a fixed 360px cell (312 shown, not chosen), wrapping by window width; health full width on top; clock/pause/settings bottom row. Supersedes skills-column |
-| 2026-09-23 | [fold](2026-09-23-fold.html) | captures of the built change: below 1280 the queue folds under the middle column, below 1020 the chapter goes full width; floor 732px |
+| 2026-09-23 | [fold](2026-09-23-fold.html) | captures of the built change: below 1280 the queue folds above the middle column, below 1020 the chapter goes full width; floor 732px |

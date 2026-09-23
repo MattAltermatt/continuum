@@ -9,10 +9,14 @@ carries the spec.
 **Task 1 pick (2026-09-23): neither A nor B.** Shown both, the user chose a
 third layout: skill cells at a fixed **360px**, filling left to right and
 wrapping by window width (three to a row at 1280, five at 1920; one cell to a
-phone's width once #62 lifts the 1280 minimum). Mockups `docs/mockups/2026-09-23-wrapping-band.html` (chosen)
+phone's width once #62 goes below the 732px floor). Mockups `docs/mockups/2026-09-23-wrapping-band.html` (chosen)
 and `2026-09-23-skills-column.html` (a right-hand column, rejected). Health on
 top and a bottom bar for clock, gear and pause were picked in the same pass;
 they belong to #46 and are not in this slice. A phone layout is #62.
+During the verify the user added, as a utility for desktop windows: the page
+folds instead of scrolling below 1280 (queue above the middle column, then
+chapter full width), down to a 732px floor set by the action row. Mockup
+`docs/mockups/2026-09-23-fold.html`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
