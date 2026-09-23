@@ -79,7 +79,7 @@ export function firstRunnable(state: GameState, content: Content): number {
 }
 
 /**
- * The bookkeeping that takes no time (spec section 9, decision B): drop full
+ * The bookkeeping that takes no time (spec section 9, decision #41): drop full
  * producers, flag entries that cannot pay, unflag entries that can again. The
  * same object back when nothing changed, so an idle tick renders nothing.
  */

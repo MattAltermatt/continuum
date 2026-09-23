@@ -25,7 +25,7 @@ describe('step', () => {
     const s = enqueue(newState(), content, 'forage');
     expect(step(s, content)).toBe(s);
   });
-  it('does nothing with an empty queue: time passes only while work happens (decision B)', () => {
+  it('does nothing with an empty queue: time passes only while work happens (decision #41)', () => {
     const s = live(newState());
     expect(step(s, content)).toBe(s);
   });

@@ -463,7 +463,7 @@ Each of these widens the engine and is filed as its own issue.
   `ticksPerSkillPoint` and the rebirth curve were derived from the old target
   and are re-examined with it.
 - MECHANICS: the decay rate is displayed in hp/s, not hp/min. Display only.
-- MECHANICS §2 step 1 **stands, by decision (B):** a tick short-circuits when
+- MECHANICS §2 step 1 **stands, by decision (B), now [decision #41](https://github.com/MattAltermatt/continuum/issues/41):** a tick short-circuits when
   the queue is empty, and when no entry can run this tick, and the tick that
   would have found the working entry unable to pay does not advance the clock
   either. Time passes only while work happens; an empty queue is a planning

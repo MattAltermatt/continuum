@@ -62,7 +62,7 @@ function reduce(content: Content) {
 }
 
 /**
- * The game opens live. Under decision B an empty queue costs no time anyway, so
+ * The game opens live. Under decision #41 an empty queue costs no time anyway, so
  * a start-paused state would only make the first click look broken.
  */
 function initial(): Model {

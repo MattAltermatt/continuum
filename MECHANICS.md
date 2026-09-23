@@ -32,7 +32,7 @@ time, such as dropping a full producer, still happens). A stopped game renders
 nothing.
 
 Pause distinguishes **paused by the player** from **paused by the system**
-(death; the first run opens live, because under decision B an empty queue costs nothing; §5's paused rebirth is unchanged). The distinction matters because passive automation is
+(death; the first run opens live, because under decision #41 an empty queue costs nothing; §5's paused rebirth is unchanged). The distinction matters because passive automation is
 suppressed while the player has deliberately paused — a paused game is a
 planning surface, and having the queue refill itself underneath the player
 while they think defeats the point.
@@ -173,7 +173,7 @@ In order:
    entries that cannot pay the unit they owe, unflag those that can again.
 3. Find the first entry that can run. If there is none (which covers an empty
    queue), stop: the clock does not advance, nothing decays, nothing is eaten.
-   Time passes only while work happens (decision B, 2026-09-22).
+   Time passes only while work happens (decision #41).
 4. Advance the run clock.
 5. Apply this tick's health decay (§4); at zero, die and stop.
 6. Eat (§4).

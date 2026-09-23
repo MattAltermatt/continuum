@@ -1,5 +1,5 @@
 /**
- * One tick. Time passes only while work happens (spec section 9, decision B).
+ * One tick. Time passes only while work happens (spec section 9, decision #41).
  * Paused or dead: nothing. Otherwise settle the queue, which takes no time;
  * then, if nothing can run, stop there with the clock untouched. Otherwise:
  * advance the clock, decay, eat, work the queue.

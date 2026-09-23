@@ -9,7 +9,7 @@ describe('useGame', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('starts live with an empty queue, so nothing ticks until work is queued (decision B), and a lifeBegins line', () => {
+  it('starts live with an empty queue, so nothing ticks until work is queued (decision #41), and a lifeBegins line', () => {
     const { result } = renderHook(() => useGame(scrub));
     expect(result.current.state.paused).toBe('none');
     expect(result.current.state.queue).toHaveLength(0);

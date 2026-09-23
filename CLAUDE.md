@@ -60,6 +60,7 @@ only an index so a number can be looked up without a search.
 | [3](https://github.com/MattAltermatt/continuum/issues/3) | All tuning lives in `balance.ts` and is sacrosanct |
 | [4](https://github.com/MattAltermatt/continuum/issues/4) | The engine never imports from the UI |
 | [31](https://github.com/MattAltermatt/continuum/issues/31) | Mockups are committed artifacts, never scratch |
+| [41](https://github.com/MattAltermatt/continuum/issues/41) | Time passes only while work happens |
 
 A decision is a **closed and locked** issue. Amending one means reopening it,
 which leaves a trail; editing a heading in a file does not.
