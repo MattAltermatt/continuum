@@ -1406,16 +1406,15 @@ are the record of the design rounds. Do not FF-merge: the user verifies in
 Chrome first (CLAUDE.md, "user-verify before FF-merge"). Hand over the URL
 and the three things to look at: the band, the death card, the log line.
 
-**For the session's wrap-up (GitHub writes, gated mid-session, standing at
-stop time):** close #24 with its answer (keyed per action, book-scoped
-because the state is); file, with no milestone, the items spec §11 lists as
-out of the slice: the headless play (carrying the cycle, cap and
-chapter-order rules dropped from the validator), the `book-author` skill,
-book two, `hurts` and the damage field, badges, the shop, the bookmark map,
-the shelf, finish detection and the finishing screen, the generator, the
-decision #3 carve-out, the ledger rename, the roster cap; and note on #27
-that `rebirth` rebuilds from a state's own keys, so a saved state from
-before a roster change needs a migration.
+**Tracker, already done at the planning session's stop (2026-09-23):** #24
+closed with its answer; #36 and #37 closed as answered by the spec; the
+out-of-slice items are filed as #51 (the headless play, carrying the
+dropped validator rules), #52 (the `book-author` skill), #53 (book two),
+#54 (damage and `hurts`), #55 (badges), #56 (the shop and the meta), #57
+(the bookmark), #58 (the shelf and finish detection), #59 (the decision #3
+carve-out), #60 (the ledger rename), #61 (the roster cap); #17, #21, #27,
+#39, #45, #46 and #47 carry comments on the knock-ons. **This slice is
+#50**; close it when the FF-merge lands, naming the squashed commit.
 
 ---
 
