@@ -48,4 +48,15 @@ describe('balance', () => {
     expect(balance.automation.unlockRepeatable).toBe(200);
     expect(balance.automation.unlockOneTime).toBe(5);
   });
+
+  it('locks the v0.1 slice content numbers', () => {
+    expect(balance.content.scrub).toEqual({
+      forage: { expCost: 4.2 },
+      mine: { expCost: 6 },
+      cabin: { expCost: 60, stone: 6, decayMultiplier: 0.8 },
+      hall: { expCost: 5000, stone: 500 },
+      berries: { cap: 20, healPerUnit: 4 },
+      stone: { cap: 5 },
+    });
+  });
 });

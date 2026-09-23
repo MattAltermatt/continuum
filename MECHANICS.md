@@ -25,12 +25,14 @@ TICK_INTERVAL_MS = 100      // 10 ticks per second of real time
 TICKS_PER_MINUTE = 600      // 100 ms × 600 = 60 s
 ```
 
-A single loop dispatches one `TICK` per interval. Pause is implemented by
-*not scheduling the interval* rather than by guarding inside it, so a paused
-game costs nothing.
+A single loop dispatches one `TICK` per interval. The tick guards itself: while
+paused or dead it returns the state untouched, and whenever nothing in the
+queue can run it returns without advancing the clock (bookkeeping that takes no
+time, such as dropping a full producer, still happens). A stopped game renders
+nothing.
 
 Pause distinguishes **paused by the player** from **paused by the system**
-(start of run, death). The distinction matters because passive automation is
+(death; the first run opens live, because under decision B an empty queue costs nothing; §5's paused rebirth is unchanged). The distinction matters because passive automation is
 suppressed while the player has deliberately paused — a paused game is a
 planning surface, and having the queue refill itself underneath the player
 while they think defeats the point.
@@ -58,7 +60,7 @@ in the game.
 ## 2. Actions and the queue
 
 The player does not click to perform work. They **queue** actions, and the
-queue executes one action at a time, front-first, one tick at a time.
+queue works one action at a time, one tick at a time: the first entry that can run, which is the front one unless it is waiting on an input. The queue holds one entry per action.
 
 ### What an action is
 
@@ -98,11 +100,14 @@ worth protecting.** Costs are paid one unit at a time as progress accrues —
 never as a lump sum checked on completion.
 
 ```ts
+// Unit n (0-based) falls due at progress n * expCost / totalUnits. The engine
+// counts thresholds reached rather than dividing, so it agrees exactly with the
+// progress a waiting entry is clamped to.
 function getRequiredCostsConsumed(action, progress): number {
   const totalUnits = sum(action.itemCosts.map(c => c.amount))
-  if (totalUnits === 0) return 0
-  const expPerUnit = action.expCost / totalUnits
-  return Math.min(totalUnits, Math.floor(progress / expPerUnit) + 1)
+  let n = 0
+  while (n < totalUnits && progress >= n * (action.expCost / totalUnits)) n++
+  return n
 }
 ```
 
@@ -120,9 +125,10 @@ progress    required units consumed
 ```
 
 Each tick, once progress has advanced, the engine walks `itemCosts` in
-**declared order**, finds the first group not yet fully paid, and removes
-exactly one unit from inventory. Declaration order *is* spend order — a
-deliberate authoring lever, not an accident.
+**declared order** and pays one unit for each unit threshold the new progress
+has reached; a unit it cannot pay stops progress at that threshold.
+Declaration order *is* spend order — a deliberate authoring lever, not an
+accident.
 
 Why this matters: a half-built cart has really eaten five wood. The player can
 see materials draining into work in progress, and abandoning a build is a real
@@ -130,16 +136,19 @@ loss rather than a free undo.
 
 ### Stalling and resuming
 
-If the next unit cannot be paid for, the action **stalls**: it is pulled out of
-the queue and its partial state is stashed.
+When an action's progress reaches the point where its next unit is due and
+that unit cannot be paid, progress stops exactly there and the action
+**waits**: it stays in the queue, flagged, keeping its progress and the units
+already spent, and the engine works the first entry that can run. Progress
+never runs past an unpaid unit, so a waiting action owes exactly one. Every
+entry is re-checked before each tick and resumes the moment it can pay.
+Nothing is re-paid. (Spec 2026-09-22 §9 replaced the earlier "pull it out and
+stash it" model, so the queue view is honest.)
 
-```ts
-stalledActionProgress[actionId] = { progress, costsConsumed }
-```
-
-When that action is queued again — by the player or by automation — it resumes
-from exactly where it stopped, with the already-spent materials still counted as
-spent. The stash is cleared when the action finally completes.
+A producer never produces into a full stack. When a completion leaves its
+stack with no room for another, the entry leaves the queue; one queued onto an
+already-full stack leaves before it does any work. Ticks spent stay spent, XP
+stays earned, and nothing lands past the cap.
 
 A stall is not a failure state and should not read as one. It is the game
 saying *you ran out of wood*, and the correct response is to go get wood.
@@ -154,24 +163,31 @@ In order:
 4. Multiply the run's `healthDecayMultiplier` by the action's, if set.
 5. Increment `actionCompletionCounts[templateKey]` — a **lifetime** counter that
    survives death and drives automation unlocks.
-6. Clear any stalled progress for the action.
+6. If repeatable and the output stack has no room for another completion, the
+   entry leaves the queue; otherwise it resets to zero progress and stays.
 
 ### Order of operations within a tick
 
-1. Short-circuit if paused, dead, or the queue is empty.
-2. Resolve the front action; drop the entry if it is no longer reachable.
-3. Gate on `canActionProceed` — skill requirements, one-time-already-done,
-   inventory capacity full.
-4. Check affordability of the next cost unit; on failure, try as-needed material
-   injection (§6), otherwise stall.
-5. Apply this tick's health decay (§4).
-6. Award tick XP to the action's required skill — to **both** mastery ledgers (§3).
-7. Advance progress, then attempt to consume the next cost unit.
-8. If progress has reached `expCost`, complete the action and handle repeat,
-   finite-count, or one-time removal.
-9. Otherwise write back progress and re-stall if it has become unaffordable.
-10. If the queue is now empty, attempt a passive automation fill (§6).
-11. If a food item hit zero this tick, attempt as-needed food injection (§6).
+1. Short-circuit if paused or dead.
+2. Settle, which takes no time: drop producers whose stack is full, flag
+   entries that cannot pay the unit they owe, unflag those that can again.
+3. Find the first entry that can run. If there is none (which covers an empty
+   queue), stop: the clock does not advance, nothing decays, nothing is eaten.
+   Time passes only while work happens (decision B, 2026-09-22).
+4. Advance the run clock.
+5. Apply this tick's health decay (§4); at zero, die and stop.
+6. Eat (§4).
+7. Work the entry found in step 3: pay the unit it owes, advance progress by
+   the tick's XP (`expCost` is in XP), and pay every unit whose threshold the
+   new progress reached. A unit that cannot be paid stops progress at its
+   threshold, and the entry waits. Then award the progress actually made as XP
+   to **both** mastery ledgers of its skill (§3): a clamped tick earns only
+   what it applied.
+8. If progress has reached `expCost`, complete the action (above).
+9. If the queue is now empty, attempt a passive automation fill (§6).
+   *Not built yet; when it is, it belongs in step 2, since an empty queue
+   never reaches this step, and it must skip producers whose stack is full.*
+10. If a food item hit zero this tick, attempt as-needed food injection (§6).
 
 ---
 
@@ -498,10 +514,7 @@ Things that bite, kept where they will be read.
 
 1. **Cost declaration order is spend order.** `itemCosts` is walked
    left-to-right, so the author controls which material drains first.
-2. **Stalled progress is keyed by `actionId`, not `templateKey`.** If content
-   ever regenerates action ids, stalled progress will not follow. Stalls are
-   short-lived so this rarely surfaces, which is exactly why it should be
-   decided on purpose rather than discovered.
+2. **A waiting action is keyed by its queue entry, and the queue holds one entry per action.** If content ever regenerates action ids, a waiting entry is simply removed by the new chapter's queue prune (design note 6).
 3. **The capacity bonus is global.** `capacityBonusOnComplete` raises *every*
    slot's maximum. Per-slot bonuses would need a reshape.
 4. **As-needed food fires on empty, not on low.** It triggers on the transition

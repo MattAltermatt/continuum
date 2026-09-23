@@ -46,13 +46,13 @@ on the original port is a whole wasted pass.
 The game is a dense text-and-control interface that changes ten times a second.
 Screenshots are the fallback; the handle is the sharp instrument.
 
-**The convention:** `src/main.tsx` publishes `window.continuum` in dev builds
-only, exposing the live state plus the controls a verification pass needs —
-at minimum a way to read state, advance the tick loop by an exact count, and
-pause. **This does not exist yet.** It gets built with the tick loop
-(`gh issue view 6`), and this section is the contract it should satisfy. If it
-is missing, say so rather than falling back to eyeballing numbers off a
-screenshot.
+**The handle:** `src/ui/App.tsx` installs `window.continuum` in dev builds only
+(`src/state/devHandle.ts`): `state()` reads the committed state, `dispatch(a)`
+sends any `GameAction`, `step(n)` advances exactly n ticks. `dispatch` and
+`step` commit synchronously, so a `state()` on the next line sees the result.
+`dispatch({ type: 'setHealth', health })` is the fast path to death; play
+reaches it through the stone hall in about ten minutes. If the handle is missing, say so rather than
+falling back to eyeballing numbers off a screenshot.
 
 **Fast-forward rather than waiting.** A run is minutes and the decay curve is
 the thing most often under test. Advancing the tick count directly is the only
@@ -81,8 +81,9 @@ that skipped them has not verified anything that matters here.
   changes — a count, a timer, a progress figure — and confirm its neighbours stay
   put. Click A, content widens, A is now where B was, the next click hits B.
 - **A stall must not read as an error.** When an action runs out of materials it
-  leaves the queue with progress preserved. Confirm it looks like the game saying
-  *you are out of wood*, not like a failure state.
+  stays in the queue, dashed, "waiting on" the input, with its progress and
+  spent units kept, and goes on by itself when the input lands. Confirm it looks
+  like the game saying *you are out of wood*, not like a failure state.
 
 ### 5. Console clean
 

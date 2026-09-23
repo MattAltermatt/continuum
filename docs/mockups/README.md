@@ -22,3 +22,4 @@ evidence.
 | 2026-09-22 | [header](2026-09-22-header.html) | Running head like a printed book, text tokens at 90 and 80 |
 | 2026-09-22 | [layout](2026-09-22-layout.html) | The whole screen assembled: health top, skills 4x3, chapter / middle / queue |
 | 2026-09-22 | [icons](2026-09-22-icons.html) | Lucide icon picks for the twelve verbs, at 15px and 26px and in the grid |
+| 2026-09-22 | [big-sink](2026-09-22-big-sink.html) | Why the Scrub needs a big sink: health over a session, frozen-alive (A) vs a one-time stone hall (B), from the headless engine |

@@ -12,11 +12,15 @@ building the right thing early.
 
 Death is the loop, not the failure.
 
-> 🚧 **Early.** The engine design is settled and written down, and so is the
-> game's shape: books and chapters, twelve verbs, and the one screen, decided
-> in [`docs/specs/2026-09-22-books-chapters-verbs.md`](./docs/specs/2026-09-22-books-chapters-verbs.md)
-> with committed mockups in [`docs/mockups/`](./docs/mockups/). Nothing is
-> built yet; the first slice's plan is in [`docs/plans/`](./docs/plans/).
+> 🚧 **Early.** v0.1 is on screen: three rows that feed each other (forage,
+> mine, build) and a stone hall no first life can finish, the twelve skills
+> with live XP ledgers, a queue whose stalls wait in place and whose producers
+> stop at a full stack, the pack, the health bar and a log. Time passes only
+> while work happens. What is next lives in
+> [the milestones](https://github.com/MattAltermatt/continuum/milestones). The design is
+> [`docs/specs/2026-09-22-books-chapters-verbs.md`](./docs/specs/2026-09-22-books-chapters-verbs.md),
+> with mockups in [`docs/mockups/`](./docs/mockups/) and plans in
+> [`docs/plans/`](./docs/plans/).
 
 ## Run it
 
@@ -60,8 +64,10 @@ than merely intended to be.
 
 ## Built with
 
-TypeScript · React · Vite · Vitest
+TypeScript · React · Vite · Vitest · Lucide icons
 
 ## License
 
 MIT — see [`LICENSE`](./LICENSE).
+
+Third-party notices: [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).

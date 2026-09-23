@@ -63,6 +63,26 @@ export const balance = {
     /** UNDERIVED. Lifetime completions to unlock a one-time action. */
     unlockOneTime: 5,
   },
+
+  /**
+   * Content numbers for the v0.1 slice, the Scrub. UNDERIVED, all of them:
+   * they exist so three rows feed each other. The stone cap is deliberately
+   * below the cabin's cost so the stall is exercised, and the cabin slows the
+   * decay clock so completing it changes the run (its beat is what shows it in
+   * v0.1; a rates chunk that shows the number arrives later). The hall is the
+   * chapter's big sink (spec section 2), a placeholder no first life can
+   * finish: it keeps stone useful, so time keeps passing and a run can die.
+   */
+  content: {
+    scrub: {
+      forage: { expCost: 4.2 },
+      mine: { expCost: 6 },
+      cabin: { expCost: 60, stone: 6, decayMultiplier: 0.8 },
+      hall: { expCost: 5000, stone: 500 },
+      berries: { cap: 20, healPerUnit: 4 },
+      stone: { cap: 5 },
+    },
+  },
 } as const;
 
 export type Balance = typeof balance;

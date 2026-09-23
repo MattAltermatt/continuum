@@ -75,9 +75,10 @@ src/
   balance.ts  every tuning number, in one place
 ```
 
-This is the layout the code is built toward, not a description of what is on
-disk today — `data/` and `state/` appear with the work that needs them. The
-boundaries are the contract; the directories are just where it gets enforced.
+All five exist as of v0.1. The boundaries are the contract; the directories are
+just where it gets enforced. Content *types* live in `src/data/types.ts` so
+that both content and the engine can import them; the engine imports data,
+never the reverse.
 
 **The engine never imports from `ui/`.** The simulation must be runnable and
 testable headless; if a test needs to render a component to check a rule, the
@@ -238,3 +239,19 @@ unsubscribed event) ship without asking.
   click hits the wrong control.
 - **Tests do not import React from engine tests.** If an engine test needs a
   component, the boundary has leaked.
+- **`src/data/` may not import `src/engine/`.** The purity test names the file
+  and the import it resolved. Content types live in `src/data/types.ts` for
+  that reason; an engine test may import data, so a test that needs both lives
+  under `src/engine/`.
+- **Ten additions of `0.1` are `0.9999…`.** A test that counts ticks to a
+  completion uses `floor(expCost / baseTickExp) + 1`, not `ceil`.
+- **The layout has a 1280px minimum and does not reflow.** Desktop target, a
+  two-dimensional game grid; accepted (audit 2026-09-22).
+- **`step()` returns the same object when nothing happened.** React skips
+  the render on an idle tick, and `useGame` only logs a state that is new. A
+  change that spreads the state on every tick breaks both silently.
+- **`realClick` needs real timers.** It awaits a real `setTimeout`; a suite
+  under `vi.useFakeTimers()` hangs on it. Wrap the await in `act`. It passes no
+  `view` to `MouseEvent`: under vitest the global `window` is not jsdom's.
+- **Spec glyphs are escapes.** `⚠` and `▶` carry the Unicode Emoji property;
+  they live in `src/ui/glyphs.ts` as `\u` escapes and are imported, never typed.

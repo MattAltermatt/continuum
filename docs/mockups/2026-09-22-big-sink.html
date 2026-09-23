@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Big sink: A vs B</title>
+<style>
+:root{--bg:oklch(20% .012 260);--cell:oklch(24% .012 260);--item:oklch(22% .012 260);--edge:oklch(34% .012 260);--edge-on:oklch(62% .06 260);--track:oklch(17% .012 260);--track-edge:oklch(55% .012 260);--ink:oklch(90% .01 80);--ink-2:oklch(80% .01 80);--core:oklch(84% .02 80);--run:oklch(70% .16 45);--hurt:oklch(66% .18 25);--hurt-text:oklch(70% .18 25);--warn:oklch(80% .15 85);--good:oklch(78% .12 150);--mono:ui-monospace,Menlo,monospace;--serif:Georgia,"Times New Roman",serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:12px/1.5 var(--mono);padding:20px;max-width:1280px}
+h1{font-size:15px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 4px}
+h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin:22px 0 8px}
+p{color:var(--ink-2);max-width:78ch;margin:4px 0}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chunk{border:1px solid var(--edge);background:var(--cell);border-radius:5px;padding:10px 12px}
+.chunk h3{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.item{border:1px solid var(--edge);background:var(--item);border-radius:4px}
+.row{display:grid;grid-template-columns:13em 1fr auto;gap:0 10px;align-items:center;padding:6px 8px;margin-bottom:5px}
+.row b{margin-right:.5em}.c2{text-align:center}.short{color:var(--warn)}.short small{color:var(--ink-2);margin-left:6px}
+.tx{text-align:right;line-height:1.2}.tx small{display:block;color:var(--ink-2);font-size:10px}
+.new{border-color:var(--run)}
+.tag{font-size:10px;color:var(--run);margin-left:6px}
+svg text{font-family:var(--mono);font-size:10px;fill:var(--ink-2)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px;font-size:11px}
+.legend span::before{content:"";display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;background:var(--c)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+td,th{padding:4px 8px;border-bottom:1px solid var(--edge);text-align:left}
+th{color:var(--ink-2);font-weight:400}
+.dead{color:var(--hurt-text)} .alive{color:var(--good)}
+.log li{list-style:none;padding:2px 0;border-bottom:1px solid var(--edge);display:grid;grid-template-columns:3.4em 1fr;gap:8px}
+.log{margin:0;padding:0}.log .t{color:var(--ink-2)}
+</style>
+</head>
+<body>
+<h1>The big sink: what A and B look like in play</h1>
+<p>Every number here comes from running the v0.1 plan's own engine headless (Revision 7), not from a sketch. The hall's numbers (500 stone, 5000 XP) are illustrative placeholders, not a proposal to tune.</p>
+
+<h2>Health over a session</h2>
+<div class="chunk">
+<svg id="chart" viewBox="0 0 1200 300" width="100%" role="img" aria-label="Health over time for four sessions"></svg>
+<div class="legend">
+<span style="--c:var(--core)">A · Forage alone</span>
+<span style="--c:var(--ink-2)">A · every row kept queued</span>
+<span style="--c:var(--run)">B · hall + Mine, no food</span>
+<span style="--c:var(--hurt)">B · every row kept queued, incl. Forage</span>
+</div>
+<p>A: both lines stop because <b>time stops</b>. The work runs out while health is at 97 to 99, and nothing more happens after that. B: time keeps passing, decay keeps accelerating, and the run ends in death.</p>
+</div>
+
+<h2>The numbers</h2>
+<div class="chunk">
+<table>
+<tr><th>session</th><th>ends at</th><th>how</th><th>lowest HP</th><th>bites eaten</th><th>hall</th></tr>
+<tr><td>A · Forage alone</td><td>1:20</td><td class="alive">time stops, alive (berries 20/20)</td><td>96</td><td>1</td><td>—</td></tr>
+<tr><td>A · every row kept queued</td><td>3:29</td><td class="alive">time stops, alive (all full, cabin built)</td><td>96</td><td>6</td><td>—</td></tr>
+<tr><td>B · hall + Mine, no food</td><td>6:57</td><td class="dead">dead</td><td>0</td><td>0</td><td>38/500 stone</td></tr>
+<tr><td>B · every row kept queued</td><td>10:21</td><td class="dead">dead, larder empty, cabin built</td><td>0</td><td>24</td><td>45/500 stone</td></tr>
+</table>
+<p>Under B the hall is a wall. A first life gets about a tenth of the way, which is the "weeks, then minutes, then seconds" arc from spec §1: life 1 barely scratches it, and a mastered life walks through it.</p>
+</div>
+
+<h2>The chapter, A and B side by side</h2>
+<div class="cols">
+<div class="chunk"><h3>A · as planned</h3>
+<div class="item row"><span><b>Forage</b>berries</span><span class="c2">→ +1 berries</span><span class="tx">4.2s<small>+4.2 xp</small></span></div>
+<div class="item row"><span><b>Mine</b>stone</span><span class="c2">→ +1 stone</span><span class="tx">6.0s<small>+6.0 xp</small></span></div>
+<div class="item row"><span><b>Build</b>a cabin</span><span class="c2"><span class="short">⚠ 6 stone<small>have 0</small></span> → cabin</span><span class="tx">1:00<small>+60.0 xp</small></span></div>
+</div>
+<div class="chunk"><h3>B · one more row</h3>
+<div class="item row"><span><b>Forage</b>berries</span><span class="c2">→ +1 berries</span><span class="tx">4.2s<small>+4.2 xp</small></span></div>
+<div class="item row"><span><b>Mine</b>stone</span><span class="c2">→ +1 stone</span><span class="tx">6.0s<small>+6.0 xp</small></span></div>
+<div class="item row"><span><b>Build</b>a cabin</span><span class="c2"><span class="short">⚠ 6 stone<small>have 0</small></span> → cabin</span><span class="tx">1:00<small>+60.0 xp</small></span></div>
+<div class="item row new"><span><b>Build</b>a stone hall<span class="tag">new</span></span><span class="c2"><span class="short">⚠ 500 stone<small>have 0</small></span> → hall</span><span class="tx">83:20<small>+5000.0 xp</small></span></div>
+</div>
+</div>
+<p>Same grammar as the other rows: one-time and Build, like the cabin. It stands in for the chapter's big event, and it is spec §2's "another building that takes 5000 stone or something". Its 83:20 is at Build level 0; it shrinks as Build levels, life over life.</p>
+
+<h2>What the log reads under B (hall + Mine, first minute, from the engine)</h2>
+<div class="cols">
+<div class="chunk"><ul class="log" id="log"></ul></div>
+<div class="chunk"><p style="margin-top:0">The hall and Mine take turns: each stone that lands lets the hall go on, and the hall waits again once it has spent it. That is two log lines per stone, so B also needs the log capped (a Task 6 change). Under A the log goes quiet within a few minutes, because nothing is happening.</p></div>
+</div>
+
+<script>
+const SERIES={"A_forage":[[1,99.9],[6,99.39],[11,98.88],[16,98.35],[21,97.82],[26,97.27],[31,96.71],[36,96.15],[41,99.57],[46,98.98],[51,98.38],[56,97.77],[61,97.15],[66,96.52],[71,99.87],[76,99.22],[79,98.82]],"A_all":[[1,99.9],[6,99.39],[11,98.88],[16,98.35],[21,97.82],[26,97.27],[31,96.71],[36,96.15],[41,99.57],[46,98.98],[51,98.38],[56,97.77],[61,97.15],[66,96.52],[71,99.87],[76,99.22],[81,98.55],[86,97.86],[91,97.17],[96,96.46],[101,99.74],[106,99],[111,98.26],[116,97.49],[121,96.72],[126,99.92],[131,99.12],[136,98.3],[141,97.46],[146,96.61],[151,99.74],[156,98.85],[161,97.95],[166,97.03],[171,96.1],[176,99.14],[181,98.31],[186,97.52],[191,96.71],[196,99.89],[201,99.05],[206,98.2],[208,97.86]],"B_unfed":[[1,99.9],[6,99.39],[11,98.88],[16,98.35],[21,97.82],[26,97.27],[31,96.71],[36,96.15],[41,95.57],[46,94.98],[51,94.38],[56,93.77],[61,93.15],[66,92.52],[71,91.87],[76,91.22],[81,90.55],[86,89.86],[91,89.17],[96,88.46],[101,87.74],[106,87],[111,86.26],[116,85.49],[121,84.72],[126,83.92],[131,83.12],[136,82.3],[141,81.46],[146,80.61],[151,79.74],[156,78.85],[161,77.95],[166,77.03],[171,76.1],[176,75.14],[181,74.17],[186,73.18],[191,72.17],[196,71.15],[201,70.1],[206,69.03],[211,67.95],[216,66.84],[221,65.71],[226,64.57],[231,63.4],[236,62.21],[241,60.99],[246,59.75],[251,58.49],[256,57.21],[261,55.9],[266,54.57],[271,53.21],[276,51.83],[281,50.42],[286,48.98],[291,47.52],[296,46.03],[301,44.52],[306,42.97],[311,41.39],[316,39.79],[321,38.15],[326,36.49],[331,34.79],[336,33.06],[341,31.3],[346,29.51],[351,27.68],[356,25.82],[361,23.92],[366,21.99],[371,20.02],[376,18.01],[381,15.97],[386,13.89],[391,11.77],[396,9.61],[401,7.4],[406,5.16],[411,2.88],[416,0.55],[417,0.08]],"B_all":[[1,99.9],[6,99.39],[11,98.88],[16,98.35],[21,97.82],[26,97.27],[31,96.71],[36,96.15],[41,99.57],[46,98.98],[51,98.38],[56,97.77],[61,97.15],[66,96.52],[71,99.87],[76,99.22],[81,98.55],[86,97.86],[91,97.17],[96,96.46],[101,99.74],[106,99],[111,98.26],[116,97.49],[121,96.72],[126,99.92],[131,99.12],[136,98.3],[141,97.46],[146,96.61],[151,99.74],[156,98.85],[161,97.95],[166,97.03],[171,96.1],[176,99.14],[181,98.31],[186,97.52],[191,96.71],[196,99.89],[201,99.05],[206,98.2],[211,97.33],[216,96.45],[221,99.55],[226,98.63],[231,97.69],[236,96.74],[241,99.77],[246,98.78],[251,97.77],[256,96.74],[261,99.7],[266,98.63],[271,97.54],[276,96.44],[281,99.31],[286,98.16],[291,96.99],[296,99.8],[301,98.59],[306,97.35],[311,96.09],[316,98.81],[321,97.5],[326,96.17],[331,98.81],[336,97.42],[341,96.02],[346,98.58],[351,97.12],[356,99.63],[361,98.11],[366,96.56],[371,98.99],[376,97.38],[381,99.75],[386,98.08],[391,96.39],[396,98.66],[401,96.9],[406,99.1],[411,97.28],[416,99.41],[421,97.52],[426,99.58],[431,97.61],[436,99.61],[441,97.57],[446,99.48],[451,97.36],[456,99.2],[461,97],[466,94.76],[471,92.47],[476,90.14],[481,87.77],[486,85.36],[491,82.9],[496,80.39],[501,77.83],[506,75.23],[511,72.58],[516,69.88],[521,67.13],[526,64.32],[531,61.47],[536,58.56],[541,55.59],[546,52.57],[551,49.5],[556,46.36],[561,43.17],[566,39.92],[571,36.6],[576,33.23],[581,29.79],[586,26.28],[591,22.71],[596,19.08],[601,15.37],[606,11.6],[611,7.75],[616,3.83],[620,0.64]]};
+const W=1200,H=300,L=40,R=60,T=10,B=30,maxS=660;
+const x=s=>L+(W-L-R)*s/maxS, y=h=>T+(H-T-B)*(1-h/100);
+const svg=document.getElementById('chart');let g='';
+for(let h=0;h<=100;h+=25)g+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(h)+'" y2="'+y(h)+'" stroke="oklch(34% .012 260)"/><text x="'+(L-6)+'" y="'+(y(h)+3)+'" text-anchor="end">'+h+'</text>';
+for(let m=0;m<=11;m++)g+='<text x="'+x(m*60)+'" y="'+(H-10)+'" text-anchor="middle">'+m+':00</text>';
+const col={A_forage:'var(--core)',A_all:'var(--ink-2)',B_unfed:'var(--run)',B_all:'var(--hurt)'};
+for(const[k,pts]of Object.entries(SERIES)){g+='<polyline fill="none" stroke-width="2" stroke="'+col[k]+'" points="'+pts.map(p=>x(p[0])+','+y(p[1])).join(' ')+'"/>';const e=pts[pts.length-1];g+='<circle cx="'+x(e[0])+'" cy="'+y(e[1])+'" r="4" fill="'+col[k]+'"/>';if(k.startsWith('A'))g+='<text x="'+(x(e[0])+7)+'" y="'+(y(e[1])+(k==='A_all'?14:-6))+'">time stops</text>';else g+='<text x="'+(x(e[0])+7)+'" y="'+(y(e[1])-4)+'">dead</text>';}
+svg.innerHTML=g;
+const lines=[[0,'Build a stone hall is waiting on stone'],[6,'Build a stone hall can go on'],[16,'Build a stone hall is waiting on stone'],[22,'Build a stone hall can go on'],[32,'Build a stone hall is waiting on stone'],[38,'Build a stone hall can go on'],[47,'Build a stone hall is waiting on stone'],[52,'Build a stone hall can go on']];
+document.getElementById('log').innerHTML=lines.reverse().map(l=>'<li><span class="t">00:'+String(l[0]).padStart(2,'0')+'</span><span>'+l[1]+'</span></li>').join('');
+</script>
+</body>
+</html>
