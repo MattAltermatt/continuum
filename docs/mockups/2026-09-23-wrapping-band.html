@@ -9,6 +9,7 @@
          font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
   main { width: 1280px; margin: 0 auto; }
   h1 { font-size: 16px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
+  h2 { font-size: 14px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; margin-top: 56px; }
   p.note { color: #9a968e; max-width: 90ch; }
   figure { margin: 32px 0; }
   figcaption { margin-bottom: 8px; font-weight: 600; }
@@ -21,21 +22,37 @@
   <h1>The skills band wraps at a fixed cell width</h1>
   <p class="note">Captured from the live game on 2026-09-23, restyled in the page with CSS
   only. Health is the top row at full width. Skill cells keep today's design at a fixed
-  312px and fill left to right, wrapping to a new row; the window's width decides how
-  many sit on a row. Settings, clock and pause move to a bottom row (user pick A).
-  Supersedes the right-hand skills column.</p>
+  width and fill left to right, wrapping to a new row; the window's width decides how
+  many sit on a row. Settings, clock and pause move to a bottom row. Supersedes the
+  right-hand skills column. Chosen cell width: <strong>360px</strong>, one cell to a
+  phone's width (a phone layout is #62).</p>
+
+  <h2>Chosen: 360px cells</h2>
   <figure>
-    <figcaption>The Salt Road's three skills at 1280
-      <span>(three cells at 312px, no stretch, no placeholder)</span></figcaption>
-    <img src="2026-09-23-wrapping-band-1280-three.png" alt="Three skill cells on one row at 1280px">
+    <figcaption>The Salt Road's three skills at 1280 <span>(one full row of three)</span></figcaption>
+    <img src="2026-09-23-wrapping-band-360-1280-three.png" alt="Three 360px skill cells on one row at 1280px">
   </figure>
   <figure>
-    <figcaption>Twelve skills at 1280 <span>(four to a row, three rows)</span></figcaption>
-    <img src="2026-09-23-wrapping-band-1280-twelve.png" alt="Twelve skill cells in three rows of four">
+    <figcaption>Twelve skills at 1280 <span>(three to a row, four rows)</span></figcaption>
+    <img src="2026-09-23-wrapping-band-360-1280-twelve.png" alt="Twelve 360px skill cells in four rows of three">
   </figure>
   <figure>
-    <figcaption>Twelve skills at 1920 <span>(six to a row, two rows; the chapter column stretches to 1354px)</span></figcaption>
-    <img src="2026-09-23-wrapping-band-1920-twelve.png" alt="Twelve skill cells in two rows of six at 1920px">
+    <figcaption>Twelve skills at 1920 <span>(five to a row, three rows)</span></figcaption>
+    <img src="2026-09-23-wrapping-band-360-1920-twelve.png" alt="Twelve 360px skill cells at 1920px">
+  </figure>
+
+  <h2>Not chosen: 312px cells (today's width)</h2>
+  <figure>
+    <figcaption>Three skills at 1280</figcaption>
+    <img src="2026-09-23-wrapping-band-1280-three.png" alt="Three 312px skill cells at 1280px">
+  </figure>
+  <figure>
+    <figcaption>Twelve skills at 1280 <span>(four to a row)</span></figcaption>
+    <img src="2026-09-23-wrapping-band-1280-twelve.png" alt="Twelve 312px skill cells in three rows of four">
+  </figure>
+  <figure>
+    <figcaption>Twelve skills at 1920 <span>(six to a row; the chapter column stretches to 1354px)</span></figcaption>
+    <img src="2026-09-23-wrapping-band-1920-twelve.png" alt="Twelve 312px skill cells in two rows of six at 1920px">
   </figure>
 </main>
 </body>
