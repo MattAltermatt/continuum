@@ -46,6 +46,12 @@ export interface GameState {
   /** Lifetime completions by templateKey. Drives automation later. */
   readonly completionCounts: Readonly<Record<string, number>>;
   readonly decayMultiplier: number;
+  /** Which life this is, from 1. Persists and counts up at rebirth. */
+  readonly life: number;
+  /** Sum of every death's max-health gain. maxHealth is always base + this. */
+  readonly rebirthBonus: number;
+  /** Core levels as this life began, so the death card can show what moved. */
+  readonly lifeStartCore: Readonly<Record<SkillId, number>>;
   /** This tick's events. Replaced every tick; never accumulates. */
   readonly events: readonly GameEvent[];
 }

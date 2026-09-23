@@ -32,8 +32,12 @@ export const balance = {
   },
 
   rebirth: {
-    /** UNDERIVED. Permanent max-health earned per death = factor * sqrt(ticks). */
-    growthFactor: 0.01,
+    /**
+     * Max health earned per death = growthRate ^ (minutes alive) - 1. The shape a
+     * player reports for Increlution (spec 2026-09-23 section 3): it rewards the
+     * longer life. User-chosen in the v0.2 brainstorm; 1.1 is UNDERIVED.
+     */
+    growthRate: 1.1,
   },
 
   skills: {

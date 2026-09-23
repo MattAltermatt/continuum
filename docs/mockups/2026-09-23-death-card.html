@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-23: death card</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; max-width: 900px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 18px; width: 1100px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+  .scr { font-family: ui-monospace, Menlo, monospace; font-size: 11px; padding: 10px; border-radius: 8px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --cell-on: oklch(30% 0.02 260); --item: oklch(22% 0.012 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --ink: oklch(90% 0.01 80); --dim: oklch(80% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --warn: oklch(80% 0.15 85); --good: oklch(78% 0.12 150); background: var(--bg); color: var(--ink); }
+  .scr .num { font-variant-numeric: tabular-nums; }
+  .scr .dim { color: var(--dim); } .scr .good { color: var(--good); } .scr .hurt { color: var(--hurt); }
+  .scr .box { border:1px solid var(--edge); background: var(--cell); border-radius:5px; padding: 6px 8px; }
+  .scr .bar { height:7px; border:1px solid var(--track-edge); border-radius:3px; position:relative; overflow:hidden; background: var(--track); }
+  .scr .bar i { position:absolute; left:0; top:0; bottom:0; background: var(--core); }
+  .scr .bar i.hp { background: var(--hurt); }
+  .scr .grid { display:grid; grid-template-columns: 1fr 250px 280px; gap: 8px; }
+  .scr .behind { opacity: .35; }
+  .scr .r { border:1px solid var(--edge); background: var(--cell); border-radius:4px; padding: 4px 7px; margin-bottom: 4px; display:flex; justify-content:space-between; }
+  .scr h5 { margin:0 0 4px; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color: var(--dim); }
+  /* the card sits over the chapter column; the pack and queue behind it are already reset */
+  .scr .col { position: relative; }
+  .scr .card { position:absolute; left: 40px; right: 40px; top: 24px; border:1px solid var(--edge-on); background: var(--cell-on); border-radius: 6px; padding: 14px 16px; box-shadow: 0 8px 28px oklch(0% 0 0 / .5); }
+  .scr .card .title { font-family: Georgia, serif; font-style: italic; font-size: 16px; text-align:center; margin-bottom: 2px; }
+  .scr .card .sub { text-align:center; color: var(--dim); margin-bottom: 12px; }
+  .scr .gain { display:grid; grid-template-columns: 1.4em 6em 1fr auto; gap: 3px 8px; align-items:center; }
+  .scr .gain .lv { text-align:right; white-space:nowrap; }
+  .scr .rule { border-top: 1px solid var(--edge); margin: 10px 0; }
+  .scr .hpgain { display:flex; justify-content:space-between; align-items:baseline; }
+  .scr .hpgain b { font-size: 13px; }
+  .scr .why { color: var(--dim); font-size: 10px; margin-top: 2px; }
+  .scr .begin { display:block; margin: 14px auto 0; padding: 6px 18px; border:1px solid var(--run); background: var(--run); color: var(--bg); border-radius: 4px; font: inherit; font-weight: 700; }
+  .scr .quiet { text-align:center; color: var(--dim); font-size: 10px; margin-top: 8px; }
+</style>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-23. v0.2 brainstorm (#13, #14). Emoji stand in for icons. Numbers are illustrative, drawn from the real formulas: a life of 9:42 on the run clock earns 1.1^9.7 − 1 = +1.52 max health.</p>
+<h2>The death card: what the life bought, then a button</h2>
+<p class="subtitle">Shown when health reaches 0. The reset has already happened behind it: the pack and queue are empty, run levels are back to 0, and the health bar is full at the new maximum. The card lists only gains. Skills that did not move are left off. Nothing ticks until the player presses Begin, and after that nothing ticks until something is queued (decision #41).</p>
+
+<div class="mockup"><div class="mockup-header">Death, life 3 → life 4</div><div class="mockup-body">
+<div class="scr">
+  <div class="box" style="margin-bottom:8px"><div class="bar" style="height:14px"><i class="hp" style="width:100%"></i></div><div class="num" style="text-align:center;font-weight:700;margin-top:3px">101.5 <span class="dim" style="font-weight:400">/ 101.5</span></div></div>
+  <div class="grid">
+    <div class="col">
+      <div class="behind">
+        <div class="r"><span>🌿 <b>Forage</b> the scrub</span><span class="dim">4.0s</span></div>
+        <div class="r"><span>⛏️ <b>Mine</b> stone</span><span class="dim">5.7s</span></div>
+        <div class="r"><span>🧱 <b>Build</b> a cabin</span><span class="dim">57s</span></div>
+        <div class="r"><span>🧱 <b>Build</b> the stone hall</span><span class="dim">1:02:10</span></div>
+        <div style="height:120px"></div>
+      </div>
+      <div class="card num" role="dialog" aria-label="Life 3 ends">
+        <div class="title">Life 3 ends</div>
+        <div class="sub">9:42 on the clock</div>
+        <div class="gain">
+          <span>🌿</span><b>Forage</b><div class="bar"><i style="width:62%"></i></div><span class="lv">core 4 → <b>6</b></span>
+          <span>⛏️</span><b>Mine</b><div class="bar"><i style="width:18%"></i></div><span class="lv">core 3 → <b>5</b></span>
+          <span>🧱</span><b>Build</b><div class="bar"><i style="width:40%"></i></div><span class="lv">core 5 → <b>6</b></span>
+        </div>
+        <div class="rule"></div>
+        <div class="hpgain"><span>max health</span><b>100.0 → <span class="good">101.5</span></b></div>
+        <div class="why">+1.52 from 9:42 alive · 1.1^9.7 − 1</div>
+        <button class="begin" type="button">Begin life 4</button>
+        <div class="quiet">pack, food, queue and run levels start over</div>
+      </div>
+    </div>
+    <div class="behind">
+      <div class="box"><h5>food</h5><div class="dim">berries 0/20</div></div>
+      <div class="box" style="margin-top:8px"><h5>pack</h5><div class="dim">stone 0/5</div></div>
+    </div>
+    <div class="behind"><h5>queue · 0</h5><div class="dim">empty</div></div>
+  </div>
+</div>
+</div></div>
+
+</body></html>

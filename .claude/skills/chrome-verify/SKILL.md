@@ -50,8 +50,11 @@ Screenshots are the fallback; the handle is the sharp instrument.
 (`src/state/devHandle.ts`): `state()` reads the committed state, `dispatch(a)`
 sends any `GameAction`, `step(n)` advances exactly n ticks. `dispatch` and
 `step` commit synchronously, so a `state()` on the next line sees the result.
-`dispatch({ type: 'setHealth', health })` is the fast path to death; play
-reaches it through the stone hall in about ten minutes. If the handle is missing, say so rather than
+`dispatch({ type: 'setHealth', health })` then one `step` is the fast path to
+death; play reaches it through the stone hall in about ten minutes. Death puts
+up the **death card**. `state()` stays the dead life (`dead: true`) until
+`dispatch({ type: 'begin' })`, while the screen behind the card already shows
+the next life. If the handle is missing, say so rather than
 falling back to eyeballing numbers off a screenshot.
 
 **Fast-forward rather than waiting.** A run is minutes and the decay curve is

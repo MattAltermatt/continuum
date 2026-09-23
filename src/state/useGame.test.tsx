@@ -112,4 +112,82 @@ describe('useGame', () => {
     expect(result.current.state.runTicks).toBe(ticks);
     expect(result.current.log).toHaveLength(lines);
   });
+  function die(result: { current: ReturnType<typeof useGame> }, workTicks: number) {
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * workTicks));
+    act(() => result.current.dispatch({ type: 'setHealth', health: 0.001 }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
+  }
+
+  it('alive, the view is the state itself and there is no card', () => {
+    const { result } = renderHook(() => useGame(scrub));
+    expect(result.current.view).toBe(result.current.state);
+    expect(result.current.card).toBeNull();
+  });
+
+  it('a death keeps the dead state; the card and the reborn view are derived from it', () => {
+    const { result } = renderHook(() => useGame(scrub));
+    die(result, 50);
+    const { state, view, card, log } = result.current;
+    expect(state.dead).toBe(true);
+    expect(card?.life).toBe(1);
+    expect(card?.runTicks).toBe(51);
+    expect(view.dead).toBe(false);
+    expect(view.life).toBe(2);
+    expect(view.queue).toEqual([]);
+    expect(view.inventory).toEqual({});
+    expect(view.health).toBe(view.maxHealth);
+    expect(view.maxHealth).toBeGreaterThan(balance.health.base);
+    expect(view.paused).toBe('system');
+    expect(log[0]!.event).toEqual({ type: 'died', runTicks: 51 });
+  });
+
+  it('while dead, orders, pause/resume and setHealth change nothing, and no time passes', () => {
+    const { result } = renderHook(() => useGame(scrub));
+    die(result, 5);
+    const before = result.current.state;
+    expect(before.dead).toBe(true);
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'mine' }));
+    act(() => result.current.dispatch({ type: 'resume' }));
+    act(() => result.current.dispatch({ type: 'pause' }));
+    act(() => result.current.dispatch({ type: 'remove', actionId: 'forage' }));
+    act(() => result.current.dispatch({ type: 'setHealth', health: 50 }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 20));
+    expect(result.current.state).toBe(before);
+  });
+
+  it('begin starts the next life live, clears the card, logs it, and the next queue ticks', () => {
+    const { result } = renderHook(() => useGame(scrub));
+    die(result, 5);
+    act(() => result.current.dispatch({ type: 'begin' }));
+    const { state, card, log } = result.current;
+    expect(card).toBeNull();
+    expect(state.dead).toBe(false);
+    expect(state.life).toBe(2);
+    expect(state.paused).toBe('none');
+    expect(log[0]!.event).toEqual({ type: 'lifeBegins', life: 2 });
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 3));
+    expect(result.current.state.runTicks).toBe(3);
+  });
+
+  it('begin while alive does nothing', () => {
+    const { result } = renderHook(() => useGame(scrub));
+    const before = result.current.state;
+    act(() => result.current.dispatch({ type: 'begin' }));
+    expect(result.current.state).toBe(before);
+    expect(result.current.log).toHaveLength(1);
+  });
+
+  it('two deaths: the second card starts where the first one ended', () => {
+    const { result } = renderHook(() => useGame(scrub));
+    die(result, 30);
+    const first = result.current.card!;
+    act(() => result.current.dispatch({ type: 'begin' }));
+    die(result, 30);
+    const second = result.current.card!;
+    expect(second.life).toBe(2);
+    expect(second.maxHealthFrom).toBe(first.maxHealthTo);
+    expect(second.maxHealthTo).toBeGreaterThan(second.maxHealthFrom);
+  });
 });

@@ -4,8 +4,8 @@
  * never into overheal, with a cooldown per food. Pure.
  */
 import { balance } from '../balance';
-import type { Content } from '../data/types';
-import { ticksToMinutes } from './time';
+import type { Content, ItemId } from '../data/types';
+import { ticksPerSecond, ticksToMinutes, ticksToSeconds } from './time';
 import { count, take } from './inventory';
 import type { GameState } from './types';
 
@@ -39,4 +39,41 @@ export function eat(state: GameState, content: Content): GameState {
     foodCooldowns[item.id] = balance.health.foodCooldownTicks;
   }
   return { ...state, health, inventory, foodCooldowns };
+}
+
+/** HP lost to decay per second of run clock, this second. Spec 2026-09-23 section 4.1. */
+export function decayPerSecond(state: GameState): number {
+  return damagePerTick(state.runTicks, state.decayMultiplier) * ticksPerSecond();
+}
+
+/**
+ * A food is feeding the player this second if a unit is on hand, or its
+ * cooldown is running (it bit within the last cooldown). The second half is
+ * what keeps hand-to-mouth eating, where each unit is eaten on the tick it
+ * lands, from reading as an empty larder (plan Revision 3).
+ */
+export function feeding(state: GameState, itemId: ItemId): boolean {
+  return count(state.inventory, itemId) > 0 || (state.foodCooldowns[itemId] ?? 0) > 0;
+}
+
+/**
+ * The larder's heal ceiling in hp/s: every food that is feeding, one bite per
+ * cooldown. A ceiling, not a rate: at full health no bite lands.
+ */
+export function foodCeilingPerSecond(state: GameState, content: Content): number {
+  let total = 0;
+  for (const item of Object.values(content.items)) {
+    if (item.healPerUnit === undefined || !feeding(state, item.id)) continue;
+    total += item.healPerUnit / ticksToSeconds(balance.health.foodCooldownTicks);
+  }
+  return total;
+}
+
+/**
+ * Whether the larder covers decay this second: the rates chunk's one judgement
+ * (spec 2026-09-23 section 4.1). There is no net line; every form of it either
+ * lied or repeated decay (plan Revisions 1 and 2).
+ */
+export function covers(state: GameState, content: Content): boolean {
+  return foodCeilingPerSecond(state, content) >= decayPerSecond(state);
 }

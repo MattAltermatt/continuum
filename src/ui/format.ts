@@ -36,3 +36,30 @@ export function clock(s: number): string {
   const r = whole % SECONDS_PER_MINUTE;
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
 }
+
+/**
+ * Keeps a floor from reading 101.69999... as 101.6. Display precision, not
+ * tuning; kept out of balance.ts on the same reasoning as TENTHS_BELOW_SECONDS.
+ */
+const TENTHS_EPSILON = 1e-9;
+
+/** Floored to `decimals` places: a value never reads higher than it is. */
+export function floored(n: number, decimals: number): string {
+  const scale = 10 ** decimals;
+  return (Math.floor(n * scale + TENTHS_EPSILON) / scale).toFixed(decimals);
+}
+
+/** Floored to one decimal. */
+export function tenths(n: number): string {
+  return floored(n, 1);
+}
+
+/**
+ * Health and its maximum as the bar shows them. A whole maximum keeps v0.1's
+ * reading (current floored, never 0 while alive). A maximum rebirth made
+ * fractional shows both in floored tenths, so a full bar reads full.
+ */
+export function healthPair(health: number, max: number): { now: string; max: string } {
+  if (Number.isInteger(max)) return { now: String(health > 0 ? Math.max(1, Math.floor(health)) : 0), max: String(max) };
+  return { now: health > 0 ? tenths(Math.max(0.1, health)) : '0', max: tenths(max) };
+}

@@ -17,4 +17,8 @@ describe('HealthBar', () => {
     render(<HealthBar health={0.5} max={100} />);
     expect(document.querySelector('.health__value')!.textContent).toBe('1 / 100');
   });
+  it('after rebirth a full bar at a fractional maximum reads full, in tenths', () => {
+    const { container } = render(<HealthBar health={101.5937} max={101.5937} />);
+    expect(container.querySelector('.health__value')).toHaveTextContent('101.5 / 101.5');
+  });
 });

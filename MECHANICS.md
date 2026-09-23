@@ -32,7 +32,7 @@ time, such as dropping a full producer, still happens). A stopped game renders
 nothing.
 
 Pause distinguishes **paused by the player** from **paused by the system**
-(death; the first run opens live, because under decision #41 an empty queue costs nothing; §5's paused rebirth is unchanged). The distinction matters because passive automation is
+(death, which holds the dead state behind the death card until Begin; the first run and every new life open live, because under decision #41 an empty queue costs nothing). The distinction matters because passive automation is
 suppressed while the player has deliberately paused — a paused game is a
 planning surface, and having the queue refill itself underneath the player
 while they think defeats the point.
@@ -348,14 +348,18 @@ Death is a normal, expected, frequent event. It is the loop, not the fail state.
 ### What resets
 
 - Health restored to maximum (including accrued rebirth bonus).
-- Inventory restored to starting defaults.
+- Inventory restored to starting defaults, **food included**: food is a
+  within-life plan (spec 2026-09-23 §2.1).
 - The queue is emptied.
 - One-time actions become available again.
 - `runTickCount` → 0.
 - `healthDecayMultiplier` → 1.0.
+- Food cooldowns cleared, and the tick's events.
 - Every skill's **run mastery** → level 0.
-- The game starts **paused**, so the next life begins with a plan rather than
-  with lost seconds.
+- The next life begins with a plan rather than with lost seconds. Under
+  decision #41 a new life costs nothing until something is queued. The dead
+  state is held behind a death card until the player presses **Begin**, and
+  the screen behind the card already shows the next life.
 
 ### What persists
 
@@ -364,29 +368,32 @@ Death is a normal, expected, frequent event. It is the loop, not the fail state.
 - Automation settings and as-needed flags, keyed by `templateKey`.
 - Skill points.
 - Accumulated rebirth health bonus.
+- The life number, counting up from 1.
 
 ### The rebirth bonus
 
 ```ts
-function calculateRebirthBonus(runTickCount: number): number {
-  return 0.01 * Math.sqrt(runTickCount)     // 🎚️
+function rebirthGain(runTicks: number): number {
+  return Math.pow(balance.rebirth.growthRate, minutes(runTicks)) - 1   // 🎚️ 1.1
 }
 ```
 
-The bonus from each run is added to a permanent total applied to maximum health.
-Growth is sub-linear, so two 15-minute runs are worth more than one 30-minute
-run — the curve deliberately rewards *more attempts* over *longer attempts*.
+The bonus from each death is added to a permanent total, and maximum health is
+`base + total`. The shape is the one a player reports for Increlution: it
+rewards the **longer** life, and a longer life is the sign that skills and
+found content are doing their work (spec 2026-09-23 §3). It is fractional and
+never floored.
 
-| Run length | Bonus earned |
+| Life length | Bonus earned |
 |---|---|
-| 5 min | +0.55 |
-| 15 min | +1.00 |
-| 30 min | +1.34 |
+| 5 min | +0.61 |
+| 10 min | +1.59 |
+| 20 min | +5.73 |
+| 30 min | +16.4 |
 
-⚠️ **The scale here is a known problem.** Against a base of 100 HP, a full
-15-minute run buys +1.00 maximum health — roughly 100 runs, or about 25 hours,
-to double. A meta-progression reward the player cannot feel is not a reward.
-Re-deriving this curve is tracked in the issues.
+A couple of seconds of extra life per death is the intended size. Max health is
+not the main lever: faster rows from core mastery are, along with content that
+multiplies the gain, which is tracked in the issues.
 
 ---
 
@@ -475,7 +482,7 @@ is what lets AN injections be exact instead of open-ended.
 | `BASE_HEALTH` | 100 | Starting maximum health |
 | `BASE_DAMAGE_PER_TICK` | 0.01 🎚️ | Decay at the start of a run |
 | `DECAY_GROWTH_RATE` | 1.25 🎚️ | Decay multiplied per minute elapsed |
-| `REBIRTH_GROWTH_FACTOR` | 0.01 🎚️ | Per-death bonus = 0.01 × √ticks |
+| `REBIRTH_GROWTH_RATE` | 1.1 🎚️ | Per-death bonus = 1.1^minutes − 1 |
 | `DEFAULT_FOOD_COOLDOWN_TICKS` | 50 🎚️ | 5 s between eats of the same food |
 | Core mastery base / multiplier | 10 / +5% 🎚️ | Persistent ledger |
 | Run mastery base / multiplier | 25 / +1% 🎚️ | Per-run ledger |
@@ -497,8 +504,9 @@ The ones that matter most, because everything else sits downstream of them:
 
 - **`BASE_DAMAGE_PER_TICK` and `DECAY_GROWTH_RATE` together define the entire
   difficulty curve.** They are what makes a run 10 minutes rather than 60.
-- **`REBIRTH_GROWTH_FACTOR`** decides whether the meta-layer is felt or
-  invisible. At its current scale it is invisible.
+- **`REBIRTH_GROWTH_RATE`** is small by design (spec 2026-09-23 §3): a
+  couple of seconds per death, with the real lever in content that multiplies
+  the gain.
 - **The 40× gap between the two automation thresholds** (200 vs 5) reads as
   correct but has never been justified.
 

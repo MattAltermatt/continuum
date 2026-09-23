@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-23: food cooldown</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  h2 { margin: 0 0 6px; font-size: 20px; } .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 16px; max-width: 900px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 290px); gap: 16px; }
+  .opt { border: 1px solid #333; border-radius: 8px; padding: 10px; }
+  .opt h3 { margin: 0 0 4px; font-size: 14px; } .opt p { margin: 0 0 10px; color: #9a9a9a; font-size: 12px; }
+  .scr { font-family: ui-monospace, Menlo, monospace; font-size: 11px; padding: 8px; border-radius: 6px;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --item: oklch(22% 0.012 260); --edge: oklch(34% 0.012 260);
+    --ink: oklch(90% 0.01 80); --dim: oklch(80% 0.01 80); --track: oklch(17% 0.01 260); --track-edge: oklch(40% 0.012 260);
+    --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45); --hurt: oklch(66% 0.18 25); --warn: oklch(80% 0.15 85);
+    background: var(--bg); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .box { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 6px 8px; }
+  h5 { margin: 0 0 4px; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+  .it { display: grid; grid-template-columns: 1fr auto 90px; gap: 0 8px; align-items: center; padding: 5px 8px; margin-bottom: 4px; border: 1px solid var(--edge); border-radius: 4px; background: var(--item); }
+  .it.p { grid-template-columns: 1fr 90px; }
+  .bar { height: 7px; border: 1px solid var(--track-edge); border-radius: 3px; position: relative; overflow: hidden; background: var(--track); }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--core); }
+  .bar i.ember { background: var(--run); }
+  .v { font-size: 9px; text-align: center; color: var(--dim); margin-top: 2px; }
+  .nm { display: flex; flex-direction: column; gap: 3px; }
+  .cd { height: 2px; background: var(--run); border-radius: 1px; }
+  .txt { font-size: 9px; color: var(--dim); }
+</style>
+</head><body>
+<p class="subtitle">Committed mockup, 2026-09-23. v0.2 code review, naysayer #1: the food chunk's cooldown bar sits where every other chunk puts a stack bar, so 14/20 under a nearly full bar reads as a full larder. Every option below animates a bite every five seconds (the real cooldown). The pack is shown under each option for comparison.</p>
+<h2>How the food chunk shows the cooldown</h2>
+<div class="grid" id="g"></div>
+<script>
+const W = 5000;
+const opts = [
+  ['Today (as built)', 'The bar under 14/20 is the cooldown: full just after a bite, draining to empty.', 'now'],
+  ['A. Stack bar, cooldown line (recommended)', 'The bar under n/cap is the stack, as everywhere else. A thin ember line under the name drains until the next bite.', 'a'],
+  ['B. Stack bar, cooldown as text', 'The bar under n/cap is the stack. The cooldown is words: "ready", or seconds left.', 'b'],
+  ['C. Today\'s layout, ember cooldown', 'Same as today, but the cooldown bar is ember, so it cannot pass for a stack bar.', 'c'],
+];
+const g = document.getElementById('g');
+for (const [t, d, k] of opts) {
+  g.insertAdjacentHTML('beforeend', `<div class="opt"><h3>${t}</h3><p>${d}</p><div class="scr">
+    <div class="box"><h5>food</h5><div class="it" id="f-${k}"></div></div>
+    <div class="box" style="margin-top:8px"><h5>pack</h5><div class="it p"><span>stone</span><div><div class="bar"><i style="width:60%"></i></div><div class="v">3/5</div></div></div></div>
+  </div></div>`);
+}
+let have = 14;
+function frame(now) {
+  const phase = (now % W) / W;          // 0 right after a bite, 1 ready
+  const cooling = 1 - phase;
+  const left = (cooling * W / 1000).toFixed(1);
+  const stack = (have / 20) * 100;
+  const f = (k, html) => { document.getElementById('f-' + k).innerHTML = html; };
+  f('now', `<span>berries</span><span>+4 hp</span><div><div class="bar"><i style="width:${cooling * 100}%"></i></div><div class="v">${have}/20</div></div>`);
+  f('a', `<span class="nm">berries<span class="cd" style="width:${cooling * 100}%"></span></span><span>+4 hp</span><div><div class="bar"><i style="width:${stack}%"></i></div><div class="v">${have}/20</div></div>`);
+  f('b', `<span class="nm">berries<span class="txt">${cooling < 0.02 ? 'ready' : left + 's'}</span></span><span>+4 hp</span><div><div class="bar"><i style="width:${stack}%"></i></div><div class="v">${have}/20</div></div>`);
+  f('c', `<span>berries</span><span>+4 hp</span><div><div class="bar"><i class="ember" style="width:${cooling * 100}%"></i></div><div class="v">${have}/20</div></div>`);
+  requestAnimationFrame(frame);
+}
+setInterval(() => { have = have > 6 ? have - 1 : 14; }, W);
+requestAnimationFrame(frame);
+</script>
+</body></html>

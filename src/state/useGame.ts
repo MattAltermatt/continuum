@@ -4,10 +4,11 @@
  * thin switch over pure engine functions, plus the log: engine events with the
  * tick they happened on. Words are the UI's job (src/ui/narrate.ts).
  */
-import { useEffect, useReducer } from 'react';
+import { useEffect, useMemo, useReducer } from 'react';
 import { balance } from '../balance';
 import type { ActionId, Content } from '../data/types';
 import { enqueue, newState, removeAction } from '../engine/queue';
+import { deathSummary, rebirth, type DeathSummary } from '../engine/rebirth';
 import { setPaused, step } from '../engine/tick';
 import type { GameEvent, GameState } from '../engine/types';
 
@@ -17,6 +18,8 @@ export type GameAction =
   | { type: 'pause' }
   | { type: 'resume' }
   | { type: 'tick' }
+  /** Lifts the death card and starts the next life (spec 2026-09-23 section 2.4). */
+  | { type: 'begin' }
   /** Dev handle only: a fast path to death for verification. Play reaches it too, through the hall, but only after minutes. */
   | { type: 'setHealth'; health: number };
 
@@ -52,7 +55,13 @@ function reduce(content: Content) {
       case 'remove': return { ...model, state: removeAction(s, action.actionId) };
       case 'pause': return { ...model, state: setPaused(s, 'player') };
       case 'resume': return { ...model, state: setPaused(s, 'none') };
-      case 'setHealth': return { ...model, state: { ...s, health: Math.min(s.maxHealth, action.health) } };
+      case 'setHealth': return s.dead ? model : { ...model, state: { ...s, health: Math.min(s.maxHealth, action.health) } };
+      case 'begin': {
+        if (!s.dead) return model;
+        const next = setPaused(rebirth(s), 'none');
+        const line: LogLine = { seq: model.nextSeq, at: 0, event: { type: 'lifeBegins', life: next.life } };
+        return { state: next, log: [line, ...model.log].slice(0, LOG_LINES), nextSeq: model.nextSeq + 1 };
+      }
       case 'tick': {
         const next = step(s, content);
         return next === s ? model : withLog(model, next);
@@ -69,11 +78,16 @@ function initial(): Model {
   return { state: setPaused(newState(), 'none'), log: [{ seq: 0, at: 0, event: { type: 'lifeBegins', life: 1 } }], nextSeq: 1 };
 }
 
-export function useGame(content: Content): { state: GameState; log: readonly LogLine[]; dispatch: (a: GameAction) => void } {
+export function useGame(content: Content): {
+  state: GameState; view: GameState; log: readonly LogLine[]; dispatch: (a: GameAction) => void; card: DeathSummary | null;
+} {
   const [model, dispatch] = useReducer(reduce(content), undefined, initial);
   useEffect(() => {
     const id = setInterval(() => dispatch({ type: 'tick' }), balance.time.tickIntervalMs);
     return () => clearInterval(id);
   }, []);
-  return { state: model.state, log: model.log, dispatch };
+  // Dead until Begin: the screen behind the card shows the life that is about to begin.
+  const view = useMemo(() => (model.state.dead ? rebirth(model.state) : model.state), [model.state]);
+  const card = useMemo(() => (model.state.dead ? deathSummary(model.state) : null), [model.state]);
+  return { state: model.state, view, log: model.log, dispatch, card };
 }

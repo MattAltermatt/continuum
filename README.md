@@ -16,9 +16,13 @@ Death is the loop, not the failure.
 > mine, build) and a stone hall no first life can finish, the twelve skills
 > with live XP ledgers, a queue whose stalls wait in place and whose producers
 > stop at a full stack, the pack, the health bar and a log. Time passes only
-> while work happens. What is next lives in
+> while work happens. v0.2 closes the loop: a run dies to a death card that
+> shows what the life bought, the next life keeps core mastery and a larger
+> maximum health, and the HUD shows decay beside the food ceiling, green when
+> the larder covers it. What is next lives in
 > [the milestones](https://github.com/MattAltermatt/continuum/milestones). The design is
-> [`docs/specs/2026-09-22-books-chapters-verbs.md`](./docs/specs/2026-09-22-books-chapters-verbs.md),
+> [`docs/specs/2026-09-22-books-chapters-verbs.md`](./docs/specs/2026-09-22-books-chapters-verbs.md)
+> and [`docs/specs/2026-09-23-v0-2-a-run-you-can-lose.md`](./docs/specs/2026-09-23-v0-2-a-run-you-can-lose.md),
 > with mockups in [`docs/mockups/`](./docs/mockups/) and plans in
 > [`docs/plans/`](./docs/plans/).
 

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { Content } from '../data/types';
 import { newState } from './queue';
-import { applyDecay, damagePerTick, eat } from './health';
+import { applyDecay, covers, damagePerTick, decayPerSecond, eat, feeding, foodCeilingPerSecond } from './health';
+import { ticksPerSecond, ticksToSeconds } from './time';
 import type { GameState } from './types';
 
 const content: Content = {
@@ -94,5 +95,39 @@ describe('eat', () => {
       if ((s.inventory.berries ?? 0) < before) bites.push(t);
     }
     expect(bites).toEqual([0, foodCooldownTicks, foodCooldownTicks * 2]);
+  });
+});
+
+describe('rates, true this second (spec 2026-09-23 section 4.1)', () => {
+  const perBite = 4 / ticksToSeconds(foodCooldownTicks);
+  it('decayPerSecond is this tick\'s damage times ticks per second, multiplier included', () => {
+    const s = { ...newState(), runTicks: balance.time.ticksPerMinute * 10, decayMultiplier: 0.8 };
+    expect(decayPerSecond(s)).toBeCloseTo(damagePerTick(s.runTicks, 0.8) * ticksPerSecond(), 12);
+  });
+  it('foodCeilingPerSecond counts each food that is feeding: heal per bite over the cooldown in seconds', () => {
+    expect(foodCeilingPerSecond({ ...newState(), inventory: { berries: 1 } }, content)).toBeCloseTo(perBite, 12);
+  });
+  it('an empty larder with no bite in the last cooldown has no ceiling', () => {
+    expect(foodCeilingPerSecond(newState(), content)).toBe(0);
+    expect(foodCeilingPerSecond({ ...newState(), foodCooldowns: { berries: 0 } }, content)).toBe(0);
+  });
+  it('a food on cooldown counts, with units (a ceiling, not a bite) and without them (eaten as it lands: still feeding)', () => {
+    expect(foodCeilingPerSecond({ ...newState(), inventory: { berries: 3 }, foodCooldowns: { berries: 20 } }, content)).toBeCloseTo(perBite, 12);
+    expect(foodCeilingPerSecond({ ...newState(), foodCooldowns: { berries: 20 } }, content)).toBeCloseTo(perBite, 12);
+  });
+  it('feeding: a unit on hand, or a running cooldown; neither is not feeding', () => {
+    expect(feeding({ ...newState(), inventory: { berries: 1 } }, 'berries')).toBe(true);
+    expect(feeding({ ...newState(), foodCooldowns: { berries: 1 } }, 'berries')).toBe(true);
+    expect(feeding(newState(), 'berries')).toBe(false);
+  });
+  it('covers: the larder covers decay at the start with a berry, and not with none', () => {
+    expect(covers({ ...newState(), inventory: { berries: 1 } }, content)).toBe(true);
+    expect(covers(newState(), content)).toBe(false);
+  });
+  it('covers stops once decay passes the ceiling, late in a run', () => {
+    // Decay reaches perBite (0.8 hp/s) a little before minute 10 at the placeholder curve.
+    const late = { ...newState(), runTicks: balance.time.ticksPerMinute * 12, inventory: { berries: 5 } };
+    expect(decayPerSecond(late)).toBeGreaterThan(perBite);
+    expect(covers(late, content)).toBe(false);
   });
 });

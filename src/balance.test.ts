@@ -30,6 +30,9 @@ describe('balance', () => {
     expect(balance.health.decayGrowthRate).toBe(1.25);
     expect(balance.health.foodCooldownTicks).toBe(50);
   });
+  it('holds the rebirth growth rate the user chose (spec 2026-09-23 section 3)', () => {
+    expect(balance.rebirth).toEqual({ growthRate: 1.1 });
+  });
 
   it('keeps core mastery cheaper per level but worth more than run mastery', () => {
     const { coreMastery, runMastery } = balance.skills;

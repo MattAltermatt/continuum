@@ -30,6 +30,9 @@ export function newState(): GameState {
     completionCounts: {},
     decayMultiplier: 1,
     events: [],
+    life: 1,
+    rebirthBonus: 0,
+    lifeStartCore: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
   };
 }
 

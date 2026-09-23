@@ -7,7 +7,7 @@ import { App } from './App';
 describe('App', () => {
   it('renders every chunk', () => {
     render(<App />);
-    for (const name of ['health', 'skills', 'chapter', 'queue', 'pack', 'log']) {
+    for (const name of ['health', 'skills', 'chapter', 'queue', 'rates', 'food', 'pack', 'log']) {
       expect(screen.getByLabelText(name)).toBeInTheDocument();
     }
   });
@@ -46,18 +46,50 @@ describe('App', () => {
     expect(container.querySelector('.working')).toBeNull();
     expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('paused');
   });
-  it('death: an alert under the health bar, no pause or resume, and the rows take no more orders', () => {
+  it('death: the card is up over the chapter, every chunk behind it is inert, and Begin starts life 2', () => {
     const { container } = render(<App />);
     const handle = window.continuum!;
-    act(() => { handle.dispatch({ type: 'queue', actionId: 'forage' }); handle.dispatch({ type: 'setHealth', health: 0.001 }); handle.step(1); });
+    act(() => { handle.dispatch({ type: 'queue', actionId: 'forage' }); handle.step(60); handle.dispatch({ type: 'setHealth', health: 0.001 }); handle.step(1); });
     expect(handle.state().dead).toBe(true);
-    expect(screen.getByRole('alert')).toHaveTextContent(/^Dead at 00:00/);
-    expect(container.querySelector('.top__health .dead')).toBeInTheDocument();   // overlays the health chunk, out of the flow
-    expect(screen.queryByRole('button', { name: 'pause' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'resume' })).toBeNull();
-    const queue = handle.state().queue;
-    act(() => { screen.getAllByRole('button', { name: /^add to queue/ })[1]!.click(); });
-    expect(handle.state().queue).toEqual(queue);
-    for (const b of screen.getAllByRole('button', { name: /^(do it now|add to queue|remove)/ })) expect(b).toHaveAttribute('aria-disabled', 'true');
+    expect(handle.state().runTicks).toBe(61);   // the dead life's clock reads 00:06
+    expect(handle.state().inventory.berries).toBe(1);   // the dead life holds a berry; the next one does not
+    const card = screen.getByRole('dialog', { name: 'Life 1 ends' });
+    expect(card.parentElement).toHaveClass('columns__chapter');
+    expect(card.closest('[inert]')).toBeNull();
+    for (const name of ['health', 'skills', 'chapter', 'queue', 'rates', 'food', 'pack', 'log']) {
+      expect(screen.getByLabelText(name).closest('[inert]'), name).not.toBeNull();
+    }
+    // Every chunk renders the view, the life about to begin, not the dead one (spec 2.4).
+    expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('00:00');
+    expect(container.querySelector('.health__value')).toHaveTextContent('100.0 / 100.0');
+    expect(screen.getByLabelText('queue')).toHaveTextContent('queue · 0');
+    expect(screen.getByLabelText('food')).toHaveTextContent('0/20');
+    expect(container.querySelector('.rates__food--short')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'add to queue: Forage berries' })).not.toHaveAttribute('aria-disabled');
+    expect(screen.queryByRole('button', { name: /^(pause|resume)$/ })).toBeNull();   // no corner control behind the card
+    act(() => { screen.getByRole('button', { name: 'Begin life 2' }).click(); });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(handle.state().life).toBe(2);
+    expect(handle.state().paused).toBe('none');
+    expect(container.querySelector('[inert]')).toBeNull();
+  });
+  it('the middle column stacks rates, food, pack, then the log (spec 8.6)', () => {
+    const { container } = render(<App />);
+    const labels = [...container.querySelectorAll('.middle > [aria-label]')].map((e) => e.getAttribute('aria-label'));
+    expect(labels).toEqual(['rates', 'food', 'pack', 'log']);
+  });
+  it('rates dim while the clock is stopped (idle at the start)', () => {
+    const { container } = render(<App />);
+    expect(container.querySelector('.rates')).toHaveClass('rates--stopped');
+  });
+  it('the food line is wired to covers: short with an empty larder, covered once a berry lands, and live while working', () => {
+    const { container } = render(<App />);
+    const handle = window.continuum!;
+    expect(container.querySelector('.rates__food--short')).toHaveTextContent('+0.00 hp/s');
+    act(() => { handle.dispatch({ type: 'queue', actionId: 'forage' }); handle.step(60); });
+    expect(handle.state().inventory.berries).toBe(1);
+    expect(container.querySelector('.rates__food--covers')).toHaveTextContent('+0.80 hp/s');
+    expect(container.querySelector('.rates')).not.toHaveClass('rates--stopped');
+    expect(screen.getByLabelText('rates')).toHaveTextContent('\u22120.10 hp/s \u25B2');   // decay is wired, not only its color
   });
 });

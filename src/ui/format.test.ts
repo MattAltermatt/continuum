@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clock, countdown, duration, fraction } from './format';
+import { clock, countdown, duration, floored, fraction, healthPair, tenths } from './format';
 
 describe('format', () => {
   it('fraction is a/b with one decimal and no spaces', () => {
@@ -20,5 +20,26 @@ describe('format', () => {
   it('clock is mm:ss padded', () => {
     expect(clock(372)).toBe('06:12');
     expect(clock(0)).toBe('00:00');
+  });
+});
+
+describe('health in the bar', () => {
+  it('a whole maximum keeps v0.1: current floored, never 0 while alive', () => {
+    expect(healthPair(71.46, 100)).toEqual({ now: '71', max: '100' });
+    expect(healthPair(0.3, 100)).toEqual({ now: '1', max: '100' });
+    expect(healthPair(0, 100)).toEqual({ now: '0', max: '100' });
+  });
+  it('a fractional maximum: both floored to tenths, so a full bar reads full', () => {
+    expect(healthPair(101.5937, 101.5937)).toEqual({ now: '101.5', max: '101.5' });
+    expect(healthPair(71.46, 101.5937)).toEqual({ now: '71.4', max: '101.5' });
+    expect(healthPair(0.04, 101.5)).toEqual({ now: '0.1', max: '101.5' });
+  });
+  it('tenths floors without float error on a computed sum: 0.7 + 0.1 reads 0.8, not 0.7', () => {
+    expect(0.7 + 0.1).toBeLessThan(0.8);   // the float the epsilon exists for
+    expect(tenths(0.7 + 0.1)).toBe('0.8');
+    expect(tenths(101.7)).toBe('101.7');
+    expect(floored(101.996, 2)).toBe('101.99');   // never rounds up, at any precision
+    expect(tenths(100)).toBe('100.0');
+    expect(tenths(101.5198)).toBe('101.5');
   });
 });
