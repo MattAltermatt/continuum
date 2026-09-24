@@ -4,7 +4,8 @@ import type { ActionDefinition, ActionId, Content } from '../data/types';
 import { isUnlocked, modeOf, nextMode, unlockAt } from '../engine/automation';
 import { gearMultiplier } from '../engine/effects';
 import { count } from '../engine/inventory';
-import { frontBlock, startBlock } from '../engine/queue';
+import { playBlock } from '../engine/fight';
+import { startBlock } from '../engine/queue';
 import { stillOwed, workOf } from '../engine/rows';
 import { tickExp } from '../engine/skills';
 import { ticksPerSecond } from '../engine/time';
@@ -82,8 +83,9 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
 
   const now = (once: boolean) => {
     if (inert) return;
-    // Only frontBlock knows `enough`; asking startBlock alone would dispatch an order that enqueue then refuses without a word.
-    const refusal = frontBlock(state, content, action.id, once);
+    // Only playBlock knows `enough` and `hurt`; asking startBlock alone would dispatch an order that enqueue then refuses
+    // without a word, or a fight that backs off at once (#74).
+    const refusal = playBlock(state, content, action.id, once);
     if (refusal !== null) {
       setRefused(true);
       setInstruction({ text: words(content, refusal, { counts }) });
@@ -95,7 +97,9 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
   const add = (once: boolean) => {
     if (built || state.dead) return;
     onQueue(action.id, once);
-    setInstruction(block?.kind === 'short' ? { text: words(content, block, { counts }) } : null);
+    // A fight that will stop the moment it reaches the top says so here too (code panel: + did nothing visible).
+    const fight = playBlock(state, content, action.id, once);
+    setInstruction(block?.kind === 'short' ? { text: words(content, block, { counts }) } : fight?.kind === 'hurt' ? { text: words(content, fight) } : null);
   };
   // Enter on a focused button is a plain press (a repeating order); Shift+Enter matches Shift+click.
   const enter = (fn: (once: boolean) => void) => (e: KeyboardEvent<HTMLButtonElement>) => {

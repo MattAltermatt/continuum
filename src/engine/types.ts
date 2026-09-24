@@ -22,6 +22,8 @@ export interface QueueEntry {
   readonly actionId: ActionId;
   readonly mode: 'repeat' | 'once';
   readonly by: 'player' | 'auto';
+  /** Shift on a hurting one-time (#74): fought to the end, never backed off. */
+  readonly forced?: true;
   /**
    * Automation's food and provision fills only: completions left before the
    * entry leaves (MECHANICS section 6's targetCount), so a fill that eating
@@ -55,11 +57,11 @@ export interface SupplyCause { readonly item: ItemId; readonly maker: ActionId |
 /** What happened this tick, for the UI to narrate. The engine writes no prose. */
 export type GameEvent =
   /** The top entry left without working: its row is not here, is done, is full, or has fetched what is needed. */
-  | { readonly type: 'popped'; readonly actionId: ActionId; readonly reason: 'elsewhere' | 'done' | 'full' | 'enough' }
+  | { readonly type: 'popped'; readonly actionId: ActionId; readonly reason: 'elsewhere' | 'done' | 'full' | 'enough' | 'hurt' }
   /** The top entry left because it lacks an item and nothing supplies it; `cause` is the deepest reason when its maker is blocked. */
   | { readonly type: 'short'; readonly actionId: ActionId; readonly item: ItemId; readonly amount: number; readonly maker: ActionId | null; readonly gap: SupplyGap; readonly cause?: SupplyCause }
   /** Automation queued a row: to supply the top, food at zero, provisions before casting off, or an empty queue. */
-  | { readonly type: 'automated'; readonly actionId: ActionId; readonly why: 'supply' | 'food' | 'provision' | 'idle' }
+  | { readonly type: 'automated'; readonly actionId: ActionId; readonly why: 'supply' | 'food' | 'provision' | 'idle' | 'delay' }
   | { readonly type: 'completed'; readonly actionId: ActionId; readonly oneTime: boolean }
   | { readonly type: 'coreLevel'; readonly skill: SkillId; readonly level: number }
   /** A row earned its automation chip (section 3.4). */
@@ -92,6 +94,11 @@ export interface GameState {
   readonly work: Readonly<Record<ActionId, Work>>;
   /** Food rows already provisioned for this port's departure (section 3.2): once each, cleared at casting off and death. */
   readonly provisioned: readonly ActionId[];
+  /**
+   * The empty-queue pass's last order was a JIT food fill (#77), so the next
+   * empty queue is another row's turn. This life's; a save without it reads false.
+   */
+  readonly idleFed: boolean;
   /** Index into content.chapters: the port this life is in (section 4). */
   readonly chapter: number;
   readonly completedOneTime: readonly ActionId[];

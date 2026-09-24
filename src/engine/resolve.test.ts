@@ -610,3 +610,98 @@ describe('resolve on a settled state', () => {
     expect(r.passes).toBe(1);
   });
 });
+
+describe('an empty queue does what JIT can (#77)', () => {
+  const cap = balance.inventory.stackCap;
+  /** A one-time with no cost, for a priority row that can always start. */
+  const charted: Content = {
+    ...content,
+    actions: { ...content.actions, chart: { id: 'chart', verb: 'rig', noun: 'a chart', expCost: 1, itemCosts: [], isOneTime: true } },
+    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'chart'] }, content.chapters[1]!],
+  };
+  const idle = (events: GameEvent[]) => automated(events).filter((e) => e.why === 'idle').map((e) => e.actionId);
+
+  it('a JIT food below its cap refills to the cap, one fill of the count it lacks', () => {
+    const s = live({ ...withModes(fresh(), content, { fish: 'jit' }), inventory: { fish: 2 } });
+    const r = resolve(s, content);
+    expect(r.state.queue).toEqual([{ id: 0, actionId: 'fish', mode: 'repeat', by: 'auto', left: cap - 2 }]);
+    expect(r.events).toContainEqual({ type: 'automated', actionId: 'fish', why: 'idle' });
+    const { s: end } = runUntil(content, s, (x) => x.queue.length === 0 && x.runTicks > 0);
+    expect(end.inventory.fish).toBe(cap);
+  });
+  it('a JIT producer waits for demand: an empty queue does not run it, and the priority row runs instead (#79)', () => {
+    const s = live(withModes(fresh(), content, { salvage: 'jit', satchel: 'high' }));
+    const r = resolve(s, content);
+    expect(idle([...r.events])).toEqual(['satchel']);
+    // The satchel's scrap is the demand: Salvage supplies it, for the satchel alone.
+    expect(r.state.queue[0]).toMatchObject({ actionId: 'salvage', for: r.state.queue[1]!.id });
+    expect(resolve(live(withModes(fresh(), content, { salvage: 'jit' })), content).state.queue).toEqual([]);
+  });
+  it('a JIT one-time waits for demand too: the gate is not run on an empty queue, only for the raid that needs its pass', () => {
+    const s = live(withModes(fresh(), content, { gate: 'jit' }));
+    expect(step(s, content)).toBe(s);
+    const r = resolve(live(enqueue(s, content, 'raid')), content);
+    expect(r.state.queue[0]).toMatchObject({ actionId: 'gate', by: 'auto' });
+  });
+  it('a JIT food goes before a JIT producer earlier in the row order', () => {
+    const reordered: Content = { ...content, chapters: [{ ...content.chapters[0]!, order: ['salvage', 'fish', 'hull', 'satchel', 'gate', 'raid'] }, content.chapters[1]!] };
+    const s = live({ ...withModes(fresh(), reordered, { salvage: 'jit', fish: 'jit' }), inventory: { fish: 2 } });
+    const r = resolve(s, reordered);
+    expect(idle([...r.events])[0]).toBe('fish');
+    expect(r.state.queue[0]).toMatchObject({ actionId: 'fish', left: cap - 2 });
+  });
+  it('paused, a step does nothing: no JIT order is queued', () => {
+    const s = setPaused({ ...withModes(fresh(), content, { fish: 'jit', salvage: 'jit' }), inventory: { fish: 2 } }, 'player');
+    expect(step(s, content)).toBe(s);
+    expect(step(live(s), content).queue[0]).toMatchObject({ actionId: 'fish', by: 'auto' });
+  });
+  it('with an order in the queue, JIT adds no idle order of its own', () => {
+    const s = live({ ...withModes(fresh(), content, { fish: 'jit' }), inventory: { fish: 2 }, queue: [entry(0, 'salvage')], nextEntryId: 1 });
+    const { states } = runUntil(content, s, (x) => !x.queue.some((e) => e.actionId === 'salvage'));
+    const busy = states.filter((x) => x.queue.some((e) => e.actionId === 'salvage'));
+    expect(busy.length).toBeGreaterThan(0);
+    for (const x of busy) expect(x.queue.filter((e) => e.by === 'auto')).toEqual([]);
+    expect(step(states[states.length - 1]!, content).queue[0]).toMatchObject({ actionId: 'fish', by: 'auto' });
+  });
+  it('an empty queue with every JIT row full or done is idle: step returns the same object', () => {
+    const s = live({ ...withModes(fresh(), content, { fish: 'jit', salvage: 'jit', gate: 'jit' }), inventory: { fish: cap, scrap: cap, pass: 1 }, completedOneTime: ['gate'] });
+    expect(step(s, content)).toBe(s);
+    expect(resolve(s, content).state).toBe(s);
+    expect(resolve({ ...s, inventory: { ...s.inventory, fish: cap - 1 } }, content).state.queue[0]).toMatchObject({ actionId: 'fish', left: 1 });
+  });
+
+  describe('food and the rest take turns', () => {
+    it('after a JIT food fill, the next empty queue goes to the priority row, then food again; a JIT producer is passed over', () => {
+      // Hurt, so the fish is eaten and is below its cap again by the time the chart's turn comes.
+      const s = live({ ...withModes(fresh(), charted, { fish: 'jit', salvage: 'jit', chart: 'high' }), inventory: { fish: 2 }, health: 20 });
+      const { events } = runUntil(charted, s, (x) => x.completedOneTime.includes('chart') && x.queue.length === 0);
+      expect(idle(events).slice(0, 2)).toEqual(['fish', 'chart']);
+      expect(idle(events)).not.toContain('salvage');
+    });
+    it('food eaten faster than it is made still lets a priority row run within a bounded number of empties', () => {
+      // A unit of fish takes longer than the food cooldown, and a hurt player eats each one as it lands: the fill
+      // never reaches the cap. Back to back, food fills would take every empty queue there is.
+      const slow: Content = { ...charted, actions: { ...charted.actions, fish: { ...charted.actions.fish!, expCost: 10 } } };
+      const s = live({ ...withModes(fresh(), slow, { fish: 'jit', chart: 'high' }), inventory: { fish: 1 }, health: 20 });
+      const { s: end, events, states } = runUntil(slow, s, (x) => x.completedOneTime.includes('chart'), 4000);
+      expect(states.every((x) => (x.inventory.fish ?? 0) < cap)).toBe(true);
+      expect(idle(events).indexOf('chart')).toBe(1);
+      expect(end.completedOneTime).toContain('chart');
+    });
+    it('with nothing else to do, food goes again at once: the settled state is a fixed point (code panel)', () => {
+      const s = live({ ...withModes(fresh(), content, { fish: 'jit' }), inventory: { fish: 2 }, idleFed: true });
+      const r = resolve(s, content);
+      expect(r.state.queue[0]).toMatchObject({ actionId: 'fish', by: 'auto', left: cap - 2 });
+      expect(resolve(r.state, content).state).toBe(r.state);
+      expect(step(s, content).runTicks).toBe(s.runTicks + 1);
+    });
+  });
+
+  it('casting off clears the food turn: the next port\'s first empty queue may feed (code panel)', () => {
+    const s = live({ ...fresh(), inventory: { pass: 1 }, idleFed: true, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'player' }], nextEntryId: 1,
+      work: { raid: { progress: content.actions.raid!.expCost - 1e-9, costsConsumed: 0 } } });
+    const after = step(s, content);
+    expect(after.chapter).toBe(1);
+    expect(after.idleFed).toBe(false);
+  });
+});

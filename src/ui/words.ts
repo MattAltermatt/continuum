@@ -77,5 +77,6 @@ export function words(content: Content, block: StartBlock, opts: WordsOptions = 
     case 'enough': return `${itemName(content, block.item)}: enough for what is queued`;
     case 'done': return 'already done';
     case 'elsewhere': return 'not in this port';
+    case 'hurt': return 'too hurt to fight: one more push would end this life \u00B7 Shift+play fights to the end';
   }
 }

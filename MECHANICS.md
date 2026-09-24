@@ -145,14 +145,16 @@ Death clears every row's progress.
 Before any time passes (decision #41), in order:
 
 1. A row the current port does not have is dropped.
-2. A producer that is full, or a repeating producer that has fetched what the
+2. A fight about to kill backs off (section 4, Hurts), unless it was forced.
+3. A producer that is full, or a repeating producer that has fetched what the
    entries below it need (the look-ahead, below), pops.
-3. A top entry that lacks an item (a cost unit it owes, or an unmet need) is
+4. A top entry that lacks an item (a cost unit it owes, or an unmet need) is
    **supplied** if automation can make the item (section 6): the maker goes in
    at the top for exactly the shortfall. Otherwise it pops, and says why:
    nothing here makes it, its maker's automation is off or not yet earned, or
    its maker is blocked itself (naming the deepest cause down the chain).
-4. An empty queue may be filled by passive automation.
+5. An empty queue is filled by automation (section 6): JIT rows first, then
+   the priorities.
 
 This repeats until the top can run or the queue is empty; an empty queue stops
 the clock.
@@ -175,7 +177,8 @@ repeating, fetches a chip for every canapé the kitchens can still make.
 
 "Now" refuses a row that cannot run and that no automation would supply
 (following the chain), and a producer whose look-ahead from the top is already
-met; + appends even then.
+met, and a fight that would stop at once (section 4, Hurts); + appends even
+then.
 
 ### On completion
 
@@ -359,6 +362,32 @@ A row may carry `hurts`, health lost per second **while it runs** (the top
 entry, on a tick it works), applied after decay. A fight interrupted by a JIT
 food fill does not drain while the food runs, and keeps its progress.
 
+**A fight stops before it kills** (#74). A hurting top **would kill** when
+fighting on for its window ends the life, played out tick by tick in the
+tick's own order (decay, hurt, then eating from the pack). The window is the
+ticks the port's first food row needs for one unit, plus one tick (a unit made
+in one tick is eaten in the next), and never past the fight's own finish, so a
+fight that would win first carries on. When it would kill, before any time
+passes:
+
+1. An automated **harvest** (repeatable, not off, does not hurt) that can start
+   without any fight on its supply chain runs **once** in front of it, foods
+   first. The fight stays queued with its progress.
+2. With none, if anything else of the port can start, the fight **stops**: it
+   leaves the queue with its progress kept, the clock may stop, and the log says
+   so once per row per life. Play on that fight is refused with the same words.
+3. With nothing else that can start, the fight goes on.
+
+**An automated fight** (chip on) takes case 1, where any automated row ranked
+above it also buys time, but never case 2: with nothing to run it fights on,
+death included. The idle fill queues it in its rank
+like any priority row. Case 2 is for a fight queued by hand with its chip off.
+
+**Shift forces** a hurting row: the entry is tagged *to the end* and never backs
+off, death included; the supply orders it pulls are forced too. JIT food is
+never refilled through a supply chain that runs through a fight that would
+kill.
+
 ### Death
 
 Checked once per tick, after decay and after hurts, before eating:
@@ -470,7 +499,12 @@ needs. A newly earned chip starts at off.
   ranked can go first: a repeatable producer, not already queued, that can work
   at once with no supply of its own (Forage on a higher priority fills the
   berries before Mine supplies the cabin). When the queue is empty and not
-  paused, the highest-priority row **that can run** is queued, one at a time;
+  paused, a JIT **food** below its cap refills to it first (#77). Only food:
+  other JIT rows wait for demand, running only when an order is short of what
+  they make (#79). Food and the priorities take turns, since late in a life
+  food is eaten faster than it is made and would
+  otherwise take every empty queue; with nothing else ready, food goes again at
+  once, so an empty queue never sits idle while a JIT **food** could run. After those, the highest-priority row **that can run** is queued, one at a time;
   ties go to the port's row order. A row set to a priority that cannot run (its
   harvest has no chip yet) is passed over, and its chip shows why.
 - **off.** Nothing. A short entry whose maker is off pops, and says so.

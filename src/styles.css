@@ -182,6 +182,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 /* repeat and once share one pinned width, so a tag never shifts the line; auto is in the automation colour. */
 .tag { display: inline-block; min-width: calc(6ch + 10px); text-align: center; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; font-size: 10px; color: var(--ink-2); margin-right: 4px; }
 .tag--auto { border-color: var(--auto); color: var(--auto); min-width: 0; }
+.tag--forced { border-color: var(--hurt); color: var(--hurt-text); min-width: 0; }
 .entry__third { justify-content: flex-start; gap: 0 10px; }
 .entry__bar { grid-column: 1 / -1; }
 /* Every entry reserves the working bar's height, so an entry that stops or starts being worked

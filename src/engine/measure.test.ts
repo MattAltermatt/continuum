@@ -70,7 +70,7 @@ describe('measure', { timeout: 30_000 }, () => {
     // Change one, and this fails until the other has been looked at: a bound
     // change is a rules change, and a reading must say which rules took it.
     expect({ PLAY_VERSION, bounds: balance.play, policy: balance.policy }).toEqual({
-      PLAY_VERSION: 2,
+      PLAY_VERSION: 3,
       bounds: { maxBookDays: 60, minBookHours: 24, maxLifeMinutes: 60, minLifeMinutes: 10, lengthTolerance: 0.25, hoursShownUpTo: 48 },
       policy: { checkEverySeconds: 30 },
     });
@@ -89,7 +89,7 @@ describe('measure', { timeout: 30_000 }, () => {
     expect(r.flags).toContainEqual({ kind: 'never-finishes', policy: attentive.name });
   });
   it('flags a frozen run with the life it froze in', () => {
-    expect(measure(frozenBook(), [attentive], 'test').flags).toContainEqual({ kind: 'frozen', policy: attentive.name, life: 1 });
+    expect(measure(frozenBook(), [attentive], 'test').flags).toContainEqual({ kind: 'frozen', policy: attentive.name, life: 1, cause: 'book' });
   });
   it('a book can freeze in a later life, and the flag names that life', () => {
     // Levels carry over: a faster later life fills a 200-stack before decay kills it,
@@ -107,7 +107,7 @@ describe('measure', { timeout: 30_000 }, () => {
     const r = measure(later, [attentive], 'test');
     expect(r.runs[0]!.outcome).toBe('frozen');
     expect(r.runs[0]!.lives).toBeGreaterThan(1);
-    expect(r.flags).toContainEqual({ kind: 'frozen', policy: attentive.name, life: r.runs[0]!.lives });
+    expect(r.flags).toContainEqual({ kind: 'frozen', policy: attentive.name, life: r.runs[0]!.lives, cause: 'book' });
   });
   it('flags a short life when a sane policy walks into a decay trap, and not without the trap', () => {
     const b = monumentBook(150, 1500);

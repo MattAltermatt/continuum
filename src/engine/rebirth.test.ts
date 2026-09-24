@@ -27,6 +27,7 @@ function deadLife(): GameState {
     work: { hall: { progress: 12, costsConsumed: 4 } },
     acquired: ['berries', 'stone'],
     provisioned: ['forage'],
+    idleFed: true,
     chapter: 1,
     automation: { forage: 'jit' },
     skillStats: { ...fresh.skillStats, forage: { ticks: 40, bestRun: 3 } },
@@ -137,7 +138,7 @@ describe('rebirth: guard and accrual', () => {
  * rebirth derives it. A field added later fails here until someone decides.
  */
 describe('rebirth: every field is classified', () => {
-  const RESETS = ['runTicks', 'paused', 'dead', 'finished', 'inventory', 'acquired', 'foodCooldowns', 'queue', 'nextEntryId', 'work', 'provisioned', 'chapter', 'completedOneTime', 'decayMultiplier', 'events'];
+  const RESETS = ['runTicks', 'paused', 'dead', 'finished', 'inventory', 'acquired', 'foodCooldowns', 'queue', 'nextEntryId', 'work', 'provisioned', 'idleFed', 'chapter', 'completedOneTime', 'decayMultiplier', 'events'];
   const PERSISTS = ['completionCounts', 'automation', 'skillStats'];
   const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'finishes', 'rebirthBonus', 'lifeStartCore'];
   it('the three lists cover newState(roster) exactly, with no overlap', () => {

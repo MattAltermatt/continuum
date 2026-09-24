@@ -80,8 +80,9 @@ describe('hurts (section 6.1)', () => {
     expect(after.health).toBeCloseTo(balance.health.base - damagePerTick(1, 1), 12);
     expect(after.work.raid).toEqual({ progress: 5, costsConsumed: 0 });
   });
-  it('a hurt that takes health to zero dies with the run clock, and the card names the row', () => {
-    const s = raidOn({ health: damagePerTick(1, 1) + 0.05 });
+  it('a forced hurt that takes health to zero dies with the run clock, and the card names the row', () => {
+    // Forced (#74): unforced, a fight this close to death backs off instead (fight.test.ts).
+    const s = raidOn({ health: damagePerTick(1, 1) + 0.05, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'player', forced: true }] });
     const after = step(s, hurting);
     expect(after.dead).toBe(true);
     expect(after.events).toContainEqual({ type: 'died', runTicks: 1 });

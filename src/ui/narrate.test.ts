@@ -21,6 +21,11 @@ describe('narrate', () => {
     expect(text).toBe(`Fight the raid stops: ${words(book, { kind: 'short', item: 'pass', amount: 1, maker: 'gate', gap: 'blocked', cause })}`);
     expect(text).toBe('Fight the raid stops: needs a pass \u00B7 Fight the gate can\'t run: needs scrap \u00B7 Salvage scrap automation is not yet earned \u00B7 earn it by hand');
   });
+  it('a fight that backed off says so and names Shift+play (#74); any other pop keeps its plain words', () => {
+    expect(narrate({ type: 'popped', actionId: 'raid', reason: 'hurt' }, book).text)
+      .toBe('Backed off from Fight the raid: one more push would end this life. Shift+play fights to the end');
+    expect(narrate({ type: 'popped', actionId: 'raid', reason: 'done' }, book).text).toBe('Fight the raid leaves the queue');
+  });
   it('casting off names the port now entered; the finish and an earned chip are notes', () => {
     expect(narrate({ type: 'castOff', chapter: 1 }, book)).toEqual({ kind: 'note', text: 'Port II \u00B7 Two' });
     expect(narrate({ type: 'finished', runTicks: 600 }, book)).toEqual({ kind: 'note', text: 'The book is finished' });

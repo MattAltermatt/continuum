@@ -2,6 +2,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { balance } from '../balance';
+import { testBook } from '../test-utils/book';
 import { saltRoadFixture } from '../test-utils/salt-road';
 import { LOG_LINES, useGame } from './useGame';
 
@@ -54,6 +55,47 @@ describe('useGame', () => {
     expect(after.length).toBeGreaterThan(before.length);
     expect(after.slice(after.length - before.length).map((l) => [l.seq, l.event.type])).toEqual(before);
     expect(new Set(after.map((l) => l.seq)).size).toBe(after.length);
+  });
+
+  it('a fight backing off is logged once per life, however often it backs off (#74 section 3.4)', () => {
+    const { result } = renderHook(() => useGame(testBook));
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'gate' }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 50));
+    expect(result.current.state.inventory.pass).toBe(1);
+    const backOff = () => {
+      act(() => result.current.dispatch({ type: 'setHealth', health: 0.5 }));
+      act(() => result.current.dispatch({ type: 'queue', actionId: 'raid' }));
+    };
+    backOff();
+    expect(result.current.state.queue).toEqual([]);
+    const hurt = () => result.current.log.filter((l) => l.event.type === 'popped');
+    expect(hurt().map((l) => l.event)).toEqual([{ type: 'popped', actionId: 'raid', reason: 'hurt' }]);
+    backOff();
+    expect(result.current.state.queue).toEqual([]);
+    expect(hurt()).toHaveLength(1);
+    // A new life may say it again: die, begin, fetch the pass, back off.
+    act(() => result.current.dispatch({ type: 'setHealth', health: 0.001 }));
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'fish' }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
+    expect(result.current.state.dead).toBe(true);
+    act(() => result.current.dispatch({ type: 'begin' }));
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'gate' }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 50));
+    backOff();
+    expect(hurt()).toHaveLength(2);
+  });
+
+  it('two backed-off orders in one batch log one line (code panel round two)', () => {
+    const { result } = renderHook(() => useGame(testBook));
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'gate' }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 50));
+    act(() => result.current.dispatch({ type: 'pause' }));
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'raid' }));
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'raid' }));
+    act(() => result.current.dispatch({ type: 'setHealth', health: 0.5 }));
+    act(() => result.current.dispatch({ type: 'resume' }));
+    expect(result.current.state.queue).toEqual([]);
+    expect(result.current.log.filter((l) => l.event.type === 'popped')).toHaveLength(1);
   });
 
   it('queues, resumes, and ticks on the balance interval', () => {

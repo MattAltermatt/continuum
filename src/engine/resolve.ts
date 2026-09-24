@@ -6,6 +6,7 @@
  */
 import type { ActionDefinition, ActionId, Content } from '../data/types';
 import { isPriority, modeOf, rankOf, withoutOrphans } from './automation';
+import { anyCalm, automated, delayFor, killers, wouldKill } from './fight';
 import { capOf } from './effects';
 import { count } from './inventory';
 import { enqueue, startBlock, supplyVia } from './queue';
@@ -101,7 +102,22 @@ function provisionDue(state: GameState, content: Content, tried: ReadonlySet<Act
   return null;
 }
 
-/** The best priority row that can start now, for an empty queue (section 3.3). Ties go to the earlier row. */
+/**
+ * A JIT food that can start, for an empty queue: JIT keeps food stocked (#77),
+ * and only food (#79, the user: "JIT only should harvest food items to keep
+ * them stocked, for non-food items, it should wait until there is demand").
+ * Other JIT rows run only when an order is short of what they make.
+ */
+function jitMeal(state: GameState, content: Content, tried: ReadonlySet<ActionId>): ActionId | null {
+  const avoid = killers(state, content);
+  return rowsHere(state, content).find((a) => makesFood(content, a) && modeOf(state, a) === 'jit' && !tried.has(a.id) && !avoid.has(a.id) && startBlock(state, content, a.id, avoid) === null)?.id ?? null;
+}
+
+/**
+ * The best priority row that can start now, for an empty queue (section 3.3). Ties go to the earlier row.
+ * A fight on a priority is taken in its rank like any row, even one that would kill: automated, it tries to keep
+ * the player alive (a harvest delays it) and fights on when nothing else can run (#74, the user 2026-09-24).
+ */
 function bestIdle(state: GameState, content: Content, tried: ReadonlySet<ActionId>): ActionId | null {
   let best: { readonly id: ActionId; readonly rank: number } | null = null;
   for (const a of rowsHere(state, content)) {
@@ -151,11 +167,11 @@ export function resolve(state: GameState, content: Content): Resolved {
   // row costs popped its consumer as 'blocked'). A second supply by the same maker in one resolve is refused,
   // a backstop against a loop (RESOLVE_PASSES bounds it too).
   const supplied = new Set<ActionId>();
-  const byAutomation = (id: ActionId, why: 'supply' | 'food' | 'provision' | 'idle', left?: number, supplies?: number) => {
+  const byAutomation = (id: ActionId, why: 'supply' | 'food' | 'provision' | 'idle' | 'delay', left?: number, supplies?: number) => {
     // A food fill takes the place of any automation order for its row further down: one fill, on top.
     // The supply that was serving the old fill is left without it, and leaves on the next pass.
     if (why === 'food' || why === 'provision') s = { ...s, queue: s.queue.filter((e) => e.actionId !== id || e.by !== 'auto') };
-    s = enqueue(s, content, id, { front: why !== 'idle', by: 'auto', ...(left === undefined ? {} : { left }), ...(supplies === undefined ? {} : { for: supplies }) });
+    s = enqueue(s, content, id, { front: why !== 'idle', by: 'auto', ...(why === 'delay' ? { once: true } : {}), ...(left === undefined ? {} : { left }), ...(supplies === undefined ? {} : { for: supplies }) });
     tried.add(id);
     events.push({ type: 'automated', actionId: id, why });
   };
@@ -173,16 +189,44 @@ export function resolve(state: GameState, content: Content): Resolved {
     if (food !== null) { byAutomation(food, 'food', fillLeft(s, content, food)); continue; }
     const top = s.queue[0];
     if (top === undefined) {
-      const idle = bestIdle(s, content, tried);
-      if (idle === null) break;
-      byAutomation(idle, 'idle');
-      continue;
+      // A JIT food first (#77; only food, #79). Food and the priorities take turns: a food fill eating outpaces
+      // never reaches its cap, and queued back to back it would take every empty queue there is. After one, the
+      // next empty queue goes to the priority idle fill; with none, food again.
+      const meal = jitMeal(s, content, tried);
+      const turn = meal !== null && s.idleFed;
+      if (meal !== null && !turn) {
+        byAutomation(meal, 'idle', fillLeft(s, content, meal));
+        s = { ...s, idleFed: true };
+        continue;
+      }
+      const other = bestIdle(s, content, tried);
+      if (other !== null) {
+        byAutomation(other, 'idle');
+        if (s.idleFed) s = { ...s, idleFed: false };
+        continue;
+      }
+      // Nothing else to do: food again, at once. Leaving the queue empty for a pass committed a state the next
+      // resolve changed (code panel: the settled state was not a fixed point, and read as #77's idle screen).
+      if (turn) { byAutomation(meal!, 'idle', fillLeft(s, content, meal!)); continue; }
+      break;
     }
     const action = content.actions[top.actionId];
     if (action === undefined || !here(s, content, action.id)) {
       pop(); events.push({ type: 'popped', actionId: top.actionId, reason: 'elsewhere' }); continue;
     }
     if (isDone(s, action)) { pop(); events.push({ type: 'popped', actionId: action.id, reason: 'done' }); continue; }
+    // A fight stops before it kills (#74, spec 2026-09-24 section 3.2), unless Shift forced it: an automated
+    // harvest runs once in front of it; with none, but anything else that can run, it leaves the queue with
+    // its progress kept; with nothing else, it goes on.
+    if (top.forced !== true && wouldKill(s, content, action)) {
+      const delay = delayFor(s, content, tried, action);
+      // Tied to the fight (`for`), so it leaves if the fight does (code panel round two: delays outlived their fight).
+      if (delay !== null) { byAutomation(delay, 'delay', undefined, top.id); continue; }
+      // An automated fight never stops (the user: "it should kill the player if there is no other action to run").
+      if (!automated(s, action) && anyCalm(s, content)) {
+        pop(); tried.add(action.id); events.push({ type: 'popped', actionId: action.id, reason: 'hurt' }); continue;
+      }
+    }
     // The last port's event is the finish, not a departure: nothing to provision for. Provisioning waits
     // until the event could start, so a key its own supply still has to fetch is fetched first and the
     // galley is not eaten on the way (the user: "Before travel, AN food items are stockpiled").
@@ -207,7 +251,13 @@ export function resolve(state: GameState, content: Content): Resolved {
       // A better-ranked producer going first is not this order's supply; the maker is, and fetches for it alone.
       // The maker counts as having supplied only once it is queued: the one going first may leave at once
       // (its look-ahead already met), and the maker must still be free to supply (the round-five fix check).
-      if (first === null) { supplied.add(supply.maker); byAutomation(supply.maker, 'supply', undefined, top.id); }
+      if (first === null) {
+        supplied.add(supply.maker);
+        byAutomation(supply.maker, 'supply', undefined, top.id);
+        // A forced order's supply is forced too (code panel round three): Shift on the compass must carry through
+        // the wardens it needs, or the promise "Shift+play fights to the end" breaks one link down.
+        if (top.forced === true) s = { ...s, queue: [{ ...s.queue[0]!, forced: true }, ...s.queue.slice(1)] };
+      }
       else byAutomation(first, 'supply');
       continue;
     }

@@ -24,6 +24,19 @@ describe('Queue', () => {
     expect(screen.getAllByText('1.0s')).toHaveLength(1);
     expect(screen.queryByText(/\u2248/)).toBeNull();
   });
+  it('a forced fight is tagged to the end (#74); a plain order is not', () => {
+    const s = { ...fresh(), inventory: { pass: 1 } };
+    const { unmount } = render(<Queue state={enqueue(s, book, 'raid', { once: true })} content={book} working={0} live={true} onRemove={noop} />);
+    expect(screen.getByText('to the end')).toBeInTheDocument();
+    unmount();
+    render(<Queue state={enqueue(s, book, 'raid')} content={book} working={0} live={true} onRemove={noop} />);
+    expect(screen.queryByText('to the end')).toBeNull();
+  });
+  it('a forced supply that does not hurt carries the flag but not the tag (code panel round four)', () => {
+    const s = { ...fresh(), queue: [{ id: 0, actionId: 'salvage', mode: 'repeat' as const, by: 'auto' as const, forced: true as const, for: 1 }, { id: 1, actionId: 'raid', mode: 'once' as const, by: 'player' as const, forced: true as const }], nextEntryId: 2 };
+    render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    expect(screen.getAllByText('to the end')).toHaveLength(1);
+  });
   it('the countdown runs to where the row will stop: the hull with 3 of its 8 scrap on hand stops at the fourth unit', () => {
     const s = { ...enqueue(fresh(), book, 'hull'), inventory: { scrap: 3 } };
     render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);

@@ -31,8 +31,11 @@ export function narrate(e: LogEvent, content: Content): Narration {
     }
     case 'coreLevel': return { kind: 'note', text: `${skillOf(content, e.skill).name} reaches Lv ${e.level}` };
     case 'died': return { kind: 'note', text: `Dead at ${clock(ticksToSeconds(e.runTicks))}` };
-    // Never logged (src/state/useGame.ts withLog keeps pops and automation's own orders out); worded only so a stray line is not blank.
-    case 'popped': return { kind: 'note', text: `${rowName(content, e.actionId)} leaves the queue` };
+    // A fight that backed off (#74) is the one pop logged: the user's "explain that you are about to die".
+    case 'popped': return e.reason === 'hurt'
+      ? { kind: 'note', text: `Backed off from ${rowName(content, e.actionId)}: one more push would end this life. Shift+play fights to the end` }
+      // Never logged otherwise (src/state/useGame.ts withLog keeps pops and automation's own orders out); worded only so a stray line is not blank.
+      : { kind: 'note', text: `${rowName(content, e.actionId)} leaves the queue` };
     case 'automated': return { kind: 'note', text: `${rowName(content, e.actionId)} queued by automation` };
     // A save from a later format may hold an event this build does not know: a plain note, never a blank log.
     default: return { kind: 'note', text: String((e as { readonly type?: unknown }).type ?? 'something happened') };

@@ -39,6 +39,14 @@ describe('the save', () => {
     expect(loaded.kind).toBe('loaded');
     expect(loaded.kind === 'loaded' && loaded.model.state.dead).toBe(true);
   });
+  it('loads a save from before #77, which has no idleFed, as food going first; a saved turn is kept', () => {
+    const m = midRun();
+    const { idleFed: _, ...old } = m.state;
+    const loaded = loadSave(JSON.stringify({ format: SAVE_FORMAT, bookId: book.id, bookVersion: book.version, model: { ...m, state: old } }), book);
+    expect(loaded.kind === 'loaded' && loaded.model.state.idleFed).toBe(false);
+    const kept = loadSave(saveText({ ...m, state: { ...m.state, idleFed: true } }, book), book);
+    expect(kept.kind === 'loaded' && kept.model.state.idleFed).toBe(true);
+  });
   it('none for no text', () => {
     expect(loadSave(null, book)).toEqual({ kind: 'none' });
   });
@@ -52,6 +60,9 @@ describe('the save', () => {
     expect(loadSave(bad({ queue: 'not a list' }), book)).toEqual({ kind: 'aside', why: 'corrupt' });
     expect(loadSave(bad({ queue: [null] }), book)).toEqual({ kind: 'aside', why: 'corrupt' });
     expect(loadSave(bad({ queue: [{ id: 0, actionId: 'forage', mode: 'repeat', by: 'auto', left: 0 }] }), book)).toEqual({ kind: 'aside', why: 'corrupt' });
+    // A forced entry (#74) loads; a forced flag that is not true is corrupt.
+    expect(loadSave(bad({ queue: [{ id: 0, actionId: 'forage', mode: 'once', by: 'player', forced: 'yes' }], nextEntryId: 1 }), book)).toEqual({ kind: 'aside', why: 'corrupt' });
+    expect(loadSave(bad({ queue: [{ id: 0, actionId: 'forage', mode: 'once', by: 'player', forced: true }], nextEntryId: 1 }), book).kind).toBe('loaded');
     expect(loadSave(bad({ skills: { ...m.state.skills, forage: {} } }), book)).toEqual({ kind: 'aside', why: 'corrupt' });
     expect(loadSave(bad({ work: { cabin: { progress: 'x', costsConsumed: 0 } } }), book)).toEqual({ kind: 'aside', why: 'corrupt' });
     expect(loadSave(bad({}, [{ seq: 1, at: 0 }]), book)).toEqual({ kind: 'aside', why: 'corrupt' });

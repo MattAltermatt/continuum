@@ -7,6 +7,7 @@ import { balance } from '../balance';
 import type { ActionDefinition, ActionId, Book, BookLength } from '../data/types';
 import { canJit, isPriority, isUnlocked, modeOf, setAutomation } from './automation';
 import { count } from './inventory';
+import { stops } from './fight';
 import { enqueue, newState, startBlock } from './queue';
 import { rebirth } from './rebirth';
 import { setPaused, step } from './tick';
@@ -20,7 +21,7 @@ import type { GameState } from './types';
  * (spec section 5). measure.test.ts locks it together with balance.play, so a
  * bound cannot change without this being looked at.
  */
-export const PLAY_VERSION = 2;
+export const PLAY_VERSION = 3;
 
 /** balance.play's shape with plain numbers, so a test or a caller can pass other bounds. */
 export type PlayBounds = { readonly [K in keyof typeof balance.play]: number };
@@ -41,6 +42,12 @@ export interface Policy {
 
 export type PlayOutcome = 'finished' | 'never-finishes' | 'frozen';
 
+/**
+ * Who froze a run (#69): the policy left a row undone that a person could have
+ * started, or the book left nothing that starts.
+ */
+export type FreezeCause = { readonly cause: 'policy'; readonly row: ActionId } | { readonly cause: 'book' };
+
 export interface PlayRun {
   readonly policy: string;
   readonly outcome: PlayOutcome;
@@ -49,6 +56,8 @@ export interface PlayRun {
   /** The furthest chapter index each life reached (spec 2026-09-23-the-windward-run section 11). */
   readonly chaptersPerLife: readonly number[];
   readonly totalTicks: number;
+  /** Present exactly when the outcome is frozen. */
+  readonly frozen?: FreezeCause;
 }
 
 export function play(book: Book, policy: Policy, bounds: PlayBounds = balance.play): PlayRun {
@@ -63,7 +72,8 @@ export function play(book: Book, policy: Policy, bounds: PlayBounds = balance.pl
   let stalled = false;              // the previous step did not advance time
   const end = (outcome: PlayOutcome, last: GameState): PlayRun => {
     const lives = [...ticksPerLife, last.runTicks];
-    return { policy: policy.name, outcome, lives: lives.length, ticksPerLife: lives, chaptersPerLife: [...chaptersPerLife, Math.max(reached, last.chapter)], totalTicks: before + last.runTicks };
+    const run = { policy: policy.name, outcome, lives: lives.length, ticksPerLife: lives, chaptersPerLife: [...chaptersPerLife, Math.max(reached, last.chapter)], totalTicks: before + last.runTicks };
+    return outcome === 'frozen' ? { ...run, frozen: freezeCause(last, book) } : run;
   };
   for (;;) {
     const decideNow = stalled || sinceDecide >= interval;
@@ -95,6 +105,43 @@ export function play(book: Book, policy: Policy, bounds: PlayBounds = balance.pl
   }
 }
 
+/**
+ * The rows that move the port on: its unfinished one-times, and the makers of
+ * what they cost or need, down the chain. A stack that nothing unfinished
+ * uses passes time without getting anywhere, so it is not one of them.
+ */
+function forward(state: GameState, book: Book): readonly ActionId[] {
+  const rows = chapterOf(state, book).order.map((id) => book.actions[id]!);
+  const wanted = new Set<string>();
+  const moving = new Set<ActionId>(rows.filter((a) => a.isOneTime && !isDone(state, a)).map((a) => a.id));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const id of moving) for (const c of [...(book.actions[id]!.needs ?? []), ...book.actions[id]!.itemCosts]) wanted.add(c.item);
+    for (const a of rows) {
+      if (moving.has(a.id) || isDone(state, a) || a.producedItem === undefined || !wanted.has(a.producedItem)) continue;
+      moving.add(a.id);
+      grew = true;
+    }
+  }
+  return rows.filter((a) => moving.has(a.id)).map((a) => a.id);
+}
+
+/**
+ * Probes a frozen state by construction (#69): each row that moves the port on,
+ * in order, queued the ways a person can (play, and Shift+play) on a copy and
+ * stepped once. The first that passes time is the row the policy left undone;
+ * if none does, the book cannot go on.
+ */
+export function freezeCause(state: GameState, book: Book): FreezeCause {
+  for (const id of forward(state, book)) {
+    for (const once of [false, true]) {
+      const probe = enqueue(state, book, id, { front: true, once });
+      if (probe !== state && step(probe, book).runTicks !== state.runTicks) return { cause: 'policy', row: id };
+    }
+  }
+  return { cause: 'book' };
+}
+
 export function declaredTicks(length: BookLength): number {
   return lengthInHours(length) * ticksPerHour();
 }
@@ -112,7 +159,8 @@ export function formatGameTime(ticks: number): string {
  * A person-like player for the queue of orders (spec section 11). Checks in
  * every balance.policy.checkEverySeconds of game time and whenever time stops.
  * It sets foods and makers to JIT as they earn chips and never uses the
- * priorities. Whenever the queue is dry it queues, by hand: food, then the
+ * priorities. Whenever the queue holds no order of its own (automation's may
+ * be running: #77 keeps an empty queue busy) it queues, by hand: food, then the
  * port's first unfinished one-time behind one fill of each maker automation
  * does not supply (the big event is the last one-time, so it comes once the
  * port is built). One fill per ask is enough, since the play asks again the
@@ -206,7 +254,21 @@ function byHand(state: GameState, book: Book, mine: (a: ActionDefinition) => boo
     const press = block?.kind === 'short' && block.maker !== null ? block.maker : food.id;
     s = enqueue(s, book, press, { front: true });
   }
-  if (s.queue.length > 0) return s;
+  // Automation's own orders do not stop a person queuing (#77: an empty queue is JIT's, and waiting it out read ~12 h long).
+  if (s.queue.some((e) => e.by === 'player')) return s;
+  // A fight that would stop (#74 case 2; a chipped fight never stops, it fights on):
+  // the user's point 3, as a person plays it. Fish while fishing can start, and fight to the end once it cannot.
+  const fight = rows.find((a) => a.isOneTime && !isDone(s, a));
+  if (fight !== undefined && stops(s, book, fight)) {
+    // Food short of an input presses its maker, as the food press above does (panel: forcing there killed 7 lives).
+    const block = food === undefined ? null : startBlock(s, book, food.id);
+    const press = food === undefined ? null : block?.kind === 'short' && block.maker !== null ? block.maker : food.id;
+    const fed = press === null ? s : enqueue(s, book, press, { front: true });
+    if (fed !== s) return fed;
+    // A forced press the fight refuses (a need not in hand) falls through to the rest of the port.
+    const forced = enqueue(s, book, fight.id, { front: true, once: true });
+    if (forced !== s) return forced;
+  }
   if (food !== undefined && modeOf(s, food) !== 'jit') s = withMakers(s, book, rows, food);
   // Withhold the event only while the idle fill will take a one-time of this port; withholding it whenever
   // any one-time is unfinished froze a life, since JIT key makers are pulled only through the event's chain.
@@ -218,7 +280,7 @@ function byHand(state: GameState, book: Book, mine: (a: ActionDefinition) => boo
 
 export type PlayFlag =
   | { readonly kind: 'never-finishes'; readonly policy: string }
-  | { readonly kind: 'frozen'; readonly policy: string; readonly life: number }
+  | ({ readonly kind: 'frozen'; readonly policy: string; readonly life: number } & FreezeCause)
   | { readonly kind: 'long-life'; readonly policy: string; readonly life: number; readonly ticks: number }
   | { readonly kind: 'short-life'; readonly policy: string; readonly lives: number; readonly life: number; readonly ticks: number }
   | { readonly kind: 'off-length'; readonly declared: number; readonly min: number; readonly max: number }
@@ -248,7 +310,7 @@ export function measure(book: Book, policies: readonly Policy[], gameVersion: st
   runs.forEach((run, k) => {
     const policy = policies[k]!;
     if (run.outcome === 'never-finishes') flags.push({ kind: 'never-finishes', policy: run.policy });
-    if (run.outcome === 'frozen') flags.push({ kind: 'frozen', policy: run.policy, life: run.lives });
+    if (run.outcome === 'frozen') flags.push({ kind: 'frozen', policy: run.policy, life: run.lives, ...run.frozen! });
     run.ticksPerLife.forEach((ticks, i) => {
       if (ticks > bounds.maxLifeMinutes * perMinute) flags.push({ kind: 'long-life', policy: run.policy, life: i + 1, ticks });
     });

@@ -302,6 +302,16 @@ unsubscribed event) ship without asking.
   and tick) is the guard for this area: five code panel rounds each found a
   queue defect the previous round's fix had made, and it fails on every one of
   them. A change to resolve that turns it red has found a real case.
+- **A fight stops before it kills: `src/engine/fight.ts`** (#74, spec
+  2026-09-24-queue-plays-safely). `wouldKill` plays the fight's window out tick
+  by tick with the tick's own functions (decay, hurt, eat), so it agrees with
+  `step` by construction; keep it that way rather than writing a formula.
+  Resolve applies the three cases before provisioning; the play button asks
+  `playBlock`. An automated fight (chip on) never stops, only waits behind a
+  harvest, then fights on to the death: the user's rule. Only JIT food skips
+  `killers`. A Shift order is `forced`, and so are the supplies it pulls. After
+  a back-off, automation may still run a harvest the player dies doing: that is
+  an age death and by design (spec §3.2).
 - **A queue entry is an order, not a row.** Entries carry their own `id`; a
   component that lists the queue keys by it. A row's progress lives on the row
   (`state.work`), so two entries for one row share it and removing one loses

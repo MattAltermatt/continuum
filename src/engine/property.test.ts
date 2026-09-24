@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { anyCalm, automated, delayFor, hurts } from './fight';
 import type { ActionId, Content } from '../data/types';
 import { windwardRun } from '../data/windward-run';
 import { cycleOf, modeOf, setAutomation, unlockAt } from './automation';
@@ -66,6 +67,11 @@ function starving(s: GameState, content: Content): readonly ActionId[] {
   });
 }
 
+/** Delays and stops seen, so a test can show the #74 invariant was exercised, not merely never reached. */
+let backedOff = 0;
+/** Deaths under an automated fight the invariant checked. */
+let automatedDeaths = 0;
+
 function play(content: Content, seed: number, actions: number, chapter = 0): void {
   const rand = lcg(seed);
   const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)]!;
@@ -81,8 +87,25 @@ function play(content: Content, seed: number, actions: number, chapter = 0): voi
     else if (roll < 0.35 && s.queue.length > 0) s = removeEntry(s, pick(s.queue).id);
     else if (roll < 0.5) { const id = pick(here); s = setAutomation(s, content, id, pick(cycleOf(content, content.actions[id]!))); }
     else if (roll < 0.53) s = setPaused(s, s.paused === 'none' ? 'player' : 'none');
+    // Low health now and then, so fights reach the brink and the #74 rule is exercised, not just reachable.
+    else if (roll < 0.56 && !s.dead) s = { ...s, health: Math.min(s.maxHealth, 0.02 + rand() * 3) };
     else for (let k = Math.floor(rand() * 40); k > 0 && !s.dead; k--) {
+      const before = s.paused === 'none' ? resolve(s, content).state : s;
       s = step(s, content);
+      // A fight stops before it kills (#74 section 3.5): an unforced, unautomated fight ends a life only when nothing else could run.
+      const top = before.queue[0];
+      backedOff += s.events.filter((e) => (e.type === 'automated' && e.why === 'delay') || (e.type === 'popped' && e.reason === 'hurt')).length;
+      // An automated fight fights on when automation has nothing else (the user, 2026-09-24): it kills only with no
+      // delay to take. A fight queued by hand with its chip off kills only when nothing at all could run.
+      const fight = top === undefined ? undefined : content.actions[top.actionId];
+      if (s.dead && !s.finished && top !== undefined && top.forced !== true && hurts(fight)) {
+        if (automated(before, fight!)) {
+          automatedDeaths++;
+          expect(delayFor(before, content, new Set(), fight), `seed ${seed}, action ${n}: ${top.actionId} killed with a delay to take`).toBeNull();
+        // Random play has never reached this branch (a chip-off fight dying with nothing at all to run): case 3 is
+        // pinned by fight.test.ts, not here. It stays as a tripwire.
+        } else expect(anyCalm(before, content), `seed ${seed}, action ${n}: ${top.actionId} killed with something else to run`).toBe(false);
+      }
       // Liveness (round five): a JIT food out and makeable is on its way by the next tick.
       const now = new Set(starving(s, content));
       for (const id of [...hungry.keys()]) if (!now.has(id)) hungry.delete(id);
@@ -128,6 +151,10 @@ describe('seeded random play keeps the queue sound', () => {
     for (const seed of [6, 7, 8]) play(chained, seed, 3000);
   }, 30_000);
   it('on The Windward Run, from each port', () => {
+    backedOff = 0;
+    automatedDeaths = 0;
     for (const chapter of [0, 1, 2]) for (const seed of [11, 12, 13]) play(windwardRun, seed + 10 * chapter, 3000, chapter);
+    expect(backedOff, 'the fight rule never came up: the invariant checked nothing').toBeGreaterThan(0);
+    expect(automatedDeaths, 'no automated fight died: its invariant checked nothing').toBeGreaterThan(0);
   }, 60_000);
 });

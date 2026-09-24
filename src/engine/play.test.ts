@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { Book } from '../data/types';
 import { canJit } from './automation';
-import { declaredTicks, attentive, formatGameTime, handsOn, play, prioritized, type Policy } from './play';
+import { declaredTicks, attentive, formatGameTime, freezeCause, handsOn, play, prioritized, type Policy } from './play';
+import { fixture } from './fixture';
+import { stops } from './fight';
+import { unlockAt } from './automation';
 import { enqueue, newState } from './queue';
 import { setPaused, step } from './tick';
 
@@ -145,8 +148,10 @@ describe('play', { timeout: 30_000 }, () => {
     // The shelter's chip is earned and Mine's too (so the shelter can start by JIT); the monument's is not.
     const b = monumentBook(150, 1500);
     const counts = { shelter: balance.automation.unlockOneTime, mine: balance.automation.unlockRepeatable, forage: balance.automation.unlockRepeatable };
-    // A berry on hand, so JIT food (Forage) does not jump in first and the idle fill is what runs.
-    const s = setPaused({ ...newState(b.roster), completionCounts: counts, inventory: { berries: 1 } }, 'none');
+    // Berries at their cap (#77: an empty queue refills a JIT food before the idle fill), so JIT has nothing to
+    // do and the idle fill is what runs. Stone is not food (#79) and needs no filling; it is kept for the setup.
+    const full = balance.inventory.stackCap;
+    const s = setPaused({ ...newState(b.roster), completionCounts: counts, inventory: { berries: full, stone: full } }, 'none');
     const asked = prioritized.decide(s, b);
     expect(asked.automation).toMatchObject({ shelter: 'high', mine: 'jit' });
     expect(asked.queue.some((e) => e.actionId === 'monument')).toBe(false);
@@ -228,10 +233,55 @@ describe('play', { timeout: 30_000 }, () => {
   it('stops frozen, alive, when nothing the policy queues can run', () => {
     const run = play(frozenBook(), attentive);
     expect(run.outcome).toBe('frozen');
+    expect(run.frozen).toEqual({ cause: 'book' });
     expect(run.lives).toBe(1);
     expect(run.ticksPerLife[0]).toBeGreaterThan(0);
     // alive: it froze well inside the first life a sane policy lives (re-measured: 2.01 min)
     expect(run.ticksPerLife[0]).toBeLessThan(balance.play.minLifeMinutes * balance.time.ticksPerMinute);
+  });
+  it('a freeze the policy caused names the row a person could have started (#69)', () => {
+    const idle: Policy = { name: 'idle', sane: false, checkEverySeconds: 0, decide: (s) => s };
+    const run = play(monumentBook(3, 30), idle);
+    expect(run.outcome).toBe('frozen');
+    expect(run.frozen).toEqual({ cause: 'policy', row: 'mine' });   // stone for the shelter; berries move nothing on
+  });
+  it('a run that did not freeze carries no freeze cause', () => {
+    expect(play(monumentBook(3, 30), attentive).frozen).toBeUndefined();
+  });
+  describe('a fight that would stop (#74)', () => {
+    // The fixture's raid hurts and is the port's only one-time; a pass is in hand. Salvage is always there to run
+    // instead, so a raid that would kill stops (case 2) rather than carrying on as the only row (case 3).
+    const book: Book = { ...fixture, id: 'raid-book', name: 'Raid', version: 1, length: { hours: 1 },
+      actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, hurts: 1 } },
+      chapters: [{ ...fixture.chapters[0]!, order: ['fish', 'salvage', 'raid'] }, fixture.chapters[1]!] };
+    const low = (fish: number) => setPaused({ ...newState(book.roster), health: 0.3, inventory: { pass: 1, fish }, work: { raid: { progress: 5, costsConsumed: 0 } } }, 'none');
+    it('is a freeze the policy caused, found only by Shift+play: the plain press backs off, the forced one fights', () => {
+      const s = low(0);
+      expect(stops(s, book, book.actions.raid!)).toBe(true);
+      expect(freezeCause(s, book)).toEqual({ cause: 'policy', row: 'raid' });
+    });
+    it('the measuring players fish while fishing can start, and force the fight once it cannot', () => {
+      // A fish in hand, but just eaten one: the cooldown keeps the next bite out of the window.
+      const one = { ...low(1), foodCooldowns: { fish: balance.health.foodCooldownTicks } };
+      expect(stops(one, book, book.actions.raid!)).toBe(true);
+      const fishing = attentive.decide(one, book);
+      expect(fishing.queue.map((e) => e.actionId)).toEqual(['fish']);
+      const full = { ...low(balance.inventory.stackCap), foodCooldowns: { fish: balance.health.foodCooldownTicks } };
+      expect(stops(full, book, book.actions.raid!)).toBe(true);
+      const forced = attentive.decide(full, book);
+      expect(forced.queue[0]).toMatchObject({ actionId: 'raid', forced: true });
+      // The prioritized player puts the raid on a chip: automated, it fights on by itself, so nothing is forced.
+      const chipped = prioritized.decide({ ...full, completionCounts: { raid: unlockAt(book.actions.raid!) } }, book);
+      expect(chipped.automation.raid).toBeDefined();
+      expect(chipped.queue.some((e) => e.forced === true)).toBe(false);
+    });
+    it('under case 1 they leave the time-buying to automation: the fight is queued plain, never forced', () => {
+      const one = { ...low(1), foodCooldowns: { fish: balance.health.foodCooldownTicks }, completionCounts: { fish: unlockAt(book.actions.fish!) }, automation: { fish: 'jit' as const } };
+      expect(stops(one, book, book.actions.raid!)).toBe(false);
+      const d = attentive.decide(one, book);
+      expect(d.queue.some((e) => e.forced === true)).toBe(false);
+      expect(d.queue.map((e) => e.actionId)).toContain('raid');
+    });
   });
   // A ceiling of 1/6 day (4 h of game time) keeps the give-up tests fast; the default is 60 days.
   const quick = { ...balance.play, maxBookDays: 1 / 6 };

@@ -35,6 +35,7 @@ export function blankRun(skills: Readonly<Record<SkillId, SkillState>>, lifeStar
     nextEntryId: 0,
     work: {},
     provisioned: [],
+    idleFed: false,
     chapter: 0,
     completedOneTime: [],
     completionCounts: {},
@@ -62,6 +63,8 @@ export type StartBlock =
   | { readonly kind: 'done' }
   | { readonly kind: 'full'; readonly item: ItemId }
   | { readonly kind: 'enough'; readonly item: ItemId }
+  /** The play button's and the row's alone (fight.ts hurtBlock): a fight that would stop (#74). */
+  | { readonly kind: 'hurt' }
   | { readonly kind: 'short'; readonly item: ItemId; readonly amount: number; readonly maker: ActionId | null; readonly gap: SupplyGap; readonly cause?: SupplyCause };
 
 export type Supply =
@@ -133,9 +136,13 @@ function blockOf(state: GameState, content: Content, id: ActionId, seen: Readonl
   return supply.cause === undefined ? base : { ...base, cause: supply.cause };
 }
 
-/** Why the row cannot start now, counting automation that would supply it along the whole chain. null: it can start. */
-export function startBlock(state: GameState, content: Content, id: ActionId): StartBlock | null {
-  return blockOf(state, content, id, new Set([id]));
+/**
+ * Why the row cannot start now, counting automation that would supply it along
+ * the whole chain. null: it can start. `avoid`: rows a supply may not run
+ * through (fight.ts: a chain through a fight buys no time).
+ */
+export function startBlock(state: GameState, content: Content, id: ActionId, avoid: ReadonlySet<ActionId> = new Set()): StartBlock | null {
+  return blockOf(state, content, id, new Set([id, ...avoid]));
 }
 
 /**
@@ -175,7 +182,10 @@ export function enqueue(state: GameState, content: Content, id: ActionId, opts: 
   const by = opts.by ?? 'player';
   if (opts.front === true && by === 'player' && frontBlock(state, content, id, opts.once === true) !== null) return state;
   const mode = action.isOneTime || opts.once === true ? 'once' : 'repeat';
-  const base: QueueEntry = { id: state.nextEntryId, actionId: id, mode, by };
+  // Shift on a hurting row forces it (#74 section 3.3): fought to the end, never backed off. Automation never forces.
+  // A hurting repeatable too (code panel): the refusal names Shift+play, so Shift+play must keep that promise.
+  const forced = by === 'player' && opts.once === true && (action.hurts ?? 0) > 0;
+  const base: QueueEntry = forced ? { id: state.nextEntryId, actionId: id, mode, by, forced: true } : { id: state.nextEntryId, actionId: id, mode, by };
   const filled: QueueEntry = by === 'auto' && mode === 'repeat' && opts.left !== undefined ? { ...base, left: opts.left } : base;
   const entry: QueueEntry = by === 'auto' && opts.for !== undefined ? { ...filled, for: opts.for } : filled;
   return {
@@ -252,7 +262,7 @@ function castOff(state: GameState, content: Content, events: GameEvent[]): GameS
   const order = content.chapters[chapter]!.order;
   const inventory = Object.fromEntries(Object.entries(state.inventory).filter(([id]) => content.items[id]?.kind === 'food'));
   events.push({ type: 'castOff', chapter });
-  return { ...state, chapter, inventory, provisioned: [], queue: state.queue.filter((e) => order.includes(e.actionId)) };
+  return { ...state, chapter, inventory, provisioned: [], idleFed: false, queue: state.queue.filter((e) => order.includes(e.actionId)) };
 }
 
 /**

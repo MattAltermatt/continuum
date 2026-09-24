@@ -71,7 +71,7 @@ export function Queue({ state, content, working, live, dead = false, onRemove }:
               <div className="bar__value">{fraction(w.progress, a.expCost)}</div>
             </div>
             <div className="entry__sub">
-              <span><span className="tag">{e.mode}</span>{e.by === 'auto' && <span className="tag tag--auto">auto</span>}</span>
+              <span><span className="tag">{e.mode}</span>{e.by === 'auto' && <span className="tag tag--auto">auto</span>}{e.forced === true && (content.actions[e.actionId]?.hurts ?? 0) > 0 && <span className="tag tag--forced">to the end</span>}</span>
               {/* The top entry's countdown only, while its rate holds (spec 8.1): live and able to work. */}
               <span className="ink-2">{i === 0 && live && working === 0 ? duration(remainingSeconds(state, content, e)) : '\u00A0'}</span>
             </div>

@@ -55,7 +55,7 @@ function looksLikeModel(v: unknown): v is Model {
 const isEntry = (e: unknown): boolean =>
   isRecord(e) && typeof e.id === 'number' && typeof e.actionId === 'string' && (e.mode === 'repeat' || e.mode === 'once')
   && (e.by === 'player' || e.by === 'auto') && (e.left === undefined || (Number.isInteger(e.left) && (e.left as number) >= 1))
-  && (e.for === undefined || typeof e.for === 'number');
+  && (e.for === undefined || typeof e.for === 'number') && (e.forced === undefined || e.forced === true);
 const isLine = (l: unknown): boolean =>
   isRecord(l) && typeof l.seq === 'number' && typeof l.at === 'number' && isRecord(l.event) && typeof l.event.type === 'string';
 
@@ -137,6 +137,8 @@ export function reconcile(state: GameState, book: Book): GameState {
     work: keep(state.work, row),
     completedOneTime: state.completedOneTime.filter(row),
     provisioned: state.provisioned.filter(row),
+    // A save from before #77 has no turn to keep: food goes first.
+    idleFed: state.idleFed === true,
     completionCounts: keep(state.completionCounts, row),
     automation: keep(state.automation, row),
     chapter: Math.min(Math.max(0, Math.floor(state.chapter)), book.chapters.length - 1),

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { balance } from '../balance';
-import { cycleOf } from '../engine/automation';
+import { cycleOf, unlockAt } from '../engine/automation';
 import { enqueue, newState } from '../engine/queue';
 import type { AutoMode, GameState } from '../engine/types';
 import type { Book } from '../data/types';
@@ -136,6 +136,30 @@ describe('ActionRow: play and +', () => {
     expect(screen.getByText('scrap: enough for what is queued')).toBeInTheDocument();
     await act(() => realClick(play(), { shiftKey: true }));
     expect(r.onNow).toHaveBeenCalledWith('salvage', true);
+  });
+  it('play on a fight that would back off is refused with the words that name Shift+play; Shift+play passes (#74)', async () => {
+    const s = { ...fresh(), inventory: { pass: 1 }, health: 0.5 };
+    const r = row(s, 'raid');
+    await act(() => realClick(play()));
+    expect(r.onNow).not.toHaveBeenCalled();
+    expect(r.el()).toHaveClass('row--refused');
+    expect(screen.getByText('too hurt to fight: one more push would end this life \u00B7 Shift+play fights to the end')).toBeInTheDocument();
+    await act(() => realClick(play(), { shiftKey: true }));
+    expect(r.onNow).toHaveBeenCalledWith('raid', true);
+  });
+  it('+ on a fight that would stop dispatches and says why, with no flash (#74: + did nothing visible)', async () => {
+    const r = row({ ...fresh(), inventory: { pass: 1 }, health: 0.5 }, 'raid');
+    await act(() => realClick(plus()));
+    expect(r.onQueue).toHaveBeenCalledWith('raid', false);
+    expect(r.el()).not.toHaveClass('row--refused');
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('too hurt to fight: one more push would end this life \u00B7 Shift+play fights to the end');
+  });
+  it('a set chip on a fight that would kill does not wait and is not refused: automated, it fights on (the user, 2026-09-24)', async () => {
+    const s = { ...fresh(), inventory: { pass: 1 }, health: 0.5, completionCounts: { raid: unlockAt(book.actions.raid!) }, automation: { raid: 'high' as const } };
+    const r = row(s, 'raid');
+    expect(r.el().querySelector('.row__say')).toBeNull();
+    await act(() => realClick(play()));
+    expect(r.onNow).toHaveBeenCalledWith('raid', false);
   });
   it('+ always dispatches, and for a short row shows the same words with no flash', async () => {
     const r = row(fresh(), 'hull');

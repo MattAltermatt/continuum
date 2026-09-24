@@ -65,9 +65,26 @@ export const LOG_LINES = 100;
  * the same row in the same batch (two entries popping at once say it once);
  * everything else the engine reports once.
  */
+/** This life's log already says the fight backed off (#74): the lines back to the life's first. Newest first. */
+function backedOff(model: Model, id: ActionId): boolean {
+  for (const l of model.log) {
+    if (l.event.type === 'lifeBegins') return false;
+    if (l.event.type === 'popped' && l.event.reason === 'hurt' && l.event.actionId === id) return true;
+  }
+  return false;
+}
+
 function withLog(model: Model, state: GameState): Model {
-  const news = (e: GameEvent) => !(e.type === 'completed' && !e.oneTime) && e.type !== 'popped' && e.type !== 'automated'
-    && !(e.type === 'short' && state.queue.some((q) => q.actionId === e.actionId));
+  // A fight backing off is news once per row per life (#74 section 3.4): with automation it may back off again and again.
+  // Within one batch too (code panel round two: two + presses logged the line twice at one tick).
+  const said = new Set<ActionId>();
+  const hurt = (e: GameEvent) => {
+    if (e.type !== 'popped' || e.reason !== 'hurt' || said.has(e.actionId) || backedOff(model, e.actionId)) return false;
+    said.add(e.actionId);
+    return true;
+  };
+  const news = (e: GameEvent) => hurt(e) || (!(e.type === 'completed' && !e.oneTime) && e.type !== 'popped' && e.type !== 'automated'
+    && !(e.type === 'short' && state.queue.some((q) => q.actionId === e.actionId)));
   const later = (k: number, id: ActionId) => state.events.slice(k + 1).some((f) => f.type === 'short' && f.actionId === id);
   const worth = state.events.filter((e, k) => news(e) && !(e.type === 'short' && later(k, e.actionId)));
   if (worth.length === 0) return { ...model, state };
