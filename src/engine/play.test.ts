@@ -44,7 +44,11 @@ function frozenBook(): Book {
   };
 }
 
-describe('play', () => {
+/**
+ * Each case plays whole books, headless: under a second or two on a laptop,
+ * past vitest's 5 s default on a slower CI runner (a two-policy case took 5.02 s).
+ */
+describe('play', { timeout: 30_000 }, () => {
   it('finishes a small book in life 1', () => {
     const run = play(monumentBook(3, 30), everyRowInOrder);
     expect(run.outcome).toBe('finished');

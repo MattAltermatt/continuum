@@ -53,7 +53,11 @@ const monumentFirst: Policy = {
   decide: (s, book) => [...book.chapters.flatMap((c) => c.order)].reverse().reduce((acc, id) => enqueue(acc, book, id), s),
 };
 
-describe('measure', () => {
+/**
+ * Each case plays whole books, headless: under a second or two on a laptop,
+ * past vitest's 5 s default on a slower CI runner (a two-policy case took 5.02 s).
+ */
+describe('measure', { timeout: 30_000 }, () => {
   it('stamps the book, the play, the game and the bounds it was measured with', () => {
     const r = measure(monumentBook(3, 30), [everyRowInOrder], 'test-1');
     expect(r).toMatchObject({ bookId: 'monument', bookVersion: 1, playVersion: PLAY_VERSION, gameVersion: 'test-1', declared: { hours: 1 }, bounds: balance.play });
