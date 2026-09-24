@@ -4,22 +4,30 @@
 # -- is deliberately absent. It is a human looking at the game, and a workflow
 # that claimed to cover it would make the other four feel like the whole bar.
 #
-# One job, not four. `npm ci` dominates the runtime; splitting the gates into
-# parallel jobs would pay for a dependency install three extra times to save
-# seconds. Vitest needs no CI configuration: it detects GITHUB_ACTIONS and emits
-# workflow annotations on the failing lines by itself.
+# One job for the gates, not four. `npm ci` dominates the runtime; splitting the
+# gates into parallel jobs would pay for a dependency install three extra times
+# to save seconds. Vitest needs no CI configuration: it detects GITHUB_ACTIONS
+# and emits workflow annotations on the failing lines by itself.
+#
+# A second job publishes a push to main that passed these four gates to GitHub
+# Pages, https://mattaltermatt.github.io/continuum/: the build the user plays. It
+# ships the dist the gates just built, holds the Pages permissions without ever
+# running npm, and deploys only while the commit is still main's tip, so
+# re-running an old run cannot roll the site back (and a green commit a red one
+# has already replaced is not published: fix forward). To redeploy, use "Re-run
+# all jobs" on the tip's run (re-runs are allowed for 30 days, the Pages
+# artifact is kept for 1), or run this workflow by hand on main, which runs the
+# gates again and publishes the tip. Never re-run an older main run. Every push
+# to main needs its own run: no paths filters, no [skip ci]. A red deploy job is
+# a release failure, not a gate failure: re-run the tip, do not go looking for
+# a broken test.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
-
-# A second push to the same branch cancels the first. The gates are a pass/fail
-# on the tip, not a history worth preserving.
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -27,6 +35,19 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # A second push to the same branch cancels the first's gates. The gates are a
+    # pass/fail on the tip, not a history worth preserving. Job-level, so a
+    # deploy already under way is never cancelled by a newer push; and a re-run
+    # (attempt 2 on) waits its turn rather than cancelling a newer push's gates.
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: ${{ github.run_attempt == 1 }}
+    # The artifact is named per attempt: "Re-run all jobs" uploads a second one,
+    # and deploy-pages refuses a run holding two of one name. Named once, here.
+    env:
+      PAGES_ARTIFACT: github-pages-${{ github.run_attempt }}
+    outputs:
+      pages_artifact: ${{ env.PAGES_ARTIFACT }}
     # The headless play is a synchronous loop; a broken bound would hang the
     # suite past vitest's per-test timeout, and GitHub's default is 6 hours.
     timeout-minutes: 15
@@ -65,3 +86,59 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Only main becomes the site (a push, or a run by hand); a pull request, a fork's included, never does.
+      - name: Keep the build for Pages
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+          name: ${{ env.PAGES_ARTIFACT }}
+
+  deploy:
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # A production deploy runs to the end; a newer one waits its turn.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      # The guard lives in the deploy job, checked when the job starts (after
+      # waiting its turn in "pages"), so a deploy cannot overtake a newer one
+      # and a re-run deploy re-checks. The cost: a skipped run still records a
+      # github-pages deployment. A failed lookup fails the job rather than
+      # passing for "not the tip".
+      - name: Only main's current tip
+        id: tip
+        shell: bash
+        env:
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          if ! refs=$(git ls-remote --exit-code "https://github.com/$REPO" refs/heads/main); then
+            echo "::error::could not read main's tip"
+            exit 1
+          fi
+          tip=$(awk '$2 == "refs/heads/main" { print $1 }' <<<"$refs")
+          if [ -z "$tip" ]; then
+            echo "::error::could not read main's tip"
+            exit 1
+          fi
+          if [ "$tip" = "$SHA" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::$SHA is no longer main's tip ($tip); not deploying it"
+          fi
+      - id: deployment
+        if: steps.tip.outputs.deploy == 'true'
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: ${{ needs.verify.outputs.pages_artifact }}

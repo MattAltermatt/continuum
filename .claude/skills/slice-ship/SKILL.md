@@ -89,3 +89,26 @@ git branch -d <branch> && git push origin --delete <branch>
 ```
 
 Branch cleanup is the final step of the merge, not a session-end chore.
+
+## 7. Validate the release live
+
+A push to `main` is a release to the player: CI's `deploy` job publishes it to
+GitHub Pages once CI's four machine gates pass. Green CI is not a working deploy.
+
+Find the run for the pushed commit (it can take a few seconds to appear, so
+ask again while this prints nothing), then watch it to the end:
+
+```bash
+gh run list --workflow ci.yml --event push --commit "$(git rev-parse HEAD)" --limit 1 --json databaseId --jq '.[0].databaseId'
+gh run watch <id> --exit-status
+```
+
+Then open https://mattaltermatt.github.io/continuum/ in Chrome, hard-reload,
+and check: the page's script is the merged build's (its `assets/index-*.js`
+name matches the one in the run's Build log, `gh run view <id> --log | grep -o
+'dist/assets/index-[^ ]*\.js'`; a local macOS build need not match Linux), the
+change is visible, and the console is clean. If the deploy job warned "no
+longer main's tip", or shows cancelled, a newer push replaced it: watch that
+run instead. If it failed, use "Re-run all jobs" on the tip's run (or run CI by
+hand on main once the day-old artifact has expired); never re-run an older
+main run.

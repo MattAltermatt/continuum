@@ -25,7 +25,13 @@ TICK_INTERVAL_MS = 100      // 10 ticks per second of real time
 TICKS_PER_MINUTE = 600      // 100 ms × 600 = 60 s
 ```
 
-A single loop dispatches one `TICK` per interval. The tick guards itself: while
+A single loop wakes every interval and dispatches the whole ticks real time says
+are due since its last wake (`{ type: 'tick', n }`), times the dev speed, and
+carries the leftover milliseconds to the next wake. A tab the browser throttled
+or a laptop that slept catches up on waking, by at most
+`balance.loop.maxCatchUpMinutes` of game time; the rest is dropped, not banked,
+so there is no offline progress. The engine still sees only whole ticks, one
+`step` at a time. The tick guards itself: while
 paused or dead it returns the state untouched, and whenever nothing in the
 queue can run it returns without advancing the clock (bookkeeping that takes no
 time, such as dropping a full producer, still happens). A stopped game renders
@@ -48,28 +54,39 @@ has this life lasted."
 
 ## 2. Actions and the queue
 
-The player does not click to perform work. They **queue** actions, and the
-queue works one action at a time, one tick at a time: the first entry that can run, which is the front one unless it is waiting on an input. The queue holds one entry per action.
+The player does not click to perform work. They **queue** actions: an ordered
+list of orders, where the same row may appear more than once and each entry has
+its own identity. **Only the top entry runs**, one tick at a time. A plain
+click queues a repeating order and Shift+click a single run, on both "now"
+(the top) and + (the bottom); a one-time row is always single. (Spec
+2026-09-23-the-windward-run section 2 replaced one-entry-per-action and
+stall-in-place.)
 
 ### What an action is
 
 ```ts
 interface ActionDefinition {
   id: string
-  name: string
-  description: string
-  requiredSkill: SkillId            // which skill earns XP while this runs
+  verb: SkillId                     // which skill earns XP while this runs
+  noun: string
   expCost: number                   // total XP of effort to complete once
   producedItem?: ItemId
   producedAmount?: number
-  itemCosts?: ItemCost[]            // consumed INCREMENTALLY — see below
+  itemCosts: ItemCost[]             // consumed INCREMENTALLY; an item at most once
+  needs?: ItemCost[]                // checked, never spent (a key the next row requires)
   isOneTime: boolean
-  capacityBonusOnComplete: number   // +N to every inventory slot's max
-  healthDecayMultiplier?: number    // permanent per-run decay modifier
-  healPerUnit?: number              // food: HP restored per unit eaten
-  requires?: Record<string, number> // gating: action id → completions needed
+  hurts?: number                    // health lost per second while this row runs
+  // effects of a one-time row, for the rest of the life:
+  healthDecayMultiplier?: number    // the run's decay multiplier
+  capacityBonus?: number            // + to the shared stack cap
+  gear?: { skill, multiplier }      // a skill's tick multiplier (the "tool" factor)
+  beat?: string                     // one authored sentence, printed on completion
 }
 ```
+
+Items carry no cap of their own: every item but a key holds at most
+`balance.inventory.stackCap`, raised by capacity rows; a key holds one. Food
+items carry `healPerUnit`.
 
 One field carries more weight than its size suggests:
 
@@ -117,60 +134,78 @@ Why this matters: a half-built cart has really eaten five wood. The player can
 see materials draining into work in progress, and abandoning a build is a real
 loss rather than a free undo.
 
-### Stalling and resuming
+### When the top cannot run: pops, and progress on the row
 
-When an action's progress reaches the point where its next unit is due and
-that unit cannot be paid, progress stops exactly there and the action
-**waits**: it stays in the queue, flagged, keeping its progress and the units
-already spent, and the engine works the first entry that can run. Progress
-never runs past an unpaid unit, so a waiting action owes exactly one. Every
-entry is re-checked before each tick and resumes the moment it can pay.
-Nothing is re-paid. (Spec 2026-09-22 §9 replaced the earlier "pull it out and
-stash it" model, so the queue view is honest.)
+A row's progress and the units already spent into it live **on the row**, for
+the rest of the life, not on the queue entry. So when the top entry cannot run
+it is **popped**, and the next entry for that row resumes exactly where the
+last stopped; nothing is paid twice, and removing an entry loses nothing.
+Death clears every row's progress.
 
-A producer never produces into a full stack. When a completion leaves its
-stack with no room for another, the entry leaves the queue; one queued onto an
-already-full stack leaves before it does any work. Ticks spent stay spent, XP
-stays earned, and nothing lands past the cap.
+Before any time passes (decision #41), in order:
 
-A stall is not a failure state and should not read as one. It is the game
-saying *you ran out of wood*, and the correct response is to go get wood.
+1. A row the current port does not have is dropped.
+2. A producer that is full, or a repeating producer that has fetched what the
+   entries below it need (the look-ahead, below), pops.
+3. A top entry that lacks an item (a cost unit it owes, or an unmet need) is
+   **supplied** if automation can make the item (section 6): the maker goes in
+   at the top for exactly the shortfall. Otherwise it pops, and says why:
+   nothing here makes it, its maker's automation is off or not yet earned, or
+   its maker is blocked itself (naming the deepest cause down the chain).
+4. An empty queue may be filled by passive automation.
+
+This repeats until the top can run or the queue is empty; an empty queue stops
+the clock.
+
+**The look-ahead.** A repeating producer looks at the entries below it, down to
+the next entry that makes the same item, and sums what they still need of its
+item. It stops once the pack holds that much, or at the cap; with nothing below
+needing the item, it fills to the cap. Each row below counts once, however
+many entries it has: a one-time row owes what it has yet to spend; a repeating
+row owes its cost for every completion it is asked for (a single entry one, an
+automation fill its count left, a repeating entry as many as it can make before
+its own stack is full), except that an automation supply order fetches for the
+one order it supplies and nothing below that (it supplies again at the next
+shortfall, and leaves when that order does);
+a need counts once, as the amount to hold. A single
+entry runs exactly one completion. So `salvage, hull, salvage, hull` with an
+8-scrap hull and a cap of 5 fetches 5, the hull eats 5 and pops, the second
+salvage fetches exactly 3, and the hull finishes; and `dealers, kitchens`, both
+repeating, fetches a chip for every canapé the kitchens can still make.
+
+"Now" refuses a row that cannot run and that no automation would supply
+(following the chain), and a producer whose look-ahead from the top is already
+met; + appends even then.
 
 ### On completion
 
 In order:
 
-1. Produce items, if any.
-2. Apply `capacityBonusOnComplete` to **every** inventory slot's maximum.
-3. If one-time, record it so it cannot be queued again this run.
-4. Multiply the run's `healthDecayMultiplier` by the action's, if set.
-5. Increment `actionCompletionCounts[id]` — a **lifetime** counter that
-   survives death and drives automation unlocks.
-6. If repeatable and the output stack has no room for another completion, the
-   entry leaves the queue; otherwise it resets to zero progress and stays.
+1. Produce items, if any, up to the cap.
+2. Multiply the run's decay multiplier by the row's `healthDecayMultiplier`, if set.
+3. Increment `completionCounts[id]`: a **lifetime** counter that survives death
+   and earns automation (section 6). Reaching the threshold is logged.
+4. A one-time row is recorded as done this life (its `capacityBonus` and `gear`
+   apply from here, derived from the done list, so they reset at death).
+5. A one-time or single entry leaves the queue; an automation fill with a
+   count left counts down; a repeating entry stays.
+6. If the row is the port's big event, **cast off** (section 7).
 
 ### Order of operations within a tick
 
 1. Short-circuit if paused or dead.
-2. Settle, which takes no time: drop producers whose stack is full, flag
-   entries that cannot pay the unit they owe, unflag those that can again.
-3. Find the first entry that can run. If there is none (which covers an empty
-   queue), stop: the clock does not advance, nothing decays, nothing is eaten.
-   Time passes only while work happens (decision #41).
-4. Advance the run clock.
-5. Apply this tick's health decay (§4); at zero, die and stop.
-6. Eat (§4).
-7. Work the entry found in step 3: pay the unit it owes, advance progress by
-   the tick's XP (`expCost` is in XP), and pay every unit whose threshold the
-   new progress reached. A unit that cannot be paid stops progress at its
-   threshold, and the entry waits. Then award the progress actually made as XP
-   to **both** mastery ledgers of its skill (§3): a clamped tick earns only
-   what it applied.
-8. If progress has reached `expCost`, complete the action (above).
-9. If the queue is now empty, attempt a passive automation fill (§6).
-   *Not built yet; when it is, it belongs in step 2, since an empty queue
-   never reaches this step, and it must skip producers whose stack is full.*
-10. If a food item hit zero this tick, attempt as-needed food injection (§6).
+2. **Resolve**, which takes no time: automation queues what it decides and the
+   top pops until it can work (above). If it cannot, stop: the clock does not
+   advance, nothing decays, nothing is eaten (decision #41).
+3. Advance the run clock.
+4. Apply this tick's health decay (section 4); at zero, die and stop.
+5. Apply the top row's `hurts`, if any; at zero, die and stop.
+6. Eat (section 4).
+7. Work the top: pay the unit it owes, advance progress by the tick's XP
+   (times its skill's gear), pay every unit whose threshold the new progress
+   reached (an unpaid one clamps progress to it), and award the progress
+   actually made as XP to **both** ledgers of its skill (section 3).
+8. If progress has reached `expCost`, complete the row (above).
 
 ---
 
@@ -219,7 +254,7 @@ While an action runs, its `requiredSkill` earns XP every tick:
 ```ts
 const totalMult = (1 + coreLevel * 0.05)     // core contributes +5%/level
                 * (1 + runLevel  * 0.01)     // run  contributes +1%/level
-                * toolMultiplier             // equipment hook; 1.0 by default
+                * gear                       // the product of the life's gear for this skill; 1.0 with none
 
 const tickExp = totalMult * 0.1              // baseline is 0.1 XP per tick
 ```
@@ -229,7 +264,7 @@ that is easy to misread: it is not a 50/50 split of one award, and it is not two
 separate calculations. It is *one* amount of effort recorded in two books, each
 of which converts it to levels at its own rate.
 
-Worked example — a skill at core level 10, run level 5, no tool bonus:
+Worked example — a skill at core level 10, run level 5, no gear:
 
 ```text
 totalMult = (1 + 10 × 0.05) × (1 + 5 × 0.01) × 1.0
@@ -306,7 +341,8 @@ Eating is automatic. There is no eat button, and that is deliberate — the
 decision the player makes is *whether to have food*, not *when to swallow it*.
 
 Once per tick, after damage is applied, each inventory item with a
-`healPerUnit` is considered:
+`healPerUnit` is considered, **smallest heal first** (the order the food chunk
+shows too, which never changes):
 
 1. Skip if that item is still on cooldown.
 2. Skip if eating it would push health above maximum — **no unit is ever
@@ -317,9 +353,15 @@ Once per tick, after damage is applied, each inventory item with a
 At most one unit per food type is eaten per tick. The cooldown exists to stop a
 full stack being swallowed in a single burst the instant health dips.
 
+### Hurts
+
+A row may carry `hurts`, health lost per second **while it runs** (the top
+entry, on a tick it works), applied after decay. A fight interrupted by a JIT
+food fill does not drain while the food runs, and keeps its progress.
+
 ### Death
 
-Checked once per tick, after damage and before the queue advances:
+Checked once per tick, after decay and after hurts, before eating:
 `health <= 0`.
 
 ---
@@ -333,8 +375,10 @@ Death is a normal, expected, frequent event. It is the loop, not the fail state.
 - Health restored to maximum (including accrued rebirth bonus).
 - Inventory restored to starting defaults, **food included**: food is a
   within-life plan (spec 2026-09-23 §2.1).
-- The queue is emptied.
-- One-time actions become available again.
+- The queue is emptied, and every row's kept progress cleared.
+- One-time actions become available again (and with them their capacity and
+  gear effects end).
+- Back to the first port.
 - `runTickCount` → 0.
 - `healthDecayMultiplier` → 1.0.
 - Food cooldowns cleared, and the tick's events.
@@ -346,11 +390,14 @@ Death is a normal, expected, frequent event. It is the loop, not the fail state.
 
 ### What persists
 
-- Every skill's **core mastery**.
-- `actionCompletionCounts` — lifetime totals that drive automation unlocks.
-- Automation settings and as-needed flags, keyed by action id.
+- Every skill's **core mastery**, and its lifetime counters (ticks spent, best
+  run level) for the skill ledger.
+- `completionCounts`: lifetime totals that earn automation.
+- Automation settings, keyed by row.
 - Accumulated rebirth health bonus.
-- The life number, counting up from 1.
+- The life number, counting up from 1, and the times the book was finished.
+
+Finishing the book ends a life the same way (section 7).
 
 ### The rebirth bonus
 
@@ -381,76 +428,67 @@ multiplies the gain, which is tracked in the issues.
 
 ## 6. Automation
 
-Automation is earned per action, by doing that action enough times across all
-lives, and once earned it is permanent.
+Automation is earned per row, by doing that row enough times across all lives,
+and once earned it is permanent.
 
-### Unlock thresholds
+### Earning it
 
 ```
-repeatable actions  → 200 lifetime completions     🎚️
-one-time actions    →   5 lifetime completions     🎚️
+repeatable rows  → 200 lifetime completions     🎚️
+one-time rows    →   5 lifetime completions     🎚️
 ```
 
-Keyed by action id, counted across deaths, never lost.
+Keyed by row, counted across deaths, never lost. Until earned, a row's chip
+shows its progress (`37/200`) and cannot be pressed.
 
-### The mode cycle
+### The modes
 
-Each unlocked action cycles through:
+An earned chip cycles:
 
 ```text
-Off (0) → AN → 1 → 2 → 3 → 4 → 5 → Off
+off → JIT → top → high → mid → low → last → off
 ```
 
-- **Off** — manual only.
-- **1..5** — passive priority, where 1 is highest.
-- **AN** — *as-needed*: a reactive producer that does not run on its own.
+JIT appears only on a row that makes a food, or an item some row costs or
+needs. A newly earned chip starts at off.
 
-### Passive mode
+- **JIT, just in time.** When the top entry lacks the item this row makes, it
+  goes in at the top at once, for exactly the shortfall (the look-ahead makes it
+  exact), skipping every priority. A JIT **food** row is queued the moment its
+  food runs out, with a count: the completions to the cap from what was on hand
+  (so a fill that eating outpaces still ends; while food is at zero a new one
+  follows). A fill the player buries under a play press (an order of the
+  player's above it) goes back to the top if the food is out, and so does a
+  fill for a food whose only order is the player's own, below anything but its
+  own supply; taken off JIT, a food row's fill leaves with its supply, and the
+  departure's provision is owed again. And when a port's big event is on top, unstarted and able to start
+  (its own supply, a key it needs, already fetched), every JIT food below its
+  cap is **provisioned** first, once per food per departure (never before the
+  book's finish, which is not a departure).
+- **top, high, mid, low, last: the priorities.** When the top entry lacks an
+  item whose maker is on a priority, the maker goes in once nothing better
+  ranked can go first: a repeatable producer, not already queued, that can work
+  at once with no supply of its own (Forage on a higher priority fills the
+  berries before Mine supplies the cabin). When the queue is empty and not
+  paused, the highest-priority row **that can run** is queued, one at a time;
+  ties go to the port's row order. A row set to a priority that cannot run (its
+  harvest has no chip yet) is passed over, and its chip shows why.
+- **off.** Nothing. A short entry whose maker is off pops, and says so.
 
-When the queue empties and the player has not deliberately paused, the engine
-picks **exactly one** action to queue:
+Supply follows the chain: a maker that is automated but cannot run itself does
+not count, and "now" refuses up front what no chain can close. Nothing refills
+while the player has paused.
 
-1. Collect every reachable action with a passive priority of 1 or higher.
-2. Drop one-times already completed this run.
-3. Drop anything the proceed-gate rejects.
-4. Sort by priority ascending, tie-broken by declaration order.
-5. Queue **the first one only.**
+## 7. Ports, casting off, and the finish
 
-Passive never bulk-fills and never stages a chain. Each completion empties the
-queue, which re-triggers the fill on the next tick.
-
-### As-needed mode
-
-An AN producer sits dormant and activates on exactly two triggers.
-
-**Trigger 1 — a consumer stalls on a missing material.** The engine finds an AN
-producer of that item, computes precisely how many runs are needed to cover the
-shortfall, and injects it at the front of the queue:
-
-```ts
-const stillNeeded = totalUnits - costsConsumed
-const mustGather  = Math.max(0, stillNeeded - inventoryCount)
-const cycles      = Math.ceil(mustGather / producer.producedAmount)
-```
-
-The producer is queued with `targetCount = cycles` and the stalled consumer is
-pushed to position 1 with its progress and consumed costs **preserved**. The
-producer removes itself the moment its count runs out, and the consumer picks up
-mid-build. Without an AN producer for that item, the consumer just stalls.
-
-**Trigger 2 — a food item reaches zero.** Detected on the transition from above
-zero to zero within a tick. Here the producer is told to gather to *capacity*,
-not merely to one unit:
-
-```ts
-const cycles = Math.max(1, Math.ceil(maxCapacity / producer.producedAmount))
-```
-
-### Finite runs (`targetCount`)
-
-A queued action with a `targetCount` decrements it on each completion and
-removes itself at zero. Without one, it repeats indefinitely. This single field
-is what lets AN injections be exact instead of open-ended.
+A book is a line of chapters, its **ports**. Only the current port's rows are on
+screen and can be queued. Completing a port's big event (its last one-time row)
+**casts off**: the next port's rows are the rows, every non-food item is dumped
+(provisions ride along), and the queue keeps only orders the new port has. The
+effects completed rows applied stay for the life. The last port's event is the
+book's **finish**: the life ends there, a finish card shows the book's last
+line, and the next life starts again at the first port with core ledgers,
+automation and counts kept and the life's max-health gain applied.
 
 ---
 
@@ -471,6 +509,8 @@ is what lets AN injections be exact instead of open-ended.
 | Baseline tick XP | 0.1 🎚️ | Before mastery and tool multipliers |
 | Automation unlock (repeatable) | 200 🎚️ | Lifetime completions |
 | Automation unlock (one-time) | 5 🎚️ | Lifetime completions |
+| Stack cap | 5 | Every item but a key; raised by capacity rows (#45) |
+| Catch-up per wake | 5 min 🎚️ | Game time a throttled or woken tab may run at once |
 
 ---
 
@@ -502,15 +542,18 @@ mechanism.
 Things that bite, kept where they will be read.
 
 1. **Cost declaration order is spend order.** `itemCosts` is walked
-   left-to-right, so the author controls which material drains first.
-2. **A waiting action is keyed by its queue entry, and the queue holds one entry per action.** If content ever regenerates action ids, a waiting entry is simply removed by the new chapter's queue prune (design note 6).
-3. **The capacity bonus is global.** `capacityBonusOnComplete` raises *every*
-   slot's maximum. Per-slot bonuses would need a reshape.
-4. **As-needed food fires on empty, not on low.** It triggers on the transition
-   to zero, so the player briefly has no food before the gather begins. Whether
-   that gap is tension or friction is an open question.
-5. **Passive automation never chains.** Staging a dependent chain of producers is
-   as-needed's job, by design. Passive picks one action and stops.
-6. **Unreachable queued entries are dropped silently.** Any notion of context or
-   location must prune the queue when it changes, or stale entries block the
-   front of the queue forever.
+   left-to-right, so the author controls which material drains first; an item
+   appears at most once in a row's costs.
+2. **Progress is keyed by row, not by entry.** Two entries for one row share
+   its progress; a popped or removed entry loses nothing.
+3. **Effects are derived.** The stack cap's raise and gear come from the life's
+   done one-time rows, so they end at death with them; the decay multiplier is
+   the one effect kept on the state.
+4. **JIT food fires on empty, not on low.** The player briefly has no food
+   before the fill begins (#25, answered by the user: "if that food item is
+   out, it is immediately queued").
+5. **The idle fill passes over a row that cannot run.** A player who sets an
+   upgrade to a priority before its harvest has a chip, and the big event too,
+   will cast off past the upgrade; the chip says why.
+6. **A port change prunes the queue.** Entries for rows the new port lacks are
+   dropped; their rows' progress stays unreachable for the rest of the life.

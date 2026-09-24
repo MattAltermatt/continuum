@@ -4,12 +4,15 @@
  * which pass only while work happens (decision #41). No clock, no randomness.
  */
 import { balance } from '../balance';
-import type { Book, BookLength } from '../data/types';
-import { enqueue, newState } from './queue';
+import type { ActionDefinition, ActionId, Book, BookLength } from '../data/types';
+import { canJit, isPriority, isUnlocked, modeOf, setAutomation } from './automation';
+import { count } from './inventory';
+import { enqueue, newState, startBlock } from './queue';
 import { rebirth } from './rebirth';
 import { setPaused, step } from './tick';
 import { HOURS_PER_DAY, lengthInHours } from '../data/length';
 import { ticksPerHour, ticksPerSecond } from './time';
+import { chapterOf, isDone } from './rows';
 import type { GameState } from './types';
 
 /**
@@ -17,7 +20,7 @@ import type { GameState } from './types';
  * (spec section 5). measure.test.ts locks it together with balance.play, so a
  * bound cannot change without this being looked at.
  */
-export const PLAY_VERSION = 1;
+export const PLAY_VERSION = 2;
 
 /** balance.play's shape with plain numbers, so a test or a caller can pass other bounds. */
 export type PlayBounds = { readonly [K in keyof typeof balance.play]: number };
@@ -43,41 +46,48 @@ export interface PlayRun {
   readonly outcome: PlayOutcome;
   readonly lives: number;
   readonly ticksPerLife: readonly number[];
+  /** The furthest chapter index each life reached (spec 2026-09-23-the-windward-run section 11). */
+  readonly chaptersPerLife: readonly number[];
   readonly totalTicks: number;
 }
 
 export function play(book: Book, policy: Policy, bounds: PlayBounds = balance.play): PlayRun {
   const interval = Math.round(policy.checkEverySeconds * ticksPerSecond());
-  // The bot gives up at one ceiling for every book, whatever it claims: a finish
-  // out of reach, or a life that never ends (spec section 6). A person playing is never stopped.
   const giveUpAt = declaredTicks({ days: bounds.maxBookDays });
   const ticksPerLife: number[] = [];
+  const chaptersPerLife: number[] = [];
+  let reached = 0;                  // the furthest chapter this life
   let before = 0;                   // ticks in the lives already ended
   let s = setPaused(newState(book.roster), 'none');
   let sinceDecide = interval;       // ticks since the last ask; decide on the first tick
   let stalled = false;              // the previous step did not advance time
   const end = (outcome: PlayOutcome, last: GameState): PlayRun => {
     const lives = [...ticksPerLife, last.runTicks];
-    return { policy: policy.name, outcome, lives: lives.length, ticksPerLife: lives, totalTicks: before + last.runTicks };
+    return { policy: policy.name, outcome, lives: lives.length, ticksPerLife: lives, chaptersPerLife: [...chaptersPerLife, Math.max(reached, last.chapter)], totalTicks: before + last.runTicks };
   };
   for (;;) {
     const decideNow = stalled || sinceDecide >= interval;
     if (decideNow) { s = policy.decide(s, book); sinceDecide = 0; }
     const next = step(s, book);
+    reached = Math.max(reached, next.chapter);
+    // A finished state is also dead: the finish is read first.
+    if (next.finished) return end('finished', next);
     if (next.dead) {
       ticksPerLife.push(next.runTicks);
+      chaptersPerLife.push(reached);
+      reached = 0;
       before += next.runTicks;
       s = setPaused(rebirth(next), 'none');
       sinceDecide = interval;
       stalled = false;
       continue;
     }
-    if (next.completedOneTime.includes(book.finish)) return end('finished', next);
     const advanced = next.runTicks !== s.runTicks;
-    // A freeze is time not advancing after the policy has had its turn. Not
-    // identity: a policy that re-queues makes a new state every call (spec section 6).
-    // A stall between asks is not a freeze: the next pass asks at once.
-    if (!advanced && decideNow) return end('frozen', next);
+    // Frozen: two steps in a row that did not advance, with the policy asked in
+    // between (a step that does not advance sets `stalled`, which asks at once).
+    // One such step is not a freeze: resolve may have drained the queue on a
+    // check-in tick, and the next ask queues again.
+    if (!advanced && stalled) return end('frozen', next);
     if (before + next.runTicks > giveUpAt) return end('never-finishes', next);
     s = next;
     stalled = !advanced;
@@ -97,17 +107,114 @@ export function formatGameTime(ticks: number): string {
   return `${Math.round(hours / HOURS_PER_DAY)} days`;
 }
 
+
 /**
- * The stand-in until #47: every tick, every row in chapter order. It is the
- * drive playable.test.ts already uses, and it breaks under #47's queue, where
- * only the top entry runs. Sane: it eats (Forage is queued) and walks every row.
+ * A person-like player for the queue of orders (spec section 11). Checks in
+ * every balance.policy.checkEverySeconds of game time and whenever time stops.
+ * It sets foods and makers to JIT as they earn chips and never uses the
+ * priorities. Whenever the queue is dry it queues, by hand: food, then the
+ * port's first unfinished one-time behind one fill of each maker automation
+ * does not supply (the big event is the last one-time, so it comes once the
+ * port is built). One fill per ask is enough, since the play asks again the
+ * moment the queue drains. With food at zero and no JIT on it, it presses
+ * "now" on the food row, or on the maker of what the food lacks when "now"
+ * refuses. It does only what the screen lets a person do. Sane: it eats and
+ * walks every row.
  */
-export const everyRowInOrder: Policy = {
-  name: 'every row in order (stand-in until #47)',
+export const attentive: Policy = {
+  name: 'attentive',
   sane: true,
-  checkEverySeconds: 0,
-  decide: (state, book) => book.chapters.flatMap((c) => c.order).reduce((acc, id) => enqueue(acc, book, id), state),
+  checkEverySeconds: balance.policy.checkEverySeconds,
+  decide: (state, book) => byHand(jitAsEarned(state, book), book),
 };
+
+/** The same player, who never touches automation: the other end of the measured range. */
+export const handsOn: Policy = {
+  name: 'hands-on',
+  sane: true,
+  checkEverySeconds: balance.policy.checkEverySeconds,
+  decide: (state, book) => byHand(state, book),
+};
+
+/**
+ * A player who switches on every chip as it arrives, the way section 3 reads:
+ * foods and makers to JIT, the port's other one-times to high, its big event
+ * to low; by hand, only rows whose chip is still off. Reported, never tuned
+ * to (Task 5): it is the player who would lock themselves out if a harvest's
+ * chip came later than the one-times it feeds (Revision 3, point 4).
+ */
+export const prioritized: Policy = {
+  name: 'prioritized',
+  sane: true,
+  checkEverySeconds: balance.policy.checkEverySeconds,
+  decide: (state, book) => {
+    let s = state;
+    const chapter = chapterOf(s, book);
+    for (const id of chapter.order) {
+      const a = book.actions[id]!;
+      if (!isUnlocked(s, a) || (s.automation[id] ?? 'off') !== 'off') continue;
+      s = setAutomation(s, book, id, canJit(book, a) ? 'jit' : id === chapter.event ? 'low' : a.isOneTime ? 'high' : 'mid');
+    }
+    return byHand(s, book, (a) => modeOf(s, a) === 'off');
+  },
+};
+
+function makesFood(book: Book, a: ActionDefinition): boolean {
+  return a.producedItem !== undefined && book.items[a.producedItem]?.kind === 'food';
+}
+
+/** Foods and makers (key makers included) to JIT as they earn their chips; nothing else is automated. */
+function jitAsEarned(state: GameState, book: Book): GameState {
+  let s = state;
+  for (const id of chapterOf(s, book).order) {
+    const a = book.actions[id]!;
+    if (isUnlocked(s, a) && (s.automation[id] ?? 'off') === 'off' && canJit(book, a)) s = setAutomation(s, book, id, 'jit');
+  }
+  return s;
+}
+
+/** Queues `a` behind one fill of each maker of what it costs or needs that automation does not supply (a key's one-time maker once). */
+function withMakers(state: GameState, book: Book, rows: readonly ActionDefinition[], a: ActionDefinition): GameState {
+  let s = state;
+  for (const c of [...(a.needs ?? []), ...a.itemCosts]) {
+    const maker = rows.find((m) => m.producedItem === c.item && !isDone(s, m));
+    if (maker === undefined || modeOf(s, maker) !== 'off') continue;
+    if (maker.isOneTime && s.queue.some((e) => e.actionId === maker.id)) continue;
+    s = enqueue(s, book, maker.id);
+  }
+  return enqueue(s, book, a.id);
+}
+
+/**
+ * `byHand` for every player: food, then the port's FIRST unfinished one-time
+ * (the big event is the last one-time in order, which the validator enforces,
+ * so it comes only once the port is built). One at a time: a costly row pops
+ * short after one fill, the queue drains, and the play asks again; a second
+ * row queued in the same batch (a 600-XP fight) would run instead. `mine`
+ * limits which one-times this player queues by hand (the prioritized player
+ * leaves chipped ones to automation), and the event waits while automation's
+ * idle fill will still take one of the port's one-times.
+ */
+function byHand(state: GameState, book: Book, mine: (a: ActionDefinition) => boolean = () => true): GameState {
+  let s = state;
+  const chapter = chapterOf(s, book);
+  const rows = chapter.order.map((id) => book.actions[id]!);
+  const queued = (id: ActionId) => s.queue.some((e) => e.actionId === id);
+  const food = rows.find((a) => makesFood(book, a));
+  if (food !== undefined && modeOf(s, food) !== 'jit' && count(s.inventory, food.producedItem!) === 0 && !queued(food.id)) {
+    const block = startBlock(s, book, food.id);
+    const press = block?.kind === 'short' && block.maker !== null ? block.maker : food.id;
+    s = enqueue(s, book, press, { front: true });
+  }
+  if (s.queue.length > 0) return s;
+  if (food !== undefined && modeOf(s, food) !== 'jit') s = withMakers(s, book, rows, food);
+  // Withhold the event only while the idle fill will take a one-time of this port; withholding it whenever
+  // any one-time is unfinished froze a life, since JIT key makers are pulled only through the event's chain.
+  const waiting = rows.some((b) => b.isOneTime && b.id !== chapter.event && !isDone(s, b) && isPriority(modeOf(s, b)) && startBlock(s, book, b.id) === null);
+  const next = rows.find((a) => a.isOneTime && !isDone(s, a) && mine(a) && (a.id !== chapter.event || !waiting));
+  if (next !== undefined && !queued(next.id)) s = withMakers(s, book, rows, next);
+  return s;
+}
 
 export type PlayFlag =
   | { readonly kind: 'never-finishes'; readonly policy: string }

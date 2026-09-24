@@ -1,26 +1,29 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { flushSync } from 'react-dom';
-import { saltRoad } from '../data/salt-road';
-import { covers, decayPerSecond, foodCeilingPerSecond } from '../engine/health';
-import { firstRunnable } from '../engine/queue';
+import { skillOf } from '../data/roster';
+import { windwardRun } from '../data/windward-run';
+import { decayPerSecond, foodCeilingPerSecond, hurtsPerSecond } from '../engine/health';
+import { topWorks } from '../engine/resolve';
+import { chapterOf } from '../engine/rows';
 import { ticksPerSecond, ticksToSeconds } from '../engine/time';
 import { installDevHandle } from '../state/devHandle';
 import { useGame } from '../state/useGame';
 import { ChapterPanel } from './ChapterPanel';
 import { DeathCard } from './DeathCard';
+import { FinishCard } from './FinishCard';
 import { Food } from './Food';
 import { clock } from './format';
 import { PAUSE, PLAY } from './glyphs';
 import { HealthBar } from './HealthBar';
-import { GearIcon } from './icons';
 import { Log } from './Log';
 import { Pack } from './Pack';
 import { Queue } from './Queue';
 import { Rates } from './Rates';
+import { Settings } from './Settings';
 import { SkillsBand } from './SkillsBand';
 
 export function App() {
-  const { state, view, log, dispatch, card } = useGame(saltRoad);
+  const { state, view, log, dispatch, card, speed, setSpeed, save, load, erase } = useGame(windwardRun);
   // The dev handle reads the committed state. The handle wraps its writes in
   // flushSync, so a read on the line after a dispatch or step sees its result;
   // the layout effect updates the ref inside that same commit.
@@ -31,17 +34,30 @@ export function App() {
       state: () => latest.current,
       dispatch: (a) => flushSync(() => dispatch(a)),
       step: (n) => flushSync(() => { for (let i = 0; i < n; i++) dispatch({ type: 'tick' }); }),
+      speed: (n) => flushSync(() => setSpeed(n)),
+      save,
+      load: () => flushSync(load),
+      erase: () => flushSync(erase),
     });
-  }, [dispatch]);
+  }, [dispatch, setSpeed, save, load, erase]);
 
   // Every chunk renders the view: while the card is up that is the next life, never a dead state.
-  const working = firstRunnable(view, saltRoad);
+  // useGame keeps it settled while live (what the next tick's zero-time resolve would do is already
+  // done), so a producer that just filled has left the top and the screen never flashes a stopped game
+  // at a handoff. "Working" is topWorks: the top able to run as the state stands. Paused, that is where work
+  // resumes, and a top that would pop or wait on a supply is not lit.
+  const screen = view;
   const live = view.paused === 'none';
+  const ready = useMemo(() => topWorks(view, windwardRun), [view]);
+  const working = ready ? 0 : -1;
   // "Running" means working AND the clock is live: no sheen, no stop mark, no countdown on a stopped game.
-  const runningActionId = live && working !== -1 ? view.queue[working]!.actionId : null;
-  const runningSkill = runningActionId ? saltRoad.actions[runningActionId]!.verb : null;
+  const runningActionId = live && working !== -1 ? screen.queue[working]!.actionId : null;
+  const runningSkill = runningActionId ? windwardRun.actions[runningActionId]!.verb : null;
+  // A hurting row takes health only while it runs (spec 2026-09-23-the-windward-run section 6.1); the rates chunk says so, by its skill.
+  const hurts = runningActionId ? hurtsPerSecond(screen, windwardRun) : 0;
+  const hurtsBy = runningSkill ? skillOf(windwardRun, runningSkill).name.toLowerCase() : undefined;
   const stopped = !live || working === -1;   // idle, waiting, paused, or the card (the view is on a system pause)
-  const clockNote = !live ? 'paused' : view.queue.length === 0 ? 'idle' : working === -1 ? 'waiting' : null;
+  const clockNote = !live ? 'paused' : screen.queue.length === 0 ? 'idle' : working === -1 ? 'waiting' : null;
   // Everything behind the death card takes no focus and no click. Wrappers carry it; no component gets a prop.
   const inert = card ? true : undefined;
 
@@ -49,12 +65,12 @@ export function App() {
     <main className="screen">
       <div className="top" inert={inert}>
         <div className="top__health">
-          <HealthBar health={view.health} max={view.maxHealth} />
+          <HealthBar health={screen.health} max={screen.maxHealth} />
         </div>
         <div className="corner">
-          <GearIcon aria-hidden="true" className="corner__gear" />
+          <Settings onErase={erase} speed={speed} onSpeed={setSpeed} dev={import.meta.env.DEV} />
           <span role="timer" className={`corner__clock${clockNote ? ' corner__clock--dim' : ''}`} aria-label="run clock">
-            {clock(ticksToSeconds(view.runTicks))}{clockNote && <small> {clockNote}</small>}
+            {clock(ticksToSeconds(screen.runTicks))}{clockNote && <small> {clockNote}</small>}
           </span>
           {/* Behind the card the control's box stays, unseen, so the corner does not reflow on death or Begin. */}
           {card ? <span className="btn btn--placeholder" aria-hidden="true" /> : view.paused === 'none'
@@ -63,25 +79,29 @@ export function App() {
           <span className="visually-hidden">{ticksPerSecond()} ticks per second</span>
         </div>
       </div>
-      <div className="inert-wrap" inert={inert}><SkillsBand content={saltRoad} skills={view.skills} runningSkill={runningSkill} /></div>
+      <div className="inert-wrap" inert={inert}><SkillsBand content={windwardRun} state={screen} runningSkill={runningSkill} /></div>
       <div className="columns">
         <div className="columns__chapter">
           <div inert={inert}>
             <ChapterPanel
-              content={saltRoad} book={saltRoad.name} chapter={saltRoad.chapters[0]!} state={view} runningActionId={runningActionId}
-              onNow={(id) => dispatch({ type: 'queue', actionId: id, front: true })}
-              onQueue={(id) => dispatch({ type: 'queue', actionId: id })}
+              content={windwardRun} book={windwardRun.name} chapter={chapterOf(screen, windwardRun)} state={screen} runningActionId={runningActionId}
+              onNow={(id, once) => dispatch({ type: 'queue', actionId: id, front: true, once })}
+              onQueue={(id, once) => dispatch({ type: 'queue', actionId: id, once })}
+              onAutomate={(id, mode) => dispatch({ type: 'automate', actionId: id, mode })}
             />
           </div>
-          {card && <DeathCard summary={card} content={saltRoad} onBegin={() => dispatch({ type: 'begin' })} />}
+          {/* A finish and a death share the card's place and its Begin: the next life starts at chapter I either way (section 9). */}
+          {card && (card.finished
+            ? <FinishCard summary={card} content={windwardRun} book={windwardRun.name} onReadAgain={() => dispatch({ type: 'begin' })} />
+            : <DeathCard summary={card} content={windwardRun} onBegin={() => dispatch({ type: 'begin' })} />)}
         </div>
         <div className="middle" inert={inert}>
-          <Rates decay={decayPerSecond(view)} ceiling={foodCeilingPerSecond(view, saltRoad)} covered={covers(view, saltRoad)} stopped={stopped} />
-          <Food state={view} content={saltRoad} />
-          <Pack state={view} content={saltRoad} />
-          <Log lines={log} content={saltRoad} />
+          <Rates decay={decayPerSecond(screen)} ceiling={foodCeilingPerSecond(screen, windwardRun)} hurts={hurts} hurtsBy={hurtsBy} stopped={stopped} />
+          <Food state={screen} content={windwardRun} />
+          <Pack state={screen} content={windwardRun} />
+          <Log lines={log} content={windwardRun} />
         </div>
-        <div className="inert-wrap" inert={inert}><Queue state={view} content={saltRoad} working={working} live={live} onRemove={(id) => dispatch({ type: 'remove', actionId: id })} /></div>
+        <div className="inert-wrap" inert={inert}><Queue state={screen} content={windwardRun} working={working} live={live} onRemove={(entryId) => dispatch({ type: 'remove', entryId })} /></div>
       </div>
     </main>
   );

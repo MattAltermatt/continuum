@@ -3,7 +3,7 @@
  * What resets, what persists, and what the life bought. Pure.
  */
 import { balance } from '../balance';
-import type { SkillId } from '../data/types';
+import type { ActionId, Content, SkillId } from '../data/types';
 import { blankRun } from './queue';
 import { expToNextLevel, newSkill } from './skills';
 import { ticksToMinutes } from './time';
@@ -30,13 +30,21 @@ export interface DeathSummary {
   readonly maxHealthFrom: number;
   readonly maxHealthTo: number;
   readonly coreGains: readonly CoreGain[];
+  /** The port the life reached, an index into content.chapters (spec 2026-09-23-the-windward-run section 9). */
+  readonly chapter: number;
+  /** The life ended at the book's finish, not a death. */
+  readonly finished: boolean;
+  /** Times the book has been finished, this life's finish included. */
+  readonly finishes: number;
+  /** The row on top when the life ended, if it hurts: a death mid-fight (section 6.1). */
+  readonly during: ActionId | null;
 }
 
 function maxHealthFor(rebirthBonus: number): number {
   return balance.health.base + rebirthBonus;
 }
 
-export function deathSummary(dead: GameState): DeathSummary {
+export function deathSummary(dead: GameState, content: Content): DeathSummary {
   const gain = rebirthGain(dead.runTicks);
   const ids = Object.keys(dead.skills);
   const coreGains = ids
@@ -46,7 +54,13 @@ export function deathSummary(dead: GameState): DeathSummary {
       return { skill: id, from: dead.lifeStartCore[id] ?? 0, to: core.level, progress: core.exp / expToNextLevel(balance.skills.coreMastery.baseExp, core.level) };
     });
   // From and to are computed the same way (Revision 1, accepted risk 1).
-  return { life: dead.life, runTicks: dead.runTicks, gain, maxHealthFrom: maxHealthFor(dead.rebirthBonus), maxHealthTo: maxHealthFor(dead.rebirthBonus + gain), coreGains };
+  // The dead state still holds its queue (rebirth clears it), so its top is what the life ended on.
+  const top = dead.queue[0];
+  const during = top !== undefined && (content.actions[top.actionId]?.hurts ?? 0) > 0 ? top.actionId : null;
+  return {
+    life: dead.life, runTicks: dead.runTicks, gain, maxHealthFrom: maxHealthFor(dead.rebirthBonus), maxHealthTo: maxHealthFor(dead.rebirthBonus + gain), coreGains,
+    chapter: dead.chapter, finished: dead.finished, finishes: dead.finishes + (dead.finished ? 1 : 0), during,
+  };
 }
 
 /**
@@ -61,5 +75,9 @@ export function rebirth(dead: GameState): GameState {
   const ids = Object.keys(dead.skills);
   const skills: Record<SkillId, SkillState> = Object.fromEntries(ids.map((id) => [id, { core: dead.skills[id]!.core, run: newSkill().run }]));
   const lifeStartCore: Record<SkillId, number> = Object.fromEntries(ids.map((id) => [id, skills[id]!.core.level]));
-  return { ...blankRun(skills, lifeStartCore), paused: 'system', life: dead.life + 1, rebirthBonus, maxHealth, health: maxHealth, completionCounts: dead.completionCounts };
+  return {
+    ...blankRun(skills, lifeStartCore), paused: 'system', life: dead.life + 1, rebirthBonus, maxHealth, health: maxHealth,
+    completionCounts: dead.completionCounts, automation: dead.automation, skillStats: dead.skillStats,
+    finishes: dead.finishes + (dead.finished ? 1 : 0),
+  };
 }

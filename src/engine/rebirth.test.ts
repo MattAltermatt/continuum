@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
+import { fixture } from './fixture';
 import { newState } from './queue';
 import { deathSummary, rebirth, rebirthGain } from './rebirth';
 import type { GameState } from './types';
@@ -20,7 +21,15 @@ function deadLife(): GameState {
     skills: { ...fresh.skills, forage: { core: { level: 3, exp: 2.5 }, run: { level: 2, exp: 1 } }, mine: { core: { level: 1, exp: 0 }, run: { level: 1, exp: 4 } } },
     inventory: { berries: 5, stone: 3 },
     foodCooldowns: { berries: 10 },
-    queue: [{ actionId: 'hall', progress: 12, costsConsumed: 4, stalled: false }],
+    finished: true,
+    queue: [{ id: 3, actionId: 'hall', mode: 'once', by: 'player' }],
+    nextEntryId: 4,
+    work: { hall: { progress: 12, costsConsumed: 4 } },
+    acquired: ['berries', 'stone'],
+    provisioned: ['forage'],
+    chapter: 1,
+    automation: { forage: 'jit' },
+    skillStats: { ...fresh.skillStats, forage: { ticks: 40, bestRun: 3 } },
     completedOneTime: ['cabin'],
     completionCounts: { forage: 7, cabin: 1 },
     decayMultiplier: 0.8,
@@ -97,6 +106,14 @@ describe('rebirth: what persists (spec 2.2)', () => {
   });
 });
 
+describe('rebirth: finishes', () => {
+  it('a finished dead state counts a finish; an unfinished one keeps the count', () => {
+    const dead = { ...deadLife(), finishes: 2 };
+    expect(rebirth(dead).finishes).toBe(3);
+    expect(rebirth({ ...dead, finished: false }).finishes).toBe(2);
+  });
+});
+
 describe('rebirth: guard and accrual', () => {
   it('does nothing to a state that is not dead', () => {
     const alive = newState(roster);
@@ -120,9 +137,9 @@ describe('rebirth: guard and accrual', () => {
  * rebirth derives it. A field added later fails here until someone decides.
  */
 describe('rebirth: every field is classified', () => {
-  const RESETS = ['runTicks', 'paused', 'dead', 'inventory', 'foodCooldowns', 'queue', 'completedOneTime', 'decayMultiplier', 'events'];
-  const PERSISTS = ['completionCounts'];
-  const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'rebirthBonus', 'lifeStartCore'];
+  const RESETS = ['runTicks', 'paused', 'dead', 'finished', 'inventory', 'acquired', 'foodCooldowns', 'queue', 'nextEntryId', 'work', 'provisioned', 'chapter', 'completedOneTime', 'decayMultiplier', 'events'];
+  const PERSISTS = ['completionCounts', 'automation', 'skillStats'];
+  const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'finishes', 'rebirthBonus', 'lifeStartCore'];
   it('the three lists cover newState(roster) exactly, with no overlap', () => {
     const all = [...RESETS, ...PERSISTS, ...DERIVED];
     expect(new Set(all).size).toBe(all.length);
@@ -147,7 +164,7 @@ describe('rebirth: every field is classified', () => {
 describe('deathSummary', () => {
   it('reports the life, its clock, the gain, max health from and to, and only the skills whose core moved', () => {
     const dead = deadLife();
-    const s = deathSummary(dead);
+    const s = deathSummary(dead, fixture);
     expect(s.life).toBe(2);
     expect(s.runTicks).toBe(10 * minute);
     expect(s.gain).toBeCloseTo(rebirthGain(10 * minute), 12);
@@ -156,12 +173,12 @@ describe('deathSummary', () => {
     expect(s.coreGains.map((g) => [g.skill, g.from, g.to])).toEqual([['forage', 1, 3]]);
   });
   it('carries the core ledger progress toward the next level, as a fraction', () => {
-    const g = deathSummary(deadLife()).coreGains[0]!;
+    const g = deathSummary(deadLife(), fixture).coreGains[0]!;
     const need = balance.skills.coreMastery.baseExp * balance.skills.expCurveExponent ** 3;
     expect(g.progress).toBeCloseTo(2.5 / need, 12);
   });
   it('a death on the first tick: a tiny positive gain and no skill lines', () => {
-    const s = deathSummary({ ...newState(roster), runTicks: 1, dead: true, health: 0 });
+    const s = deathSummary({ ...newState(roster), runTicks: 1, dead: true, health: 0 }, fixture);
     expect(s.gain).toBeGreaterThan(0);
     expect(s.coreGains).toEqual([]);
   });

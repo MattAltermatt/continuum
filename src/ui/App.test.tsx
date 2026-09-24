@@ -1,8 +1,18 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import { ticksPerSecond } from '../engine/time';
+import { balance } from '../balance';
+import { windwardRun } from '../data/windward-run';
+import { newState } from '../engine/queue';
+import { ticksPerSecond, ticksToSeconds } from '../engine/time';
+import { realClick } from '../test-utils/realClick';
 import { App } from './App';
+
+const w = balance.content.windward;
+/** Ticks to one fish at multiplier 1. Ten 0.1s are 0.999..., so +1. */
+const ticksPerFish = Math.floor(w.fish.expCost / balance.skills.baseTickExp) + 1;
+/** The food line with one cloud-fish feeding: one bite per cooldown. */
+const fishCeiling = (w.cloudFish.healPerUnit / ticksToSeconds(balance.health.foodCooldownTicks)).toFixed(2);
 
 describe('App', () => {
   it('renders every chunk', () => {
@@ -31,7 +41,7 @@ describe('App', () => {
     const before = env.IS_REACT_ACT_ENVIRONMENT;
     env.IS_REACT_ACT_ENVIRONMENT = false;
     try {
-      handle.dispatch({ type: 'queue', actionId: 'forage' });
+      handle.dispatch({ type: 'queue', actionId: 'fish' });
       handle.step(3);
       expect(handle.state().runTicks).toBe(3);
     } finally {
@@ -46,13 +56,55 @@ describe('App', () => {
     expect(container.querySelector('.working')).toBeNull();
     expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('paused');
   });
+  it('a producer that fills hands over with no stopped frame: the hull runs on the frame the last scrap lands', () => {
+    const { container } = render(<App />);
+    const handle = window.continuum!;
+    act(() => { handle.dispatch({ type: 'queue', actionId: 'salvage' }); handle.dispatch({ type: 'queue', actionId: 'hull' }); });
+    const cap = balance.inventory.stackCap;
+    for (let i = 0; i < 10_000 && (handle.state().inventory.scrap ?? 0) < cap; i++) act(() => handle.step(1));
+    // Settled in the same commit: Salvage has already left the top, and the dev handle reads what the screen shows.
+    expect(handle.state().inventory.scrap).toBe(cap);
+    expect(handle.state().queue.map((e) => e.actionId)).toEqual(['hull']);
+    expect(container.querySelector('.row.working')).toHaveTextContent('the hull');
+    expect(container.querySelector('.entry.working')).toHaveTextContent('the hull');
+  }, 30_000);   // steps the real App tick by tick: fast on a laptop, generous for a slow runner
+  it('an empty queue refilled by a priority row hands over with no stopped frame: no idle note, the row runs', () => {
+    const { container } = render(<App />);
+    const handle = window.continuum!;
+    const fresh = newState(windwardRun.roster);
+    const state = { ...fresh, paused: 'none' as const, completionCounts: { salvage: balance.automation.unlockRepeatable }, automation: { salvage: 'mid' as const }, queue: [{ id: 0, actionId: 'fish', mode: 'once' as const, by: 'player' as const }], nextEntryId: 1 };
+    act(() => handle.dispatch({ type: 'load', model: { state, log: [], nextSeq: 0 } }));
+    for (let i = 0; i < 10_000 && (handle.state().completionCounts.fish ?? 0) === 0; i++) act(() => handle.step(1));
+    expect(handle.state().queue.map((e) => `${e.actionId}:${e.by}`)).toEqual(['salvage:auto']);
+    expect(screen.getByRole('timer', { name: 'run clock' })).not.toHaveTextContent('idle');
+    expect(container.querySelector('.row.working')).toHaveTextContent('drifting scrap');
+  }, 30_000);   // steps the real App tick by tick: fast on a laptop, generous for a slow runner
+  it('paused, a top that would leave on resume is not lit as where work resumes', () => {
+    const { container } = render(<App />);
+    act(() => { screen.getByRole('button', { name: 'pause' }).click(); });
+    act(() => window.continuum!.dispatch({ type: 'queue', actionId: 'hull' }));
+    expect(window.continuum!.state().queue.map((e) => e.actionId)).toEqual(['hull']);
+    expect(container.querySelector('.entry--on')).toBeNull();
+    act(() => window.continuum!.dispatch({ type: 'queue', actionId: 'fish', front: true }));
+    expect(container.querySelector('.entry--on')).toHaveTextContent('the cloud shallows');
+  });
+  it('the dev handle sets only an offered speed', () => {
+    render(<App />);
+    const handle = window.continuum!;
+    act(() => { screen.getByRole('button', { name: 'settings' }).click(); });
+    const pressed = () => screen.getAllByRole('button', { pressed: true }).map((b) => b.textContent);
+    act(() => handle.speed(7));
+    expect(pressed()).toEqual(['\u00D71']);
+    act(() => handle.speed(10));
+    expect(pressed()).toEqual(['\u00D710']);
+  });
   it('death: the card is up over the chapter, every chunk behind it is inert, and Begin starts life 2', () => {
     const { container } = render(<App />);
     const handle = window.continuum!;
-    act(() => { handle.dispatch({ type: 'queue', actionId: 'forage' }); handle.step(60); handle.dispatch({ type: 'setHealth', health: 0.001 }); handle.step(1); });
+    act(() => { handle.dispatch({ type: 'queue', actionId: 'fish' }); handle.step(ticksPerFish); handle.dispatch({ type: 'setHealth', health: 0.001 }); handle.step(1); });
     expect(handle.state().dead).toBe(true);
-    expect(handle.state().runTicks).toBe(61);   // the dead life's clock reads 00:06
-    expect(handle.state().inventory.berries).toBe(1);   // the dead life holds a berry; the next one does not
+    expect(handle.state().runTicks).toBe(ticksPerFish + 1);
+    expect(handle.state().inventory['cloud-fish']).toBe(1);   // the dead life holds a fish; the next one does not
     const card = screen.getByRole('dialog', { name: 'Life 1 ends' });
     expect(card.parentElement).toHaveClass('columns__chapter');
     expect(card.closest('[inert]')).toBeNull();
@@ -62,16 +114,48 @@ describe('App', () => {
     // Every chunk renders the view, the life about to begin, not the dead one (spec 2.4).
     expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('00:00');
     expect(container.querySelector('.health__value')).toHaveTextContent('100.0 / 100.0');
-    expect(screen.getByLabelText('queue')).toHaveTextContent('queue · 0');
-    expect(screen.getByLabelText('food')).toHaveTextContent('0/20');
+    expect(screen.getByLabelText('queue')).toHaveTextContent('queue \u00B7 0');
+    expect(screen.getByLabelText('food')).toHaveTextContent(`0/${balance.inventory.stackCap}`);
     expect(container.querySelector('.rates__food--short')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'add to queue: Forage berries' })).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByRole('button', { name: 'add to queue: Fish the cloud shallows' })).not.toHaveAttribute('aria-disabled');
     expect(screen.queryByRole('button', { name: /^(pause|resume)$/ })).toBeNull();   // no corner control behind the card
     act(() => { screen.getByRole('button', { name: 'Begin life 2' }).click(); });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(handle.state().life).toBe(2);
     expect(handle.state().paused).toBe('none');
     expect(container.querySelector('[inert]')).toBeNull();
+  });
+  it('the book finished: the finish card is up in the death card\'s place, and Read again starts the next life at port I', async () => {
+    render(<App />);
+    const handle = window.continuum!;
+    const done = { ...newState(windwardRun.roster), dead: true, finished: true, paused: 'system' as const, chapter: 2, runTicks: 600, life: 7 };
+    act(() => { handle.dispatch({ type: 'load', model: { state: done, log: [], nextSeq: 0 } }); });
+    const card = screen.getByRole('dialog', { name: `${windwardRun.name}, finished` });
+    expect(card.parentElement).toHaveClass('columns__chapter');
+    expect(screen.queryByRole('dialog', { name: /ends$/ })).toBeNull();
+    expect(card).toHaveTextContent(windwardRun.actions[windwardRun.finish]!.beat!);
+    expect(card).toHaveTextContent('finished 1\u00D7');
+    await act(() => realClick(screen.getByRole('button', { name: 'Read again' })));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(handle.state()).toMatchObject({ life: 8, finishes: 1, chapter: 0, dead: false, finished: false, paused: 'none' });
+  });
+  it('a hurting row that runs puts its hurt on the rates chunk, by its skill', () => {
+    render(<App />);
+    const handle = window.continuum!;
+    const hurts = balance.content.windward.pirates.hurts;
+    expect(screen.getByLabelText('rates')).not.toHaveTextContent(/fight/);
+    act(() => { handle.dispatch({ type: 'queue', actionId: 'pirates', front: true }); handle.step(1); });
+    expect(screen.getByLabelText('rates')).toHaveTextContent(`fight\u2212${hurts.toFixed(2)} hp/s`);
+    act(() => { screen.getByRole('button', { name: 'pause' }).click(); });
+    expect(screen.getByLabelText('rates')).not.toHaveTextContent(/fight/);
+  });
+  it('an earned chip pressed sets the row\'s automation', async () => {
+    render(<App />);
+    const handle = window.continuum!;
+    const earned = { ...newState(windwardRun.roster), paused: 'none' as const, completionCounts: { fish: balance.automation.unlockRepeatable } };
+    act(() => { handle.dispatch({ type: 'load', model: { state: earned, log: [], nextSeq: 0 } }); });
+    await act(() => realClick(screen.getByRole('button', { name: /^automation: off, press for JIT/ })));
+    expect(handle.state().automation.fish).toBe('jit');
   });
   it('the middle column stacks rates, food, pack, then the log (spec 8.6)', () => {
     const { container } = render(<App />);
@@ -82,13 +166,13 @@ describe('App', () => {
     const { container } = render(<App />);
     expect(container.querySelector('.rates')).toHaveClass('rates--stopped');
   });
-  it('the food line is wired to covers: short with an empty larder, covered once a berry lands, and live while working', () => {
+  it('the food line is wired to covers: short with an empty larder, covered once a fish lands, and live while working', () => {
     const { container } = render(<App />);
     const handle = window.continuum!;
     expect(container.querySelector('.rates__food--short')).toHaveTextContent('+0.00 hp/s');
-    act(() => { handle.dispatch({ type: 'queue', actionId: 'forage' }); handle.step(60); });
-    expect(handle.state().inventory.berries).toBe(1);
-    expect(container.querySelector('.rates__food--covers')).toHaveTextContent('+0.80 hp/s');
+    act(() => { handle.dispatch({ type: 'queue', actionId: 'fish' }); handle.step(ticksPerFish); });
+    expect(handle.state().inventory['cloud-fish']).toBe(1);
+    expect(container.querySelector('.rates__food--covers')).toHaveTextContent(`+${fishCeiling} hp/s`);
     expect(container.querySelector('.rates')).not.toHaveClass('rates--stopped');
     expect(screen.getByLabelText('rates')).toHaveTextContent('\u22120.10 hp/s \u25B2');   // decay is wired, not only its color
   });

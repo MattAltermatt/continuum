@@ -1,141 +1,150 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import { saltRoad } from '../data/salt-road';
-import { enqueue, newState } from '../engine/queue';
+import { balance } from '../balance';
+import { unitThreshold } from '../engine/costs';
+import { enqueue, newState, removeEntry } from '../engine/queue';
 import type { GameState } from '../engine/types';
+import { testBook as book } from '../test-utils/book';
+import { realClick } from '../test-utils/realClick';
 import { WARN } from './glyphs';
 import { Queue } from './Queue';
 
 const noop = () => {};
+const fresh = (): GameState => newState(book.roster);
+const cap = balance.inventory.stackCap;
 
 describe('Queue', () => {
-  it('shows each entry with its progress fraction under the bar and this completion\'s time, and no total', () => {
-    let s = enqueue(newState(saltRoad.roster), saltRoad, 'mine');
-    s = enqueue(s, saltRoad, 'forage');
-    render(<Queue state={s} content={saltRoad} working={0} live={true} onRemove={noop} />);
-    expect(screen.getByText('Mine')).toBeInTheDocument();
-    expect(screen.getByText(/queue · 2/)).toBeInTheDocument();
-    expect(screen.getByText('6.0s')).toBeInTheDocument();
-    expect(screen.getByText('4.2s')).toBeInTheDocument();
-    expect(screen.queryByText(/≈/)).toBeNull();   // a total was not accurate in play, so it is not shown
-    expect(screen.getByText(`0.0/${saltRoad.actions.mine!.expCost.toFixed(1)}`)).toBeInTheDocument();
+  it('shows each order with its row\'s progress under the bar, the top entry\'s countdown only, and no total', () => {
+    const s = enqueue(enqueue(fresh(), book, 'fish'), book, 'salvage');
+    render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    expect(screen.getByText(/queue \u00B7 2/)).toBeInTheDocument();
+    expect(screen.getAllByText('0.0/1.0')).toHaveLength(2);
+    // Fish: 1 xp at 0.1 a tick, ten ticks a second. The second entry has no countdown.
+    expect(screen.getAllByText('1.0s')).toHaveLength(1);
+    expect(screen.queryByText(/\u2248/)).toBeNull();
   });
-  it('says waiting only when nothing can run: not while something runnable is queued, and not while paused', () => {
-    const mixed = enqueue(enqueue(newState(saltRoad.roster), saltRoad, 'forage'), saltRoad, 'cabin');
-    const one = render(<Queue state={mixed} content={saltRoad} working={0} live={true} onRemove={noop} />);
-    expect(screen.queryByText('waiting')).toBeNull();
-    one.unmount();
-    const stuck = enqueue(newState(saltRoad.roster), saltRoad, 'cabin');
-    const two = render(<Queue state={stuck} content={saltRoad} working={-1} live={false} onRemove={noop} />);
-    expect(screen.queryByText('waiting')).toBeNull();
-    two.unmount();
-    render(<Queue state={stuck} content={saltRoad} working={-1} live={true} onRemove={noop} />);
-    expect(screen.getByText('waiting')).toBeInTheDocument();
+  it('the countdown runs to where the row will stop: the hull with 3 of its 8 scrap on hand stops at the fourth unit', () => {
+    const s = { ...enqueue(fresh(), book, 'hull'), inventory: { scrap: 3 } };
+    render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    expect(unitThreshold(book.actions.hull!, 3)).toBe(3);
+    expect(screen.getByText('3.0s')).toBeInTheDocument();
+    expect(screen.queryByText('8.0s')).toBeNull();
   });
-  it('shows no countdown on an entry while paused or dead', () => {
-    render(<Queue state={enqueue(newState(saltRoad.roster), saltRoad, 'forage')} content={saltRoad} working={0} live={false} onRemove={noop} />);
-    expect(screen.queryByText('4.2s')).toBeNull();
+  it('a producer on top whose target is 1 names one unit', () => {
+    const shop = { ...book, items: { ...book.items, scrap: { ...book.items.scrap!, name: 'scraps', one: 'scrap' } } };
+    const s = { ...enqueue(enqueue(fresh(), shop, 'salvage'), shop, 'satchel'), work: { satchel: { progress: 1, costsConsumed: 1 } } };
+    render(<Queue state={s} content={shop} working={0} live={true} onRemove={noop} />);
+    expect(screen.getByText('0/1 scrap')).toBeInTheDocument();
   });
-  it('the working entry carries the sheen and the sum shows only while live', () => {
-    const s = enqueue(newState(saltRoad.roster), saltRoad, 'forage');
-    const on = render(<Queue state={s} content={saltRoad} working={0} live={true} onRemove={noop} />);
-    expect(on.container.querySelector('.working')).toBeInTheDocument();
-    on.unmount();
-    const off = render(<Queue state={s} content={saltRoad} working={0} live={false} onRemove={noop} />);
-    expect(off.container.querySelector('.working')).toBeNull();
-    expect(off.container.querySelector('.entry--on')).toBeInTheDocument();
-    expect(screen.queryByText(/≈/)).toBeNull();
+  it('the countdown is at the gear-aware rate: with the net made, the fish take 0.8s', () => {
+    const s = { ...enqueue(fresh(), book, 'fish'), completedOneTime: ['net'] };
+    render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    expect(screen.getByText('0.8s')).toBeInTheDocument();
   });
-  it('a waiting entry is dashed, says why, warns on the input it owes, and the header says waiting with no sum', () => {
-    let s = enqueue(newState(saltRoad.roster), saltRoad, 'cabin');
-    s = { ...s, queue: [{ ...s.queue[0]!, stalled: true, progress: 10, costsConsumed: 1 }] };
-    const { container } = render(<Queue state={s} content={saltRoad} working={-1} live={true} onRemove={noop} />);
-    expect(container.querySelector('.entry--waiting')).toBeInTheDocument();
-    expect(screen.getByText(/waiting on stone/)).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(WARN))).toBeInTheDocument();
-    expect(screen.getByText('waiting')).toBeInTheDocument();
-    expect(screen.queryByText(/≈/)).toBeNull();
-  });
-  it('an entry that can pay what it owes right now carries no warning, even if the pack cannot cover the whole recipe', () => {
-    const s = { ...enqueue(newState(saltRoad.roster), saltRoad, 'cabin'), inventory: { stone: 5 } };
-    render(<Queue state={s} content={saltRoad} working={-1} live={true} onRemove={noop} />);
-    expect(screen.queryByText(new RegExp(WARN))).toBeNull();
-  });
-  it('a producer on a full stack, queued while paused, says so and is not counted', () => {
-    const s = enqueue({ ...newState(saltRoad.roster), inventory: { stone: 5 } }, saltRoad, 'mine');
-    const paused = render(<Queue state={s} content={saltRoad} working={-1} live={false} onRemove={noop} />);
-    expect(paused.container.querySelector('.entry--waiting')).toBeInTheDocument();
-    expect(screen.getByText(/stone is full/)).toBeInTheDocument();
+  it('no countdown while paused, nor while the top cannot work', () => {
+    const paused = render(<Queue state={enqueue(fresh(), book, 'fish')} content={book} working={0} live={false} onRemove={noop} />);
+    expect(screen.queryByText('1.0s')).toBeNull();
     paused.unmount();
-    render(<Queue state={s} content={saltRoad} working={-1} live={true} onRemove={noop} />);
-    expect(screen.getByText('waiting')).toBeInTheDocument();
-    expect(screen.queryByText(/≈/)).toBeNull();
+    render(<Queue state={enqueue(fresh(), book, 'hull')} content={book} working={-1} live={true} onRemove={noop} />);
+    expect(screen.queryByText(/\d\.\ds$/)).toBeNull();
   });
-  it('attributes consumed units to each cost in declared order', () => {
-    const two = { ...saltRoad, actions: { ...saltRoad.actions, pair: { id: 'pair', verb: 'build' as const, noun: 'a pair', expCost: 10, itemCosts: [{ item: 'stone', amount: 2 }, { item: 'berries', amount: 3 }], isOneTime: true } } };
-    const base: GameState = enqueue(newState(saltRoad.roster), two, 'pair');
-    const s = { ...base, queue: [{ ...base.queue[0]!, costsConsumed: 3 }] };
-    render(<Queue state={s} content={two} working={0} live={true} onRemove={noop} />);
-    expect(screen.getByText(/stone 2\/2/)).toBeInTheDocument();
-    expect(screen.getByText(/berries 1\/3/)).toBeInTheDocument();
+  it('each order is tagged repeat or once, and an order automation added is tagged auto', () => {
+    let s = enqueue(fresh(), book, 'salvage');
+    s = enqueue(s, book, 'salvage', { once: true });
+    s = enqueue(s, book, 'hull', { by: 'auto' });
+    const { container } = render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    const entries = [...container.querySelectorAll('.entry')];
+    expect(entries.map((e) => e.querySelector('.tag')!.textContent)).toEqual(['repeat', 'once', 'once']);
+    expect(entries.map((e) => e.querySelector('.tag--auto')?.textContent ?? null)).toEqual([null, null, 'auto']);
   });
-  it('remove calls back with the action id, on one press when nothing has been consumed', () => {
-    const onRemove = vi.fn();
-    render(<Queue state={enqueue(newState(saltRoad.roster), saltRoad, 'forage')} content={saltRoad} working={0} live={true} onRemove={onRemove} />);
-    act(() => { screen.getByRole('button', { name: 'remove Forage berries' }).click(); });
-    expect(onRemove).toHaveBeenCalledWith('forage');
+  it('entries are keyed by their own id: removing the first keeps every other entry\'s node', () => {
+    const s = enqueue(enqueue(enqueue(fresh(), book, 'salvage'), book, 'salvage'), book, 'fish');
+    const { container, rerender } = render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    const second = container.querySelector('[data-entry="1"]');
+    const third = container.querySelector('[data-entry="2"]');
+    rerender(<Queue state={removeEntry(s, 0)} content={book} working={0} live={true} onRemove={noop} />);
+    expect(container.querySelector('[data-entry="1"]')).toBe(second);
+    expect(container.querySelector('[data-entry="2"]')).toBe(third);
+    expect(container.querySelector('[data-entry="0"]')).toBeNull();
   });
-  it('an entry that has consumed inputs takes two presses; the first only arms it, and arming lapses', () => {
-    vi.useFakeTimers();
-    try {
-      const onRemove = vi.fn();
-      const base = enqueue(newState(saltRoad.roster), saltRoad, 'cabin');
-      const s = { ...base, queue: [{ ...base.queue[0]!, costsConsumed: 5, progress: 50 }] };
-      render(<Queue state={s} content={saltRoad} working={-1} live={true} onRemove={onRemove} />);
-      act(() => { screen.getByRole('button', { name: 'remove Build a cabin' }).click(); });
-      expect(onRemove).not.toHaveBeenCalled();
-      act(() => { vi.runAllTimers(); });
-      act(() => { screen.getByRole('button', { name: 'remove Build a cabin' }).click(); });
-      expect(onRemove).not.toHaveBeenCalled();
-      act(() => { screen.getByRole('button', { name: 'press again to remove Build a cabin' }).click(); });
-      expect(onRemove).toHaveBeenCalledWith('cabin');
-    } finally {
-      vi.useRealTimers();
+  it('the bar and each cost come from the row\'s kept work, on every entry that row has; the unit owed now is warned', () => {
+    let s = enqueue(enqueue(fresh(), book, 'fish'), book, 'hull');
+    s = { ...s, work: { hull: { progress: 5, costsConsumed: 5 } } };
+    const { container } = render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    const hull = container.querySelector('[data-entry="1"]')!;
+    expect(hull.querySelector('.bar__value')).toHaveTextContent('5.0/8.0');
+    expect(hull.querySelector('.bar__fill')).toHaveStyle({ width: `${(5 / 8) * 100}%` });
+    expect(hull.querySelector('.bar__fill')).toHaveClass('bar__fill--wait');
+    expect(hull.querySelector('.entry__third')).toHaveTextContent(`${WARN} scrap 5/8`);
+  });
+  it('the worked top is ember; the same entry paused is grey', () => {
+    const s = enqueue(fresh(), book, 'fish');
+    const on = render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    expect(on.container.querySelector('.working .bar__fill')).toHaveClass('bar__fill--run');
+    on.unmount();
+    const off = render(<Queue state={s} content={book} working={0} live={false} onRemove={noop} />);
+    expect(off.container.querySelector('.working')).toBeNull();
+    expect(off.container.querySelector('.entry--on .bar__fill')).toHaveClass('bar__fill--wait');
+  });
+  it('a repeating producer on top shows have/target from the look-ahead: what the orders below it still need', () => {
+    // The hull has spent 5 of its 8: it owes 3, and the pack holds 1.
+    let s = enqueue(enqueue(fresh(), book, 'salvage'), book, 'hull');
+    s = { ...s, inventory: { scrap: 1 }, work: { hull: { progress: 5, costsConsumed: 5 } } };
+    const { container, rerender } = render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    expect(container.querySelector('[data-entry="0"] .entry__target')).toHaveTextContent('1/3 scrap');
+    // Nothing below it needs scrap: it fills to the cap.
+    rerender(<Queue state={{ ...enqueue(fresh(), book, 'salvage'), inventory: { scrap: 1 } }} content={book} working={0} live={true} onRemove={noop} />);
+    expect(container.querySelector('.entry__target')).toHaveTextContent(`1/${cap} scrap`);
+  });
+  it('no target on a single run, on an entry below the top, or on a row that makes nothing', () => {
+    let s = enqueue(fresh(), book, 'salvage', { once: true });
+    s = enqueue(s, book, 'salvage');
+    s = enqueue(s, book, 'hull');
+    const { container } = render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    expect(container.querySelector('.entry__target')).toBeNull();
+  });
+  it('a hurting row shows its hurt on its order', () => {
+    const { container } = render(<Queue state={enqueue(fresh(), book, 'raid')} content={book} working={-1} live={true} onRemove={noop} />);
+    expect(container.querySelector('.entry__third')).toHaveTextContent('\u22121.00 hp/s');
+  });
+  it('every entry keeps all its lines, so none changes height and no x moves', () => {
+    const s = enqueue(enqueue(enqueue(fresh(), book, 'fish'), book, 'hull'), book, 'raid');
+    const { container } = render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);
+    for (const e of container.querySelectorAll('.entry')) {
+      expect(e.querySelectorAll('.entry__sub')).toHaveLength(2);
+      expect(e.querySelector('.entry__third')!.textContent!.length).toBeGreaterThan(0);
     }
   });
-  it('a press that slides onto a costly entry after the one above leaves only arms it', () => {
-    const onRemove = vi.fn();
-    const base = enqueue(enqueue(newState(saltRoad.roster), saltRoad, 'mine'), saltRoad, 'cabin');
-    const s = { ...base, queue: [base.queue[0]!, { ...base.queue[1]!, costsConsumed: 5, progress: 50 }] };
-    const { container, rerender } = render(<Queue state={s} content={saltRoad} working={0} live={true} onRemove={onRemove} />);
-    const firstSlot = () => container.querySelectorAll<HTMLButtonElement>('.entry__x')[0]!;
-    rerender(<Queue state={{ ...s, queue: [s.queue[1]!] }} content={saltRoad} working={-1} live={true} onRemove={onRemove} />);   // Mine left on its own
-    act(() => { firstSlot().click(); });   // the press aimed at Mine's remove
-    expect(onRemove).not.toHaveBeenCalled();
+  it('says waiting only when the top cannot run: not while it can, and not while paused', () => {
+    const one = render(<Queue state={enqueue(fresh(), book, 'fish')} content={book} working={0} live={true} onRemove={noop} />);
+    expect(screen.queryByText('waiting')).toBeNull();
+    one.unmount();
+    const stuck = enqueue(fresh(), book, 'hull');
+    const two = render(<Queue state={stuck} content={book} working={-1} live={false} onRemove={noop} />);
+    expect(screen.queryByText('waiting')).toBeNull();
+    two.unmount();
+    render(<Queue state={stuck} content={book} working={-1} live={true} onRemove={noop} />);
+    expect(screen.getByText('waiting')).toBeInTheDocument();
   });
-  it('on a dead run the remove buttons say they are inert and do nothing, even on a costly entry', () => {
+  it('x removes on one press, with the entry\'s own id, even when its row has kept work', async () => {
     const onRemove = vi.fn();
-    const base = enqueue(enqueue(newState(saltRoad.roster), saltRoad, 'forage'), saltRoad, 'cabin');
-    const s = { ...base, queue: [base.queue[0]!, { ...base.queue[1]!, costsConsumed: 5, progress: 50 }], dead: true };
-    render(<Queue state={s} content={saltRoad} working={-1} live={false} dead={true} onRemove={onRemove} />);
-    for (const name of ['remove Forage berries', 'remove Build a cabin']) {
+    let s = enqueue(enqueue(fresh(), book, 'fish'), book, 'hull');
+    s = { ...s, work: { hull: { progress: 5, costsConsumed: 5 } } };
+    render(<Queue state={s} content={book} working={0} live={true} onRemove={onRemove} />);
+    await act(() => realClick(screen.getByRole('button', { name: 'remove Rig the hull' })));
+    expect(onRemove.mock.calls).toEqual([[1]]);
+    expect(screen.queryByText('?')).toBeNull();
+  });
+  it('on a dead run the remove buttons say they are inert and do nothing', () => {
+    const onRemove = vi.fn();
+    const s = { ...enqueue(enqueue(fresh(), book, 'fish'), book, 'hull'), dead: true };
+    render(<Queue state={s} content={book} working={-1} live={false} dead={true} onRemove={onRemove} />);
+    for (const name of ['remove Fish the shallows', 'remove Rig the hull']) {
       const x = screen.getByRole('button', { name });
       expect(x).toHaveAttribute('aria-disabled', 'true');
       act(() => { x.click(); });
-      act(() => { x.click(); });
     }
     expect(onRemove).not.toHaveBeenCalled();
-    expect(screen.queryByText('?')).toBeNull();
-  });
-  it('an armed remove goes back to x when the run dies', () => {
-    const base = enqueue(newState(saltRoad.roster), saltRoad, 'cabin');
-    const s = { ...base, queue: [{ ...base.queue[0]!, costsConsumed: 2, progress: 20 }] };
-    const { rerender } = render(<Queue state={s} content={saltRoad} working={-1} live={true} onRemove={noop} />);
-    act(() => { screen.getByRole('button', { name: 'remove Build a cabin' }).click(); });
-    expect(screen.getByText('?')).toBeInTheDocument();
-    rerender(<Queue state={{ ...s, dead: true }} content={saltRoad} working={-1} live={false} dead={true} onRemove={noop} />);
-    expect(screen.queryByText('?')).toBeNull();
-    expect(screen.getByRole('button', { name: 'remove Build a cabin' })).toHaveAttribute('aria-disabled', 'true');
   });
 });

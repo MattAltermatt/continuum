@@ -16,6 +16,11 @@ body {
   margin: 0;
 }
 
+/* A long queue can grow the page past the window; the gutter is kept either way, so a classic scrollbar appearing never moves the page under the cursor. */
+html {
+  scrollbar-gutter: stable;
+}
+
 
 :root {
   --bg: oklch(20% 0.012 260);
@@ -86,35 +91,70 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .head { padding: 6px 8px 8px; }
 .head__line { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
 .head__story { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
-.row { display: grid; grid-template-columns: 13.5em 1fr auto; gap: 0 10px; align-items: center; padding: 6px 8px; }
+/* The name column keeps the 24-character budget for skill plus noun (09-22 8.1), "Fight the harbor pirates". */
+.row { display: grid; grid-template-columns: calc(1.6em + 8px + 24ch) minmax(0, 1fr) auto; gap: 0 10px; align-items: center; padding: 6px 8px; }
 .row--on { background: var(--cell-on); }
-.row__c1 { display: grid; grid-template-columns: 1.6em 1fr; gap: 0 8px; align-items: center; white-space: nowrap; }
+.row__c1 { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); gap: 0 8px; align-items: center; white-space: nowrap; }
+.row__c1 > span { overflow: hidden; text-overflow: ellipsis; }
 .row__c1 svg { width: 15px; height: 15px; }
-.row__c1 b { font-weight: 700; margin-right: .5em; }
-/* Pinned per chapter (spec 8.1): the input column fits the Scrub's widest, "⚠ 499 of 500 stone have 5", on one line. */
-.row__c2 { display: grid; grid-template-columns: 26ch 1.2em 9em; gap: 0 6px; align-items: center; justify-content: center; }
+/* The space between verb and noun is a real character (a screen reader reads "Fight the harbor pirates"), so no margin: 24 characters are 24ch. */
+.row__c1 b { font-weight: 700; }
+/* The middle chunk stacks (09-22 8.4): needs on their own line above the inputs, one input per line, so every row
+   fits the chapter column, which is 712px at the 732px floor and 714px at 1280 (plan Task 7; mockup
+   2026-09-23-queue-orders frame d). Every row reserves three lines of the words at their own size, so no row changes
+   height when an instruction or a waiting look comes or goes, and nothing below it moves under the cursor. */
+.row__c2 { display: grid; grid-template-columns: minmax(0, 1fr) 1.2em 14ch; gap: 0 6px; align-items: center; min-height: calc(3 * 1.15 * 11px); }
+.row__in { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
 .row__in > span { white-space: nowrap; }
-.row__in { text-align: right; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.row__needs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 4px; }
+.need { border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; font-size: 11px; color: var(--ink); white-space: nowrap; }
+.need--unmet { border-color: var(--hurt); color: var(--hurt-text); }
 .row__short { color: var(--warn); }
-.row__short small { color: var(--ink-2); margin-left: 6px; }
+.row__short small { color: var(--ink-2); margin-left: 6px; font-size: 11px; }
 .row__arr { color: var(--edge-on); text-align: center; }
-.row__say { grid-column: 1 / -1; text-align: center; color: var(--warn); }
-.row__say b { color: var(--ink); }
-.row__c3 { display: grid; grid-template-columns: 6em var(--control) var(--control) auto; gap: 0 8px; align-items: center; justify-items: end; }
-.row__tx { text-align: right; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.row__out { display: flex; flex-direction: column; white-space: nowrap; }
+.row__say { grid-column: 1 / -1; text-align: center; color: var(--warn); font-size: 11px; line-height: 1.15;
+  overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+.row__c3 { display: grid; grid-template-columns: 5em var(--control) var(--control) auto; gap: 0 8px; align-items: center; justify-items: end; }
+.row__tx { text-align: right; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .row__tx small { display: block; color: var(--ink-2); font-size: 10px; }
 .btn { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
 .btn--play { color: var(--run); }
 .btn--stop { background: var(--run); color: var(--bg); cursor: default; }   /* keeps --edge-on: still a focusable control (spec 8.1) */
-/* Pinned to fit "199/200" (spec 8.1): seven characters at the chip's own font, plus padding and borders. */
-.auto { width: calc(7ch + 8px); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 9px; position: relative; overflow: hidden; box-sizing: border-box; }
+/* The refusal (#43, spec 2.5): one red flash on the row and its play button. The class comes off on animationend. */
+@keyframes refuse { from { border-color: var(--hurt); box-shadow: 0 0 0 2px var(--hurt); background: color-mix(in oklch, var(--hurt) 12%, var(--item)); } }
+@keyframes refuse-play { from { background: var(--hurt); color: var(--bg); border-color: var(--hurt); } }
+.row--refused { animation: refuse 700ms ease-out; }
+.row--refused .btn--play { animation: refuse-play 700ms ease-out; }
+/* Pinned to fit "199/200" (spec 8.1): seven characters at the chip's own 9px, plus padding and borders. The mode word
+   is an 11px child, so the box keeps the 9px width in every look and nothing moves when a chip is earned. */
+.auto { width: calc(7ch + 8px); height: var(--control); border: 1px solid var(--edge); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); font-family: var(--mono); font-size: 9px; position: relative; overflow: hidden; box-sizing: border-box; padding: 0; background: transparent; font-variant-numeric: tabular-nums; }
 .auto i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--auto); }
+.auto--btn { border-color: var(--edge-on); cursor: pointer; }
+.auto--btn b { font-size: 11px; font-weight: 400; }
+.auto--lit { border-color: var(--auto); color: var(--auto); }
+.auto--lit b { font-weight: 700; }
+/* Set, but its row cannot start: the stall's dashed look (09-22 8.5). */
+.auto--waits { border-style: dashed; }
+.auto--btn[aria-disabled="true"] { opacity: .7; cursor: default; }
 
 /* The floor is the action row, which cannot shrink below 712px, plus the page padding. Below it the page scrolls sideways; a phone layout is #62. */
 .screen { display: grid; gap: 8px; padding: 10px; min-width: 732px; container-type: inline-size; }
 .top { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
 .corner { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; font-size: 10px; color: var(--ink-2); gap: 4px; width: 14ch; }   /* pinned: "00:00 waiting" must not resize the health bar */
-.corner__gear { width: 14px; height: 14px; }
+.settings { position: relative; }
+.settings__gear { display: grid; place-items: center; padding: 0; }
+.settings__gear svg { width: 14px; height: 14px; }
+/* The panel's width is fixed, so "erase save" and "press again to erase" swap in one box and nothing moves (spec 8.1). */
+.settings__panel { position: absolute; right: 0; top: calc(var(--control) + 4px); z-index: 5; width: 22ch; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--cell); border: 1px solid var(--edge-on); border-radius: 6px; box-shadow: 0 8px 24px #0008; text-align: left; }
+.settings__head { margin: 0; display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); font-weight: 400; }
+.settings__dev { letter-spacing: 0; text-transform: none; color: var(--auto); }
+.settings__btn { min-height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.settings__btn--armed { color: var(--hurt-text); border-color: var(--hurt-text); }
+.settings__rule { border-top: 1px solid var(--edge); }
+.settings__seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.settings__seg button { min-height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.settings__seg button[aria-pressed="true"] { background: var(--core); color: var(--bg); }
 .corner__clock { font-variant-numeric: tabular-nums; color: var(--ink); }
 .corner__clock--dim { color: var(--ink-2); }
 .columns { display: grid; grid-template-columns: 1fr 250px 280px; gap: 8px; align-items: start; }
@@ -136,8 +176,13 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .entry { display: grid; grid-template-columns: 1.4em 1fr var(--control); gap: 3px 6px; align-items: center; padding: 6px 8px; }
 .entry svg { width: 15px; height: 15px; }
 .entry--on { background: var(--cell-on); }
-.entry--waiting { border-style: dashed; }
+.entry__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry__name b { font-weight: 700; }
 .entry__x { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 3px; background: transparent; color: var(--ink-2); font: inherit; cursor: pointer; }
+/* repeat and once share one pinned width, so a tag never shifts the line; auto is in the automation colour. */
+.tag { display: inline-block; min-width: calc(6ch + 10px); text-align: center; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; font-size: 10px; color: var(--ink-2); margin-right: 4px; }
+.tag--auto { border-color: var(--auto); color: var(--auto); min-width: 0; }
+.entry__third { justify-content: flex-start; gap: 0 10px; }
 .entry__bar { grid-column: 1 / -1; }
 /* Every entry reserves the working bar's height, so an entry that stops or starts being worked
    does not shift the entries (and their remove buttons) below it. Padding, not margin: a margin
@@ -145,7 +190,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .entry__bar { padding-block: calc((var(--bar-working) - var(--bar)) / 2); }
 .entry--on .entry__bar { padding-block: 0; }
 .entry--on .bar { height: var(--bar-working); }
-.entry__sub { grid-column: 1 / -1; display: flex; justify-content: space-between; font-size: 11px; font-variant-numeric: tabular-nums; }
+.entry__sub { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-variant-numeric: tabular-nums; min-height: 18px; white-space: nowrap; overflow: hidden; }
 .warn { color: var(--warn); } .ink-2 { color: var(--ink-2); }
 .pack { display: grid; gap: 4px; }
 .pack__item { display: grid; grid-template-columns: 1fr 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
@@ -179,14 +224,22 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .card__why { color: var(--ink-2); font-size: 10px; margin-top: 2px; }
 .card__begin { display: block; margin: 14px auto 0; padding: 6px 18px; border: 1px solid var(--run); background: var(--run); color: var(--bg); border-radius: 4px; font: inherit; font-weight: 700; }
 .card__quiet { font-size: 10px; margin-top: 8px; }
+/* The finish card's last line, in the running head's serif (mockup 2026-09-23-finish-card). */
+.card__line { font-family: var(--serif); font-style: italic; font-size: 13px; line-height: 1.45; color: var(--ink-2); text-align: center; max-width: 42ch; margin: 8px auto; }
+.card__facts { text-align: center; margin: -6px 0 12px; line-height: 1.5; }
+.card__count { text-align: center; }
+.card__count b { font-size: 13px; }
 .rates { font-variant-numeric: tabular-nums; }
 .rates--stopped { opacity: .55; }
 .rates__kv { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; }
 .rates__v { text-align: right; min-width: 13ch; display: inline-block; }
 .rates__food--covers { color: var(--good); }
 .rates__food--short { color: var(--hurt-text); }
+/* The hurts line's box is always there, blank until a hurting row runs, so the chunks below never jump when a fight starts. */
+.rates__blank { visibility: hidden; }
 .food { display: grid; gap: 4px; }
 .food__item { display: grid; grid-template-columns: 1fr auto 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+.food__item > span { white-space: nowrap; }   /* "cloud-fish" broke at its hyphen, and "+4 hp" at its space */
 .food__item--empty { border-color: var(--hurt); }
 .food__item--full { color: var(--warn); }
 .btn--placeholder { visibility: hidden; }

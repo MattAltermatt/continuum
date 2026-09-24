@@ -2,13 +2,17 @@
 
 ## The pitch
 
-An idle survival game about **queuing work against a clock you cannot beat.**
+An idle adventure about **queuing work against a clock you cannot beat.**
 
-You do not click to chop wood. You decide what deserves the next stretch of a
-short, accelerating life — and then you watch whether you chose well. Health
+The world is in the sky; it just is. Towns float on warm air, ruins drift,
+and a casino the size of a city hangs over the clouds. We are adventurers
+with our own ship, hopping from port to port, and we are the heroes.
+
+You do not click to haul scrap. You decide what deserves the next stretch of a
+short, accelerating life, and then you watch whether you chose well. Health
 decays faster every minute you stay alive, so every run ends the same way. What
 carries forward is what you learned to do faster, and what you taught the game
-to do without you.
+to do without you: automation, earned row by row.
 
 Death is the loop, not the failure.
 
@@ -21,19 +25,23 @@ plan (paused)  →  queue work  →  the clock accelerates  →  you die
                  the max-health you earned by lasting
 ```
 
-A run is minutes, not hours. The interesting decision is never *what to click*
-— it is **what to spend a shortening life on**, and when to stop gathering and
-start building the thing that slows the clock down.
+A run is tuned for about twenty minutes. The interesting decision is never
+*what to click*; it is **what to spend a shortening life on**, and when to stop
+gathering and start building the thing that slows the clock down.
+
+A book is a voyage: a few ports of call, each ending in a big event that casts
+the ship off to the next. Provisions ride along; cargo stays at the dock. The
+last port's big event is the book's end.
 
 ## What the game is made of
 
 | Layer | What it does |
 |---|---|
-| **The queue** | One action at a time, front-first, advancing per tick. The only way work happens. |
+| **The queue** | A list of orders. Only the top runs; one that cannot run is popped, and its progress stays on the row. The only way work happens. |
 | **Incremental costs** | Materials are spent *into* work as it progresses, not paid on delivery. A half-built thing has really eaten half its cost. |
 | **Dual mastery** | Every skill keeps two ledgers from the same effort — one that survives death, one that does not. |
 | **The decay clock** | Health loss grows exponentially with run length. The only counter is having built something earlier that slows it. |
-| **Automation** | Earned by repetition across lives. Passive priorities keep the queue fed; as-needed producers react to exactly the shortfall they see. |
+| **Automation** | Earned per row by repetition across lives. JIT producers step in for exactly the shortfall they see; the priorities (top, high, mid, low, last) keep an empty queue fed. |
 
 The full specification lives in [`MECHANICS.md`](./MECHANICS.md).
 

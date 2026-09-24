@@ -18,38 +18,55 @@ export interface SkillDefinition {
 export type ItemId = string;
 export type ActionId = string;
 
-/** What a produced thing is, for where it is shown. */
-export type ItemKind = 'material' | 'food' | 'structure';
+/** What an item is, for where it is shown and how many can be held (spec 2026-09-23-the-windward-run section 7). */
+export type ItemKind = 'material' | 'food' | 'key';
 
 export interface ItemCost { readonly item: ItemId; readonly amount: number }
 
+/** A skill's tick multiplier for the rest of the life (section 6.3). */
+export interface Gear { readonly skill: SkillId; readonly multiplier: number }
+
 export interface ActionDefinition {
   readonly id: ActionId;
-  /** The verb is the skill (spec section 6). */
+  /** The verb is the skill (spec 2026-09-22 section 6). */
   readonly verb: SkillId;
-  /** The chapter's flavor, shown after the verb: "berries", "a cabin". */
+  /** The chapter's flavor, shown after the verb. */
   readonly noun: string;
   /** Total XP of effort to complete once; progress is in the same unit. */
   readonly expCost: number;
   readonly producedItem?: ItemId;
   readonly producedAmount?: number;
-  /** Consumed incrementally, in declared order. MECHANICS section 2. */
+  /** Consumed incrementally, in declared order; an item appears at most once. MECHANICS section 2. */
   readonly itemCosts: readonly ItemCost[];
+  /** Checked, never spent (section 6.2). */
+  readonly needs?: readonly ItemCost[];
   readonly isOneTime: boolean;
-  /** Multiplies the run's decay for the rest of the run. MECHANICS section 2. */
+  /** Health lost per second while this row runs (section 6.1). */
+  readonly hurts?: number;
+  /** Effects on completion, for the rest of the life. One-time rows only (section 6.3). */
   readonly healthDecayMultiplier?: number;
-  /** One authored sentence the log prints when a one-time completes (spec 9). */
+  readonly capacityBonus?: number;
+  readonly gear?: Gear;
+  /** One authored sentence the log prints when a one-time completes (spec 2026-09-22 section 9). */
   readonly beat?: string;
 }
 
 export interface ItemDefinition {
   readonly id: ItemId;
   readonly name: string;
+  /** The name of one unit, where it differs from `name` ("chip" for "chips"): printed beside an amount of 1. */
+  readonly one?: string;
   readonly kind: ItemKind;
-  /** Per-item stack cap (spec section 9). A producer stops at it; nothing lands past it. */
-  readonly cap: number;
   /** Food only: HP restored per unit eaten. */
   readonly healPerUnit?: number;
+}
+
+/** A port of call (section 4): its head, its rows in display order, and its big event. */
+export interface Chapter {
+  readonly head: ChapterHead;
+  readonly order: readonly ActionId[];
+  /** Completing it casts off; in the last chapter it is the book's finish. A one-time row in `order`. */
+  readonly event: ActionId;
 }
 
 export interface Content {
@@ -57,6 +74,18 @@ export interface Content {
   readonly roster: readonly SkillDefinition[];
   readonly actions: Readonly<Record<ActionId, ActionDefinition>>;
   readonly items: Readonly<Record<ItemId, ItemDefinition>>;
+  /** Ports of call, in order (section 4). */
+  readonly chapters: readonly Chapter[];
+  /** The last chapter's event: its completion finishes the book. */
+  readonly finish: ActionId;
+}
+
+/** A book: content plus what the shelf and the play need. The format a generator emits. */
+export interface Book extends Content {
+  readonly id: string;
+  readonly name: string;
+  readonly version: number;
+  readonly length: BookLength;
 }
 
 /** The running head (spec section 8.6). The book's name comes from the book. */
@@ -66,23 +95,5 @@ export interface ChapterHead {
   readonly story: string;
 }
 
-/** A chapter: its head and its rows in display order, which is also queue order. */
-export interface Chapter {
-  readonly head: ChapterHead;
-  readonly order: readonly ActionId[];
-}
-
 /** The author's claim, in game time (spec 2026-09-23-headless-play section 3). Never a measurement. */
 export type BookLength = { readonly hours: number; readonly days?: never } | { readonly days: number; readonly hours?: never };
-
-/** A book: content plus what the shelf and the chapter panel need. The format a generator emits. */
-export interface Book extends Content {
-  readonly id: string;
-  readonly name: string;
-  /** 1, 2, ... A shared book is "The Salt Road v1" (headless-play spec section 3). */
-  readonly version: number;
-  /** The big event whose completion finishes the book: a one-time row in the last chapter. */
-  readonly finish: ActionId;
-  readonly length: BookLength;
-  readonly chapters: readonly Chapter[];
-}

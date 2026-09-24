@@ -1,0 +1,42 @@
+/* The skill pop-out (spec 2026-09-23-the-windward-run section 8, mockup 2026-09-23-skills-ledger-gear). Tokens come from src/styles.css. */
+
+/* The slot takes the band's grid cell and positions the pop-out; the cell itself clips (its sheen needs overflow: hidden), so the pop-out is its sibling. */
+.skill-slot { position: relative; }
+.skill-slot > .skill { height: 100%; }
+.skill[aria-expanded="true"] { box-shadow: 0 0 0 1px var(--edge-on); }
+
+/* z-index 1: over every row below the band, and under the death card, which is also 1 and later in the page. */
+.ledger { position: absolute; left: 0; top: calc(100% + 4px); z-index: 1; width: 470px; background: oklch(26% 0.014 260); border: 1px solid var(--edge-on); border-radius: 6px; padding: 10px 12px; box-shadow: 0 8px 24px oklch(0% 0 0 / .55); font-variant-numeric: tabular-nums; text-align: left; }
+.ledger:focus { outline: none; }
+/* Opened by hover alone, the pointer passes through it to the cells beneath, which open their own. */
+.ledger--hover { pointer-events: none; }
+.ledger--right { left: auto; right: 0; }
+
+.ledger__title { margin: 0 0 8px; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.ledger__title svg { width: 15px; height: 15px; display: block; }
+
+.ledger__grid { display: grid; grid-template-columns: 1fr 7.5em; column-gap: 14px; align-items: end; }
+.ledger__l { border-top: 1px solid var(--edge); padding-top: 6px; margin-top: 6px; }
+.ledger__r { border-top: 1px solid var(--edge); padding-top: 6px; margin-top: 6px; text-align: right; align-self: stretch; display: flex; flex-direction: column; justify-content: flex-start; }
+.ledger__l--first, .ledger__r--first { border-top: 0; padding-top: 0; margin-top: 0; }
+.ledger__h { margin: 0 0 4px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); font-weight: 400; display: flex; justify-content: space-between; gap: 8px; }
+.ledger__h b { color: var(--ink); font-weight: 700; white-space: nowrap; }
+.ledger__sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.ledger__sw--core { background: var(--core); }
+.ledger__sw--run { background: var(--run); }
+.ledger__l .bar { margin: 3px 0 5px; }
+.ledger__kv { display: grid; grid-template-columns: auto 1fr; gap: 1px 12px; }
+.ledger__kv > span:nth-child(even) { text-align: right; }
+.ledger__d { color: var(--ink-2); }
+.ledger__fac { font-size: 15px; font-weight: 700; }
+.ledger__sub { font-size: 10px; color: var(--ink-2); margin-top: 2px; white-space: nowrap; }
+.ledger__total-l, .ledger__total-r { border-top: 2px solid var(--edge-on); margin-top: 8px; padding-top: 6px; }
+.ledger__total-l { color: var(--ink-2); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; align-self: center; }
+.ledger__total-r { text-align: right; font-size: 17px; font-weight: 700; }
+
+/* Right now on the left, lifetime on the right: lifetime keeps its column while the skill starts and stops. */
+.ledger__after { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--edge); display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.ledger__now { grid-column: 1; }
+.ledger__life { grid-column: 2; }
+.ledger__h2 { margin: 0 0 3px; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); font-weight: 400; }
+.ledger__after .ledger__kv { gap: 1px 10px; font-size: 11px; }

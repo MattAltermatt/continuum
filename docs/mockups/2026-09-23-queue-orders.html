@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-23: queue orders</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  main { width: 1232px; }
+  h2 { margin: 0 0 6px; font-size: 20px; } h3 { margin: 26px 0 6px; font-size: 15px; }
+  .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 14px; max-width: 1180px; line-height: 1.45; }
+  .subtitle code { color: #cfcfcf; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; display: flex; gap: 12px; align-items: flex-start; }
+
+  /* Tokens: 09-22 spec 8.1, as src/styles.css ships them. */
+  .scr { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 10px; border-radius: 8px; box-sizing: border-box;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --item: oklch(22% 0.012 260); --cell-on: oklch(30% 0.02 260);
+    --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --track: oklch(17% 0.012 260); --track-edge: oklch(55% 0.012 260);
+    --ink: oklch(90% 0.01 80); --ink-2: oklch(80% 0.01 80); --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45);
+    --hurt: oklch(66% 0.18 25); --hurt-text: oklch(70% 0.18 25); --warn: oklch(80% 0.15 85); --auto: oklch(72% 0.10 235); --good: oklch(78% 0.12 150);
+    --serif: Georgia, "Times New Roman", serif; --bar: 8px; --bar-working: 12px; --control: 24px;
+    background: var(--bg); color: var(--ink); }
+  .scr * { box-sizing: border-box; }
+  .scr .ic { width: 15px; height: 15px; display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .scr .ink-2 { color: var(--ink-2); } .scr .warn { color: var(--warn); } .scr .hurt-text { color: var(--hurt-text); } .scr .auto-text { color: var(--auto); }
+  .scr .lbl { font-size: 11px; color: var(--ink-2); margin: 12px 0 5px; }
+  .scr .lbl:first-child { margin-top: 0; }
+  .scr h5 { margin: 0 0 6px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); font-weight: 400; display: flex; justify-content: space-between; }
+
+  .scr .item { border: 1px solid var(--edge); background: var(--item); border-radius: 4px; }
+  .scr .item.working { position: relative; overflow: hidden; border-color: var(--run); background: var(--cell-on); }
+  @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .scr .item.working::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--run) 12%, transparent), transparent); animation: sheen 2.2s linear infinite; }
+
+  .scr .bar { height: var(--bar); border: 1px solid var(--track-edge); border-radius: 3px; background: var(--track); position: relative; overflow: hidden; }
+  .scr .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--core); }
+  .scr .bar i.run { background: var(--run); } .scr .bar i.kept { background: var(--track-edge); }
+  .scr .bar__value { font-size: 10px; text-align: center; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
+
+  /* The running head (09-22 8.6). */
+  .scr .head { padding: 6px 8px 8px; }
+  .scr .head__line { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+  .scr .head__story { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
+
+  /* The action row: three chunks, one grammar (09-22 8.4). Pinned for Port Cinder: the name column fits
+     "Fight the harbor pirates" (24 characters, the 09-22 budget); inputs fit a need chip; outputs fit "the star chart". */
+  .scr .row { display: grid; grid-template-columns: calc(1.6em + 8px + 24ch) 1fr auto; gap: 0 10px; align-items: center; padding: 6px 8px; margin-bottom: 5px; position: relative; }
+  .scr .row__c1 { display: grid; grid-template-columns: 1.6em 1fr; gap: 0 8px; align-items: center; white-space: nowrap; }
+  .scr .row__c1 b { font-weight: 700; margin-right: .5em; }
+  .scr .row__c2 { display: grid; grid-template-columns: 23ch 1.2em 15ch; gap: 0 6px; align-items: center; justify-content: center; min-height: 34px; }
+  .scr .row__in { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
+  .scr .row__in > span { white-space: nowrap; }
+  .scr .row__short { color: var(--warn); }
+  .scr .row__short small { color: var(--ink-2); margin-left: 6px; font-size: 11px; }
+  .scr .row__arr { color: var(--edge-on); text-align: center; }
+  .scr .row__out { white-space: nowrap; }
+  .scr .row__say { grid-column: 1 / -1; text-align: center; color: var(--warn); white-space: nowrap; }
+  .scr .row__say b { color: var(--ink); }
+  .scr .need { border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; font-size: 11px; color: var(--ink); white-space: nowrap; }
+  .scr .need--unmet { border-color: var(--hurt); color: var(--hurt-text); }
+  .scr .row__c3 { display: grid; grid-template-columns: 6em var(--control) var(--control) auto; gap: 0 8px; align-items: center; justify-items: end; }
+  .scr .row__tx { text-align: right; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .scr .row__tx small { display: block; color: var(--ink-2); font-size: 10px; }
+  .scr .btn { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .scr .btn--play { color: var(--run); }
+  .scr .btn--stop { background: var(--run); color: var(--bg); }
+  .scr .btn--hit { background: var(--run); color: var(--bg); border-color: var(--run); }
+  .scr .btn--refused { background: var(--hurt); color: var(--bg); border-color: var(--hurt); }
+  /* The refusal (#43): one red flash on the row. */
+  .scr .row--refused { border-color: var(--hurt); box-shadow: 0 0 0 2px var(--hurt); background: color-mix(in oklch, var(--hurt) 10%, var(--item)); }
+  @keyframes refuse { 0% { border-color: var(--hurt); box-shadow: 0 0 0 2px var(--hurt); background: color-mix(in oklch, var(--hurt) 10%, var(--item)); } 12%, 100% { border-color: var(--edge); box-shadow: 0 0 0 0 transparent; background: var(--item); } }
+  @keyframes sayfade { 0%, 70% { opacity: 1; } 85%, 100% { opacity: 0; } }
+  @keyframes c2back { 0%, 75% { opacity: 0; } 90%, 100% { opacity: 1; } }
+  @keyframes playhit { 0%, 6% { background: var(--hurt); color: var(--bg); border-color: var(--hurt); } 10%, 100% { background: transparent; color: var(--run); border-color: var(--edge-on); } }
+  .scr .row.loop { animation: refuse 4.5s ease-out infinite; }
+  .scr .row.loop .btn--play { animation: playhit 4.5s linear infinite; }
+  .scr .row.loop .mid { position: relative; }
+  .scr .row.loop .row__say { animation: sayfade 4.5s linear infinite; }
+  .scr .row.loop .mid .row__c2 { position: absolute; inset: 0; animation: c2back 4.5s linear infinite; }
+
+  /* The automation chip. Pinned to fit "199/200" at its own 9px (09-22 8.1). A status until earned, a button after. */
+  .scr .auto { width: calc(7ch + 8px); height: var(--control); border: 1px solid var(--edge); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 9px; font-family: inherit; position: relative; overflow: hidden; background: transparent; padding: 0; font-variant-numeric: tabular-nums; }
+  .scr .auto i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--auto); }
+  .scr .auto--btn { border-color: var(--edge-on); }
+  .scr .auto--btn b { font-size: 11px; font-weight: 400; }
+  .scr .auto--lit { border-color: var(--auto); color: var(--auto); }
+  .scr .auto--lit b { font-weight: 700; }
+  .scr .looks { display: grid; grid-template-columns: calc(9ch + 8px) 1fr; gap: 6px 10px; align-items: center; font-size: 11px; }
+  .scr .looks .auto { justify-self: start; }
+  .scr .looks .d { color: var(--ink-2); }
+  .scr .looks .sep { grid-column: 1 / -1; border-top: 1px solid var(--edge); margin: 3px 0; }
+  .scr .cycle { font-size: 11px; line-height: 1.6; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--edge); }
+  .scr .cycle b { color: var(--auto); font-weight: 400; }
+  .scr .words { display: grid; gap: 6px; font-size: 11px; }
+  .scr .words .say { color: var(--warn); } .scr .words .say b { color: var(--ink); }
+  .scr .words .d { color: var(--ink-2); font-size: 10px; margin-top: -3px; margin-bottom: 3px; }
+
+  /* The queue: one boxed entry per order (spec 2.1). Real column width at 1280. */
+  .scr .queue { width: 280px; display: grid; gap: 5px; align-content: start; }
+  .scr .qn { position: relative; }
+  .scr .qn::before { content: attr(data-n); position: absolute; left: -24px; top: 6px; width: 16px; height: 16px; border: 1px solid var(--edge-on); border-radius: 8px; font-size: 9px; color: var(--ink-2); display: flex; align-items: center; justify-content: center; }
+  .scr .entry { display: grid; grid-template-columns: 1.4em 1fr var(--control); gap: 3px 6px; align-items: center; padding: 6px 8px; }
+  .scr .entry__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scr .entry__name b { font-weight: 700; }
+  .scr .entry__x { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 3px; background: transparent; color: var(--ink-2); font: inherit; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .scr .entry__bar { grid-column: 1 / -1; padding-block: calc((var(--bar-working) - var(--bar)) / 2); }
+  .scr .entry.working .entry__bar { padding-block: 0; }
+  .scr .entry.working .bar { height: var(--bar-working); }
+  .scr .entry__sub { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-variant-numeric: tabular-nums; min-height: 18px; }
+  .scr .tag { display: inline-block; min-width: calc(6ch + 10px); text-align: center; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; font-size: 10px; color: var(--ink-2); margin-right: 4px; }
+  .scr .tag--auto { border-color: var(--auto); color: var(--auto); min-width: 0; }
+  .scr .notes { font-size: 11px; line-height: 1.5; }
+  .scr .notes ol { margin: 0 0 10px; padding-left: 22px; }
+  .scr .notes li { margin-bottom: 7px; }
+  .scr .notes li b { font-weight: 700; }
+  .scr .notes ul { margin: 0; padding-left: 16px; color: var(--ink-2); }
+  .scr .notes ul li { margin-bottom: 4px; }
+
+  /* (d) The waiting chip. Drawn at the real chapter column (714px at 1280, 712px at the 732px floor) with the middle chunk
+     stacked as Task 7 builds it: the name column keeps its 24ch budget, the middle takes what is left, and every row reserves
+     three lines of the words so a row never changes height when the words come or go. */
+  .scr.col714 { width: 714px; }
+  .scr.col714 .row { grid-template-columns: calc(1.6em + 8px + 24ch) minmax(0, 1fr) auto; }
+  .scr.col714 .row__c2 { grid-template-columns: minmax(0, 1fr) 1.2em 14ch; min-height: 38px; justify-content: stretch; }
+  .scr.col714 .row__c3 { grid-template-columns: 5em var(--control) var(--control) auto; }
+  .scr .row__say--wrap { white-space: normal; font-size: 11px; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+  .scr .auto--waits { border-style: dashed; }
+  .scr .row__say--wrap b { font-weight: 400; color: var(--warn); }
+</style>
+</head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-fishing-rod" viewBox="0 0 24 24"><path d="M4 11h1"/><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"/><circle cx="18" cy="18" r="2"/></symbol><symbol id="i-recycle" viewBox="0 0 24 24"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></symbol><symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></symbol><symbol id="i-sailboat" viewBox="0 0 24 24"><path d="M10 2v15"/><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"/><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"/></symbol><symbol id="i-sword" viewBox="0 0 24 24"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></symbol><symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol></defs></svg>
+<main>
+<p class="subtitle">Committed mockup, 2026-09-23. Task 1 of docs/plans/2026-09-23-the-windward-run.md; designs spec docs/specs/2026-09-23-the-windward-run.md sections 2, 3, 6 and 12. Icons are Lucide (inline SVG); control glyphs are the game's own (&#x25B6;&#xFE0E; &#x25A0; &#x26A0;&#xFE0E; &times; &rarr; &minus;). Times and xp are computed from balance.ts for an assumed life 14; the book is not tuned yet (plan Task 5), so the scale is illustrative and the arithmetic is exact.</p>
+<h2>The queue of orders: the row, the refusal, the queue</h2>
+<p class="subtitle">On &#x25B6;&#xFE0E; and +, a <b>click queues a repeating order</b> and <b>Shift+click queues a single run</b> (spec 2.1); a one-time row is always single. &#x25B6;&#xFE0E; puts the order on top and refuses a row that cannot run and that no automation would supply; + appends at the bottom and never refuses (2.5).</p>
+
+<h3>(a) The row, now with needs, hurts, effects and the automation chip</h3>
+<div class="mockup">
+  <div class="mockup-header">Life 14 &middot; I &middot; Port Cinder &middot; pack: cloud-fish 3/5, scrap 2/5 &middot; Salvage running (pressed &#x25B6;&#xFE0E;; its chip is off)</div>
+  <div class="mockup-body">
+    <div class="scr" style="width:800px">
+      <div class="head"><div class="head__line"><span>The Windward Run</span><span>I &middot; Port Cinder</span></div><p class="head__story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p></div>
+
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-fishing-rod"/></svg><span><b>Fish</b>the cloud shallows</span></div><div class="row__c2"><div class="row__in"></div><div class="row__arr">&rarr;</div><div class="row__out">+1 cloud-fish</div></div><div class="row__c3"><div class="row__tx">1.3s<small>+4.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>JIT</b></span></div></div>
+      <div class="item row working"><div class="row__c1"><svg class="ic"><use href="#i-recycle"/></svg><span><b>Salvage</b>drifting scrap</span></div><div class="row__c2"><div class="row__in"></div><div class="row__arr">&rarr;</div><div class="row__out">+1 scrap</div></div><div class="row__c3"><div class="row__tx">1.8s<small>+5.0 xp</small></div><span class="btn btn--stop">&#x25A0;</span><span class="btn">+</span><span class="auto auto--btn"><b>off</b></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="row__c2"><div class="row__in"><span class="row__short">&#x26A0;&#xFE0E; 8 scrap<small>have 2</small></span></div><div class="row__arr">&rarr;</div><div class="row__out">decay &times;0.80</div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-wrench"/></svg><span><b>Tinker</b>a trawl net</span></div><div class="row__c2"><div class="row__in"><span class="row__short">&#x26A0;&#xFE0E; 6 scrap<small>have 2</small></span></div><div class="row__arr">&rarr;</div><div class="row__out">Fish &times;1.25</div></div><div class="row__c3"><div class="row__tx">18s<small>+40.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-wrench"/></svg><span><b>Tinker</b>a canvas satchel</span></div><div class="row__c2"><div class="row__in"><span class="row__short">&#x26A0;&#xFE0E; 10 scrap<small>have 2</small></span></div><div class="row__arr">&rarr;</div><div class="row__out">stack +5</div></div><div class="row__c3"><div class="row__tx">23s<small>+50.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto">4/5<i style="width:80%"></i></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sword"/></svg><span><b>Fight</b>the harbor pirates</span></div><div class="row__c2"><div class="row__in"><span class="hurt-text">&minus;0.30 hp/s</span></div><div class="row__arr">&rarr;</div><div class="row__out">casts off</div></div><div class="row__c3"><div class="row__tx">3:12<small>+480.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>low</b></span></div></div>
+
+      <div class="lbl" style="margin-top:14px">From later ports, same grammar. II &middot; The Hollow Isle, with the inner door and the star chart in the pack:</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-eye"/></svg><span><b>Search</b>the halls</span></div><div class="row__c2"><div class="row__in"><span class="need">needs the inner door</span></div><div class="row__arr">&rarr;</div><div class="row__out">the star chart</div></div><div class="row__c3"><div class="row__tx">1:15<small>+150.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sword"/></svg><span><b>Fight</b>the guardian</span></div><div class="row__c2"><div class="row__in"><span class="need">needs the star chart</span><span class="hurt-text">&minus;0.60 hp/s</span></div><div class="row__arr">&rarr;</div><div class="row__out">casts off</div></div><div class="row__c3"><div class="row__tx">4:48<small>+900.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>low</b></span></div></div>
+      <div class="lbl">The same row before the chart is found: the chip turns hurt. The row is not dimmed; + still queues it, &#x25B6;&#xFE0E; refuses unless Search would supply the chart.</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sword"/></svg><span><b>Fight</b>the guardian</span></div><div class="row__c2"><div class="row__in"><span class="need need--unmet">needs the star chart</span><span class="hurt-text">&minus;0.60 hp/s</span></div><div class="row__arr">&rarr;</div><div class="row__out">casts off</div></div><div class="row__c3"><div class="row__tx">4:48<small>+900.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>low</b></span></div></div>
+      <div class="lbl">III &middot; The Gilded Fortune, the book's finish. Never completed, so its chip is still blank:</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-message-circle"/></svg><span><b>Talk</b>to Varro</span></div><div class="row__c2"><div class="row__in"><span class="need">needs Varro&rsquo;s table</span></div><div class="row__arr">&rarr;</div><div class="row__out">the end</div></div><div class="row__c3"><div class="row__tx">2:47<small>+400.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto"></span></div></div>
+    </div>
+
+    <div class="scr" style="flex:1">
+      <h5><span>the automation chip, every look</span><span>one size</span></h5>
+      <div class="looks">
+        <span class="auto"></span><span class="d">blank until the row's first completion</span>
+        <span class="auto">37/200<i style="width:18.5%"></i></span><span class="d">earning a repeatable: lifetime completions, a hairline under. A status, not a button: decorative edge, nothing to press</span>
+        <span class="auto">4/5<i style="width:80%"></i></span><span class="d">earning a one-time</span>
+        <span class="auto">199/200<i style="width:99.5%"></i></span><span class="d">the widest it ever reads: the pin</span>
+        <span class="sep"></span>
+        <span class="auto auto--btn"><b>off</b></span><span class="d">earned: now a button (active edge), and it starts here</span>
+        <span class="auto auto--btn auto--lit"><b>JIT</b></span><span class="d">just in time: the moment the top is short, it goes in at index 0 for exactly the shortfall; food at zero; provisions before casting off</span>
+        <span class="auto auto--btn auto--lit"><b>top</b></span><span class="d">passive priorities, highest first</span>
+        <span class="auto auto--btn auto--lit"><b>high</b></span><span class="d">&nbsp;</span>
+        <span class="auto auto--btn auto--lit"><b>mid</b></span><span class="d">&nbsp;</span>
+        <span class="auto auto--btn auto--lit"><b>low</b></span><span class="d">&nbsp;</span>
+        <span class="auto auto--btn auto--lit"><b>last</b></span><span class="d">ties break by the port's row order</span>
+      </div>
+      <div class="cycle">
+        <div class="ink-2">a press moves one step:</div>
+        <div>off &rarr; <b>JIT</b> &rarr; <b>top</b> &rarr; <b>high</b> &rarr; <b>mid</b> &rarr; <b>low</b> &rarr; <b>last</b> &rarr; off</div>
+        <div class="ink-2" style="margin-top:6px">a row whose output no row uses and that is not food skips JIT:</div>
+        <div>off &rarr; <b>top</b> &rarr; <b>high</b> &rarr; <b>mid</b> &rarr; <b>low</b> &rarr; <b>last</b> &rarr; off</div>
+        <div class="ink-2" style="margin-top:6px">accessible name: <span style="color:var(--ink)">automation: JIT, press for top</span></div>
+      </div>
+      <div class="cycle">
+        <div class="ink-2">the middle chunk, left to right:</div>
+        <div><span class="need">needs &hellip;</span> chips (checked, never spent), inputs owed (<span class="warn">&#x26A0;&#xFE0E; &hellip; have n</span> when short, <span>3 of 8 scrap</span> once part is spent), <span class="hurt-text">&minus;0.30 hp/s</span>, &rarr;, then the output: <span>+1 scrap</span>, a made thing's name, or a one-time's effect (<span>decay &times;0.80</span>, <span>stack +5</span>, <span>Fish &times;1.25</span>, <span>casts off</span>, <span>the end</span>).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>(b) A refused &#x25B6;&#xFE0E;: one red flash, the instruction, nothing queued</h3>
+<div class="mockup">
+  <div class="mockup-header">Life 14 &middot; the hull kept 5 of its 8 scrap from an earlier try (spec 2.2) &middot; the pack holds no scrap &middot; Salvage's chip is off</div>
+  <div class="mockup-body">
+    <div class="scr" style="width:800px">
+      <div class="lbl">1 &middot; at rest. The row owes what its kept progress has not spent.</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="row__c2"><div class="row__in"><span class="row__short">&#x26A0;&#xFE0E; 3 of 8 scrap<small>have 0</small></span></div><div class="row__arr">&rarr;</div><div class="row__out">decay &times;0.80</div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+
+      <div class="lbl">2 &middot; the press, frame 0. &#x25B6;&#xFE0E; fills hurt for the frame, the row flashes red once, and the middle chunk becomes the instruction. No order is added.</div>
+      <div class="item row row--refused"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="row__c2"><div class="row__say">needs 3 scrap &middot; <b>Salvage automation is off</b></div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--refused">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+
+      <div class="lbl">3 &middot; a beat later. The flash is gone; the words hold for INSTRUCTION_MS (3 s), then fade back to 1.</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="row__c2"><div class="row__say">needs 3 scrap &middot; <b>Salvage automation is off</b></div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+
+      <div class="lbl">4 &middot; + on the same row instead: the order is appended (+ never refuses, spec 2.5); the same words, no red.</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="row__c2"><div class="row__say">needs 3 scrap &middot; <b>Salvage automation is off</b></div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn btn--hit">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+
+      <div class="lbl">Live, looping: 1 &rarr; 2 &rarr; 3 &rarr; 1.</div>
+      <div class="item row loop"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="mid"><div class="row__say" style="display:flex;align-items:center;justify-content:center;min-height:34px">needs 3 scrap &middot;&nbsp;<b>Salvage automation is off</b></div><div class="row__c2"><div class="row__in"><span class="row__short">&#x26A0;&#xFE0E; 3 of 8 scrap<small>have 0</small></span></div><div class="row__arr">&rarr;</div><div class="row__out">decay &times;0.80</div></div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+    </div>
+
+    <div class="scr" style="flex:1">
+      <h5><span>the words, one per reason</span></h5>
+      <div class="words">
+        <div class="say">needs 3 scrap &middot; <b>Salvage automation is off</b></div>
+        <div class="d">its maker is earned but off</div>
+        <div class="say">needs 3 scrap &middot; <b>Salvage automation is not yet earned</b></div>
+        <div class="d">its maker's chip still reads n/200</div>
+        <div class="say">needs 3 scrap &middot; <b>Salvage automation can't run either</b></div>
+        <div class="d">its maker is automated but blocked itself</div>
+        <div class="say"><b>nothing here makes scrap</b></div>
+        <div class="d">no row in this port makes it</div>
+        <div class="say">needs the star chart &middot; <b>Search automation is off</b></div>
+        <div class="d">an unmet need reads the same way as a missing input</div>
+        <div class="say"><b>scrap is full</b></div>
+        <div class="d">&#x25B6;&#xFE0E; on a producer whose stack is at its cap</div>
+      </div>
+      <div class="cycle ink-2">The log uses the same words when the top entry pops for the same reason: <span style="color:var(--ink)">Rig the hull stops: needs 3 scrap &middot; Salvage automation is off</span>. One function writes both.</div>
+    </div>
+  </div>
+</div>
+
+<h3>(c) The queue: orders, repeat or once, what automation added, the work kept on the row</h3>
+<div class="mockup">
+  <div class="mockup-header">Life 14 &middot; I &middot; Port Cinder &middot; pack: cloud-fish 4/5, scrap 0/5 &middot; Salvage and Fish on JIT, the hull on high</div>
+  <div class="mockup-body">
+    <div class="scr" style="width:340px;padding-left:36px">
+      <div class="queue">
+        <h5 style="margin-bottom:1px"><span>queue &middot; 5</span><span></span></h5>
+
+        <div class="qn" data-n="1"><div class="item entry working">
+          <svg class="ic"><use href="#i-recycle"/></svg><span class="entry__name"><b>Salvage</b> drifting scrap</span><span class="entry__x">&times;</span>
+          <div class="entry__bar"><div class="bar"><i class="run" style="width:58%"></i></div><div class="bar__value">2.9/5.0</div></div>
+          <div class="entry__sub"><span><span class="tag">repeat</span><span class="tag tag--auto">auto</span></span><span class="ink-2">0.7s</span></div>
+          <div class="entry__sub"><span>fetching 3 of 8</span><span></span></div>
+        </div></div>
+
+        <div class="qn" data-n="2"><div class="item entry">
+          <svg class="ic"><use href="#i-sailboat"/></svg><span class="entry__name"><b>Rig</b> the hull</span><span class="entry__x">&times;</span>
+          <div class="entry__bar"><div class="bar"><i class="kept" style="width:62.5%"></i></div><div class="bar__value">37.5/60.0</div></div>
+          <div class="entry__sub"><span><span class="tag">once</span><span class="tag tag--auto">auto</span></span><span>&nbsp;</span></div>
+          <div class="entry__sub"><span><span class="warn">&#x26A0;&#xFE0E;</span> scrap 5/8</span><span></span></div>
+        </div></div>
+
+        <div class="qn" data-n="3"><div class="item entry">
+          <svg class="ic"><use href="#i-fishing-rod"/></svg><span class="entry__name"><b>Fish</b> the cloud shallows</span><span class="entry__x">&times;</span>
+          <div class="entry__bar"><div class="bar"><i class="kept" style="width:0%"></i></div><div class="bar__value">0.0/4.0</div></div>
+          <div class="entry__sub"><span><span class="tag">repeat</span></span><span>&nbsp;</span></div>
+          <div class="entry__sub"><span>&nbsp;</span><span></span></div>
+        </div></div>
+
+        <div class="qn" data-n="4"><div class="item entry">
+          <svg class="ic"><use href="#i-sword"/></svg><span class="entry__name"><b>Fight</b> the harbor pirates</span><span class="entry__x">&times;</span>
+          <div class="entry__bar"><div class="bar"><i class="kept" style="width:0%"></i></div><div class="bar__value">0.0/480.0</div></div>
+          <div class="entry__sub"><span><span class="tag">once</span></span><span>&nbsp;</span></div>
+          <div class="entry__sub"><span class="hurt-text">&minus;0.30 hp/s</span><span></span></div>
+        </div></div>
+
+        <div class="qn" data-n="5"><div class="item entry">
+          <svg class="ic"><use href="#i-fishing-rod"/></svg><span class="entry__name"><b>Fish</b> the cloud shallows</span><span class="entry__x">&times;</span>
+          <div class="entry__bar"><div class="bar"><i class="kept" style="width:0%"></i></div><div class="bar__value">0.0/4.0</div></div>
+          <div class="entry__sub"><span><span class="tag">once</span></span><span>&nbsp;</span></div>
+          <div class="entry__sub"><span>&nbsp;</span><span></span></div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="scr notes" style="flex:1">
+      <h5><span>reading it</span></h5>
+      <ol>
+        <li><b>The working top.</b> Only the top runs (2.1): the ember border, the sheen, the 12px ember bar with this completion's value under it, and the countdown at the current rate. It is a JIT supply: automation put it at index 0 when the hull reached the top short, so it carries <span class="auto-text">auto</span>. The look-ahead (2.3) sums what the entries below still need of scrap, down to the next scrap maker: the hull owes the last <b>3 of its 8</b>, so this order stops after 3, under the cap of 5, and says so.</li>
+        <li><b>Kept progress.</b> The hull's work lives on the row (2.2): 37.5/60.0 xp and 5/8 scrap spent on an earlier try survive the pop and are never paid twice. A one-time is always <b>once</b>. Passive fill queued it on high when the queue ran dry (<span class="auto-text">auto</span>). Below the top a bar is grey: nothing below the top moves. &#x26A0;&#xFE0E; marks what the pack cannot pay right now.</li>
+        <li><b>A repeat order</b> (a plain click on +). A repeating producer with nothing below it that needs fish fills to the cap, then pops.</li>
+        <li><b>A once order</b>: a one-time row. Its hurt shows on the order as on the row.</li>
+        <li><b>A once order of a repeatable</b> (Shift+click on +): exactly one completion, to top the galley up after the fight.</li>
+      </ol>
+      <ul>
+        <li>&times; removes on one press: removing loses nothing, because the work stays on the row. The armed &ldquo;?&rdquo; is gone (2.2).</li>
+        <li>Every entry keeps four lines, the last always present, so no entry changes height and no &times; moves under the cursor.</li>
+        <li><span class="tag">repeat</span>/<span class="tag">once</span> share one pinned width, so a tag never shifts the row; <span class="tag tag--auto">auto</span> is in the automation color.</li>
+        <li>No total in the header: a repeating order's length depends on what it fetches (09-22 8.1: not accurate, not shown).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h3>(d) The waiting chip: set, but its row cannot start, and the row says why</h3>
+<div class="mockup">
+  <div class="mockup-header">Life 6 &middot; I &middot; Port Cinder &middot; pack: cloud-fish 3/5, scrap 0/5 &middot; Salvage at 120/200, no chip yet &middot; the hull set to high, the net to mid (added for plan Task 7; accepted risk 3)</div>
+  <div class="mockup-body">
+    <div class="scr col714">
+      <div class="lbl">1 &middot; the hull is on high while Salvage has no chip. Nothing would supply its scrap, so the idle fill passes it over. Its chip goes dashed, and the row says why in its own middle chunk.</div>
+      <div class="head"><div class="head__line"><span>The Windward Run</span><span>I &middot; Port Cinder</span></div><p class="head__story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-fishing-rod"/></svg><span><b>Fish</b>the cloud shallows</span></div><div class="row__c2"><div class="row__in"></div><div class="row__arr">&rarr;</div><div class="row__out">+1 cloud-fish</div></div><div class="row__c3"><div class="row__tx">1.3s<small>+4.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>JIT</b></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-recycle"/></svg><span><b>Salvage</b>drifting scrap</span></div><div class="row__c2"><div class="row__in"></div><div class="row__arr">&rarr;</div><div class="row__out">+1 scrap</div></div><div class="row__c3"><div class="row__tx">1.8s<small>+5.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto">120/200<i style="width:60%"></i></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="row__c2"><div class="row__say row__say--wrap">waits: Salvage drifting scrap is not yet earned (120/200)</div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit auto--waits"><b>high</b></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-wrench"/></svg><span><b>Tinker</b>a trawl net</span></div><div class="row__c2"><div class="row__say row__say--wrap">waits: Salvage drifting scrap is not yet earned (120/200)</div></div><div class="row__c3"><div class="row__tx">18s<small>+40.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit auto--waits"><b>mid</b></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-wrench"/></svg><span><b>Tinker</b>a canvas satchel</span></div><div class="row__c2"><div class="row__in"><span class="row__short">&#x26A0;&#xFE0E; 10 scrap<small>have 0</small></span></div><div class="row__arr">&rarr;</div><div class="row__out">stack +5</div></div><div class="row__c3"><div class="row__tx">23s<small>+50.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn"><b>off</b></span></div></div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sword"/></svg><span><b>Fight</b>the harbor pirates</span></div><div class="row__c2"><div class="row__in"><span class="hurt-text">&minus;0.30 hp/s</span></div><div class="row__arr">&rarr;</div><div class="row__out">casts off</div></div><div class="row__c3"><div class="row__tx">3:12<small>+480.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>low</b></span></div></div>
+
+      <div class="lbl" style="margin-top:14px">2 &middot; Salvage earns its chip and starts at off. The words follow what would let the hull run.</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="row__c2"><div class="row__say row__say--wrap">waits: Salvage drifting scrap automation is off</div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit auto--waits"><b>high</b></span></div></div>
+
+      <div class="lbl" style="margin-top:14px">3 &middot; Salvage set to JIT: the chain closes. The chip is solid again, the row shows its grammar, and the idle fill takes the hull.</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span></div><div class="row__c2"><div class="row__in"><span class="row__short">&#x26A0;&#xFE0E; 8 scrap<small>have 0</small></span></div><div class="row__arr">&rarr;</div><div class="row__out">decay &times;0.80</div></div><div class="row__c3"><div class="row__tx">29s<small>+60.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit"><b>high</b></span></div></div>
+
+      <div class="lbl" style="margin-top:14px">4 &middot; II &middot; The Hollow Isle, a chain that does not close: Search is on JIT but cannot run itself. Three lines is the most the words take, and every row already reserves them.</div>
+      <div class="item row"><div class="row__c1"><svg class="ic"><use href="#i-sword"/></svg><span><b>Fight</b>the guardian</span></div><div class="row__c2"><div class="row__say row__say--wrap">waits: Search the halls can't run: needs the inner door &middot; Fight the wardens automation is off</div></div><div class="row__c3"><div class="row__tx">4:48<small>+900.0 xp</small></div><span class="btn btn--play">&#x25B6;&#xFE0E;</span><span class="btn">+</span><span class="auto auto--btn auto--lit auto--waits"><b>low</b></span></div></div>
+    </div>
+
+    <div class="scr" style="flex:1">
+      <h5><span>the waiting look</span></h5>
+      <div class="words">
+        <div class="d" style="margin:0 0 6px;font-size:11px">A chip that is <b style="color:var(--ink)">set</b> (not off) on a row whose start is <b style="color:var(--ink)">short</b>: it cannot start, and no automation along the chain would supply it.</div>
+        <div><span class="auto auto--btn auto--lit auto--waits"><b>high</b></span></div>
+        <div class="d" style="font-size:11px">The chip: the same word, a dashed edge (the stall's look, 09-22 8.5). Still a button; a press still moves one step.</div>
+        <div class="d" style="font-size:11px">The row: while it is neither running nor showing an instruction, its middle chunk shows the words in the warn color, wrapped inside the chunk. A press on &#x25B6;&#xFE0E; shows the refusal for INSTRUCTION_MS; then the waiting words come back.</div>
+      </div>
+      <div class="cycle">
+        <div class="ink-2">the words, by reason, each naming the maker by its row:</div>
+        <div class="words" style="margin-top:6px">
+          <div class="say">waits: Salvage drifting scrap is not yet earned (120/200)</div>
+          <div class="say">waits: Salvage drifting scrap automation is off</div>
+          <div class="say">waits: Search the halls can't run: needs the inner door &middot; Fight the wardens automation is off</div>
+          <div class="say">waits: nothing here makes scrap</div>
+        </div>
+      </div>
+      <div class="cycle">
+        <div class="ink-2">accessible name of the chip:</div>
+        <div>automation: high, press for mid; waits: Salvage drifting scrap is not yet earned (120/200)</div>
+      </div>
+      <div class="cycle ink-2">One function writes the waiting words, the refusal (<span class="warn">needs 8 scrap &middot; Salvage drifting scrap is not yet earned (120/200)</span>) and the log line (<span style="color:var(--ink)">Rig the hull stops: needs 8 scrap &middot; &hellip;</span>). The waiting words are the refusal's reason without the item it lacks. The row never changes height: every row reserves three lines of the words.</div>
+    </div>
+  </div>
+</div>
+</main>
+</body></html>

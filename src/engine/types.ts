@@ -10,47 +10,103 @@ export interface Ledger { readonly level: number; readonly exp: number }
 /** MECHANICS section 3: two ledgers advancing from the same effort. */
 export interface SkillState { readonly core: Ledger; readonly run: Ledger }
 
-/** One per action: the queue never holds two entries for the same action. */
+/** Lifetime counters the pop-out shows that the ledgers cannot derive (spec 2026-09-23-the-windward-run section 8). */
+export interface SkillStats { readonly ticks: number; readonly bestRun: number }
+
+/** A row's automation (section 3.1): off, just in time, or a passive priority. */
+export type AutoMode = 'off' | 'jit' | 'top' | 'high' | 'mid' | 'low' | 'last';
+
+/** An order in the queue (section 2.1). Its own id, so a row can be queued more than once. */
 export interface QueueEntry {
+  readonly id: number;
   readonly actionId: ActionId;
-  readonly progress: number;
-  readonly costsConsumed: number;
-  /** Waiting on an input it cannot pay. It stays in the queue (spec 8.5, 9). */
-  readonly stalled: boolean;
+  readonly mode: 'repeat' | 'once';
+  readonly by: 'player' | 'auto';
+  /**
+   * Automation's food and provision fills only: completions left before the
+   * entry leaves (MECHANICS section 6's targetCount), so a fill that eating
+   * outpaces still ends and lets the row behind it run.
+   */
+  readonly left?: number;
+  /**
+   * Automation's supply orders only: the id of the order this one was queued
+   * to supply. It fetches for that order alone, and leaves when that order
+   * leaves (code panel round three): a supply never outlives what it served.
+   */
+  readonly for?: number;
 }
+
+/** A row's work in progress this life (section 2.2). It lives on the row, so a popped entry loses nothing. */
+export interface Work { readonly progress: number; readonly costsConsumed: number }
 
 export type PauseReason = 'none' | 'player' | 'system';
 
+/**
+ * Why a short row got no supply (section 2.4): nothing here makes the item;
+ * its maker is off or not yet earned; or its maker is automated but could not
+ * run either.
+ */
+export type SupplyGap = 'none' | 'off' | 'unearned' | 'blocked';
+
+/** Where a blocked chain stops: the item the deepest maker lacks, that maker (or null when nothing makes it) and why (the words name all three). */
+/** The deepest reason down a blocked chain. `deep`: more than one maker down, so the blocked maker does not itself lack `item`. */
+export interface SupplyCause { readonly item: ItemId; readonly maker: ActionId | null; readonly gap: SupplyGap; readonly deep?: true }
+
 /** What happened this tick, for the UI to narrate. The engine writes no prose. */
 export type GameEvent =
-  | { readonly type: 'stalled'; readonly actionId: ActionId; readonly item: ItemId }
-  | { readonly type: 'resumed'; readonly actionId: ActionId }
-  /** A producer whose stack has no room for another completion left the queue. */
-  | { readonly type: 'full'; readonly actionId: ActionId; readonly item: ItemId }
+  /** The top entry left without working: its row is not here, is done, is full, or has fetched what is needed. */
+  | { readonly type: 'popped'; readonly actionId: ActionId; readonly reason: 'elsewhere' | 'done' | 'full' | 'enough' }
+  /** The top entry left because it lacks an item and nothing supplies it; `cause` is the deepest reason when its maker is blocked. */
+  | { readonly type: 'short'; readonly actionId: ActionId; readonly item: ItemId; readonly amount: number; readonly maker: ActionId | null; readonly gap: SupplyGap; readonly cause?: SupplyCause }
+  /** Automation queued a row: to supply the top, food at zero, provisions before casting off, or an empty queue. */
+  | { readonly type: 'automated'; readonly actionId: ActionId; readonly why: 'supply' | 'food' | 'provision' | 'idle' }
   | { readonly type: 'completed'; readonly actionId: ActionId; readonly oneTime: boolean }
   | { readonly type: 'coreLevel'; readonly skill: SkillId; readonly level: number }
-  | { readonly type: 'died'; readonly runTicks: number };
+  /** A row earned its automation chip (section 3.4). */
+  | { readonly type: 'unlocked'; readonly actionId: ActionId }
+  /** The chapter's big event completed; `chapter` is the index now entered (section 4). */
+  | { readonly type: 'castOff'; readonly chapter: number }
+  | { readonly type: 'died'; readonly runTicks: number }
+  /** The book's finish completed; the life is over (section 9). */
+  | { readonly type: 'finished'; readonly runTicks: number };
 
 export interface GameState {
   readonly runTicks: number;
   readonly health: number;
   readonly maxHealth: number;
   readonly paused: PauseReason;
+  /** The life is over and its card is up: a death, or the book's finish (then `finished` too). */
   readonly dead: boolean;
+  readonly finished: boolean;
   readonly skills: Readonly<Record<SkillId, SkillState>>;
+  readonly skillStats: Readonly<Record<SkillId, SkillStats>>;
   readonly inventory: Readonly<Record<ItemId, number>>;
+  /** Items in the order this life first acquired them: the pack's order (section 7). */
+  readonly acquired: readonly ItemId[];
   /** Ticks until each food may be eaten again. Absent means ready. */
   readonly foodCooldowns: Readonly<Record<ItemId, number>>;
   readonly queue: readonly QueueEntry[];
+  /** The next entry's id. Counts up within a life; a new life starts at 0 with an empty queue. */
+  readonly nextEntryId: number;
+  /** Each row's kept progress this life (section 2.2). */
+  readonly work: Readonly<Record<ActionId, Work>>;
+  /** Food rows already provisioned for this port's departure (section 3.2): once each, cleared at casting off and death. */
+  readonly provisioned: readonly ActionId[];
+  /** Index into content.chapters: the port this life is in (section 4). */
+  readonly chapter: number;
   readonly completedOneTime: readonly ActionId[];
-  /** Lifetime completions by action id. Drives automation later. */
+  /** Lifetime completions by action id. Drives automation (section 3.4). */
   readonly completionCounts: Readonly<Record<string, number>>;
+  /** Each row's mode, once set. Kept across lives (MECHANICS section 5). */
+  readonly automation: Readonly<Record<ActionId, AutoMode>>;
   readonly decayMultiplier: number;
   /** Which life this is, from 1. Persists and counts up at rebirth. */
   readonly life: number;
-  /** Sum of every death's max-health gain. maxHealth is always base + this. */
+  /** Times the book has been finished. */
+  readonly finishes: number;
+  /** Sum of every life's max-health gain. maxHealth is always base + this. */
   readonly rebirthBonus: number;
-  /** Core levels as this life began, so the death card can show what moved. */
+  /** Core levels as this life began, so the card can show what moved. */
   readonly lifeStartCore: Readonly<Record<SkillId, number>>;
   /** This tick's events. Replaced every tick; never accumulates. */
   readonly events: readonly GameEvent[];

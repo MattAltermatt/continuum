@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Continuum mockup 2026-09-23: finish card</title>
+<style>
+  body { margin: 0; padding: 24px; background: #15161a; color: #ddd; font-family: ui-sans-serif, system-ui, sans-serif; }
+  main { width: 1232px; }
+  h2 { margin: 0 0 6px; font-size: 20px; }
+  .subtitle { color: #9a9a9a; font-size: 13px; margin: 0 0 14px; max-width: 1180px; line-height: 1.45; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .mockup { border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+  .mockup-header { font-size: 12px; color: #9a9a9a; padding: 6px 10px; border-bottom: 1px solid #333; }
+  .mockup-body { padding: 10px; }
+
+  /* Tokens: 09-22 spec 8.1, as src/styles.css ships them. */
+  .scr { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 10px; border-radius: 8px; box-sizing: border-box;
+    --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --item: oklch(22% 0.012 260); --cell-on: oklch(30% 0.02 260);
+    --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --track: oklch(17% 0.012 260); --track-edge: oklch(55% 0.012 260);
+    --ink: oklch(90% 0.01 80); --ink-2: oklch(80% 0.01 80); --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45);
+    --hurt: oklch(66% 0.18 25); --hurt-text: oklch(70% 0.18 25); --warn: oklch(80% 0.15 85); --auto: oklch(72% 0.10 235); --good: oklch(78% 0.12 150);
+    --serif: Georgia, "Times New Roman", serif; --bar: 8px; --bar-health: 20px; --control: 24px;
+    background: var(--bg); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .scr * { box-sizing: border-box; }
+  .scr .ic { width: 14px; height: 14px; display: block; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .scr .ink-2 { color: var(--ink-2); } .scr .good { color: var(--good); } .scr .hurt-text { color: var(--hurt-text); }
+  .scr .chunk { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; }
+  .scr .item { border: 1px solid var(--edge); background: var(--item); border-radius: 4px; }
+  .scr .bar { height: var(--bar); border: 1px solid var(--track-edge); border-radius: 3px; background: var(--track); position: relative; overflow: hidden; }
+  .scr .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--core); }
+  .scr .bar i.hp { background: var(--hurt); }
+  .scr .health .bar { height: var(--bar-health); }
+  .scr .health__value { text-align: center; font-weight: 700; font-size: 14px; margin-top: 4px; }
+  .scr .health__value small { font-weight: 400; color: var(--ink-2); font-size: 14px; }
+
+  /* Behind the card: the next life, already reset, back at port I. */
+  .scr .col { position: relative; min-height: 420px; margin-top: 8px; }
+  .scr .behind { opacity: .35; }
+  .scr .head { padding: 6px 8px 8px; }
+  .scr .head__line { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+  .scr .head__story { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
+  .scr .r { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 0 8px; align-items: center; padding: 8px; margin-bottom: 5px; }
+  .scr .r b { font-weight: 700; margin-right: .5em; }
+
+  /* The card: the death card's frame (src/styles.css .card). */
+  .scr .card { position: absolute; left: 24px; right: 24px; top: 18px; z-index: 1; border: 1px solid var(--edge-on); background: var(--cell-on); border-radius: 6px; padding: 14px 16px; box-shadow: 0 8px 28px oklch(0% 0 0 / .5); }
+  .scr .card__title { font-family: var(--serif); font-style: italic; font-size: 16px; text-align: center; }
+  .scr .card__line { font-family: var(--serif); font-style: italic; font-size: 13px; line-height: 1.45; color: var(--ink-2); text-align: center; max-width: 42ch; margin: 8px auto 8px; }
+  .scr .card__sub { color: var(--ink-2); text-align: center; margin-bottom: 12px; }
+  .scr .card__facts { text-align: center; margin: -6px 0 12px; line-height: 1.5; }
+  .scr .card__gains { display: grid; grid-template-columns: 1.4em 6em 1fr auto; gap: 5px 8px; align-items: center; }
+  .scr .card__lv { text-align: right; white-space: nowrap; }
+  .scr .card__rule { border-top: 1px solid var(--edge); margin: 10px 0; }
+  .scr .card__hp { display: flex; justify-content: space-between; align-items: baseline; }
+  .scr .card__hp b { font-size: 13px; }
+  .scr .card__why { color: var(--ink-2); font-size: 10px; margin-top: 2px; }
+  .scr .card__count { text-align: center; }
+  .scr .card__count b { font-size: 13px; }
+  .scr .card__begin { display: block; margin: 14px auto 0; padding: 6px 18px; min-height: var(--control); border: 1px solid var(--run); background: var(--run); color: var(--bg); border-radius: 4px; font: inherit; font-weight: 700; outline: 2px solid var(--edge-on); outline-offset: 2px; }
+  .scr .card__quiet { color: var(--ink-2); text-align: center; font-size: 10px; margin-top: 8px; }
+
+  .notes { color: #9a9a9a; font-size: 13px; line-height: 1.5; margin: 4px 0 0; padding-left: 18px; max-width: 1180px; }
+  .notes li { margin-bottom: 5px; }
+  .notes b { color: #cfcfcf; font-weight: 600; }
+</style>
+</head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-fishing-rod" viewBox="0 0 24 24"><path d="M4 11h1"/><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"/><circle cx="18" cy="18" r="2"/></symbol><symbol id="i-recycle" viewBox="0 0 24 24"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></symbol><symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></symbol><symbol id="i-sailboat" viewBox="0 0 24 24"><path d="M10 2v15"/><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"/><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"/></symbol><symbol id="i-sword" viewBox="0 0 24 24"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></symbol><symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-message-circle" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol></defs></svg>
+<main>
+<p class="subtitle">Committed mockup, 2026-09-23. Task 1 of docs/plans/2026-09-23-the-windward-run.md; designs spec docs/specs/2026-09-23-the-windward-run.md section 9 (ends) and the death card's new line. Built on the v0.2 death card (2026-09-23-death-card.html) and its shipped frame in src/styles.css. Icons are Lucide (inline SVG). Max-health numbers follow the real formula, 1.1^minutes &minus; 1, every value floored, so from + gain = to on the card.</p>
+<h2>The finish card, and the death card that says how far it got</h2>
+<p class="subtitle">Completing the book's finish ends the life (spec 9). The finish card sits where the death card sits, over the chapter column, in the same frame. As with a death, the reset has already happened behind it: back at I &middot; Port Cinder, pack, food, queue and run levels empty, health full at the new maximum. Nothing ticks until the button is pressed. Each panel here is the chapter column at 584px so the two sit side by side; at 1280 the real column is 714px.</p>
+
+<div class="pair">
+<div class="mockup"><div class="mockup-header">The book finished, life 71 &rarr; life 72</div><div class="mockup-body">
+<div class="scr">
+  <div class="chunk health"><div class="bar"><i class="hp" style="width:100%"></i></div><div class="health__value">430.6 <small>/ 430.6</small></div></div>
+  <div class="col">
+    <div class="behind">
+      <div class="head"><div class="head__line"><span>The Windward Run</span><span>I &middot; Port Cinder</span></div><p class="head__story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p></div>
+      <div class="item r"><svg class="ic"><use href="#i-fishing-rod"/></svg><span><b>Fish</b>the cloud shallows</span><span class="ink-2">1.2s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-recycle"/></svg><span><b>Salvage</b>drifting scrap</span><span class="ink-2">1.4s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span><span class="ink-2">20s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-wrench"/></svg><span><b>Tinker</b>a trawl net</span><span class="ink-2">12s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-wrench"/></svg><span><b>Tinker</b>a canvas satchel</span><span class="ink-2">15s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-sword"/></svg><span><b>Fight</b>the harbor pirates</span><span class="ink-2">1:55</span></div>
+    </div>
+    <div class="card" role="dialog" aria-modal="true" aria-label="The Windward Run, finished">
+      <div class="card__title">The Windward Run</div>
+      <p class="card__line">He takes one look at the Compass and goes white. &ldquo;Where did you get this?&rdquo; The lights go out.</p>
+      <div class="card__sub">31:04 on the clock</div>
+      <div class="card__gains">
+        <svg class="ic"><use href="#i-sword"/></svg><b>Fight</b><div class="bar"><i style="width:22%"></i></div><span class="card__lv">core 41 &rarr; <b>43</b></span>
+        <svg class="ic"><use href="#i-message-circle"/></svg><b>Talk</b><div class="bar"><i style="width:64%"></i></div><span class="card__lv">core 33 &rarr; <b>35</b></span>
+        <svg class="ic"><use href="#i-eye"/></svg><b>Search</b><div class="bar"><i style="width:47%"></i></div><span class="card__lv">core 30 &rarr; <b>31</b></span>
+        <svg class="ic"><use href="#i-sailboat"/></svg><b>Rig</b><div class="bar"><i style="width:9%"></i></div><span class="card__lv">core 36 &rarr; <b>37</b></span>
+        <svg class="ic"><use href="#i-recycle"/></svg><b>Salvage</b><div class="bar"><i style="width:81%"></i></div><span class="card__lv">core 52 &rarr; <b>53</b></span>
+      </div>
+      <div class="card__rule"></div>
+      <div class="card__hp"><span>max health</span><b>412.37 &rarr; <span class="good">430.68</span></b></div>
+      <div class="card__why">+18.31 from 31:04 alive &middot; 1.1^31.06 &minus; 1</div>
+      <div class="card__rule"></div>
+      <div class="card__count">finished <b>1&times;</b></div>
+      <button class="card__begin" type="button">Read again</button>
+      <div class="card__quiet">back to I &middot; Port Cinder &middot; pack, food, queue and run levels start over</div>
+    </div>
+  </div>
+</div>
+</div></div>
+
+<div class="mockup"><div class="mockup-header">A death, life 23 &rarr; life 24</div><div class="mockup-body">
+<div class="scr">
+  <div class="chunk health"><div class="bar"><i class="hp" style="width:100%"></i></div><div class="health__value">143.4 <small>/ 143.4</small></div></div>
+  <div class="col">
+    <div class="behind">
+      <div class="head"><div class="head__line"><span>The Windward Run</span><span>I &middot; Port Cinder</span></div><p class="head__story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p></div>
+      <div class="item r"><svg class="ic"><use href="#i-fishing-rod"/></svg><span><b>Fish</b>the cloud shallows</span><span class="ink-2">1.4s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-recycle"/></svg><span><b>Salvage</b>drifting scrap</span><span class="ink-2">2.0s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-sailboat"/></svg><span><b>Rig</b>the hull</span><span class="ink-2">33s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-wrench"/></svg><span><b>Tinker</b>a trawl net</span><span class="ink-2">20s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-wrench"/></svg><span><b>Tinker</b>a canvas satchel</span><span class="ink-2">25s</span></div>
+      <div class="item r"><svg class="ic"><use href="#i-sword"/></svg><span><b>Fight</b>the harbor pirates</span><span class="ink-2">3:31</span></div>
+    </div>
+    <div class="card" role="dialog" aria-modal="true" aria-label="Life 23 ends">
+      <div class="card__title">Life 23 ends</div>
+      <div class="card__sub">18:47 on the clock</div>
+      <div class="card__facts">
+        <div>reached II &middot; The Hollow Isle</div>
+        <div class="hurt-text">fell during Fight the wardens</div>
+      </div>
+      <div class="card__gains">
+        <svg class="ic"><use href="#i-fishing-rod"/></svg><b>Fish</b><div class="bar"><i style="width:35%"></i></div><span class="card__lv">core 37 &rarr; <b>38</b></span>
+        <svg class="ic"><use href="#i-recycle"/></svg><b>Salvage</b><div class="bar"><i style="width:58%"></i></div><span class="card__lv">core 33 &rarr; <b>34</b></span>
+        <svg class="ic"><use href="#i-sword"/></svg><b>Fight</b><div class="bar"><i style="width:12%"></i></div><span class="card__lv">core 18 &rarr; <b>19</b></span>
+      </div>
+      <div class="card__rule"></div>
+      <div class="card__hp"><span>max health</span><b>138.42 &rarr; <span class="good">143.41</span></b></div>
+      <div class="card__why">+4.99 from 18:47 alive &middot; 1.1^18.78 &minus; 1</div>
+      <button class="card__begin" type="button">Begin life 24</button>
+      <div class="card__quiet">pack, food, queue and run levels start over</div>
+    </div>
+  </div>
+</div>
+</div></div>
+</div>
+
+<ul class="notes">
+  <li><b>What changes from the death card:</b> the title is the book's name, not &ldquo;Life N ends&rdquo;; under it, the finish row's beat (the cliffhanger) in the running head's serif; a count, <b>finished 1&times;</b>, counting this finish; the button reads <b>Read again</b>; the quiet line names where the next life starts. Everything else is the death card: the clock, core gains with bars (skills that did not move are left off), max health from &rarr; to with its arithmetic.</li>
+  <li><b>Read again</b> dispatches the same begin as a death: the next life starts at I &middot; Port Cinder with core ledgers, automation and completion counts kept (BOYS 8), and the life's max-health gain applied as a death's would be (spec 9). It takes focus when the card opens, as Begin does.</li>
+  <li><b>The death card gains one fact:</b> the port the life reached, <b>reached II &middot; The Hollow Isle</b>. When the life ended while a hurting row was on top it says so as well (<span style="color:oklch(70% 0.18 25)">fell during Fight the wardens</span>, spec 6.1 and plan Task 7); a death to decay alone shows the first line only.</li>
+</ul>
+</main>
+</body></html>

@@ -1,34 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import type { Content } from '../data/types';
 import { add, count, has, room, take } from './inventory';
 
-const content: Content = {
-  roster: [
-    { id: 'forage', name: 'Forage', icon: 'sprout' },
-    { id: 'mine', name: 'Mine', icon: 'pickaxe' },
-    { id: 'build', name: 'Build', icon: 'house' },
-  ],
-  actions: {},
-  items: {
-    stone: { id: 'stone', name: 'stone', kind: 'material', cap: 5 },
-    berries: { id: 'berries', name: 'berries', kind: 'food', cap: 20, healPerUnit: 4 },
-  },
-};
+const CAP = 5;
 
 describe('inventory', () => {
   it('counts a missing item as zero', () => {
     expect(count({}, 'stone')).toBe(0);
   });
-  it('room is the cap minus the count, and unbounded for an item with no definition', () => {
-    expect(room({ stone: 3 }, content, 'stone')).toBe(2);
-    expect(room({ stone: 5 }, content, 'stone')).toBe(0);
-    expect(room({}, content, 'nothing')).toBe(Number.POSITIVE_INFINITY);
+  it('room is the cap minus the count', () => {
+    expect(room({ stone: 3 }, 'stone', CAP)).toBe(2);
+    expect(room({ stone: 5 }, 'stone', CAP)).toBe(0);
+    expect(room({}, 'nothing', Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY);
   });
   it('add never exceeds the cap and reports what landed (a guard: the queue never produces into a full stack)', () => {
-    const r = add({ stone: 4 }, content, 'stone', 3);
+    const r = add({ stone: 4 }, 'stone', 3, CAP);
     expect(r.inventory.stone).toBe(5);
     expect(r.added).toBe(1);
-    const full = add({ stone: 5 }, content, 'stone', 1);
+    const full = add({ stone: 5 }, 'stone', 1, CAP);
     expect(full.inventory.stone).toBe(5);
     expect(full.added).toBe(0);
   });
@@ -42,7 +30,7 @@ describe('inventory', () => {
   });
   it('never mutates', () => {
     const inv = { stone: 1 };
-    add(inv, content, 'stone', 1);
+    add(inv, 'stone', 1, CAP);
     take(inv, 'stone', 1);
     expect(inv.stone).toBe(1);
   });

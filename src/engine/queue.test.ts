@@ -1,276 +1,410 @@
 import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { Content } from '../data/types';
-import type { GameEvent, GameState } from './types';
-import { enqueue, firstRunnable, fullItem, missingInput, newState, removeAction, settle, stepQueue } from './queue';
+import { setAutomation, unlockAt } from './automation';
 import { unitThreshold } from './costs';
+import { capOf } from './effects';
+import { fixture } from './fixture';
+import { enqueue, frontBlock, newState, removeEntry, startBlock, supplyVia, work } from './queue';
+import { deathSummary, rebirth } from './rebirth';
+import { setPaused, step } from './tick';
+import type { AutoMode, GameEvent, GameState } from './types';
 
-const content: Content = {
-  roster: [
-    { id: 'forage', name: 'Forage', icon: 'sprout' },
-    { id: 'mine', name: 'Mine', icon: 'pickaxe' },
-    { id: 'build', name: 'Build', icon: 'house' },
-    { id: 'craft', name: 'Craft', icon: 'wrench' },
-  ],
-  items: {
-    berries: { id: 'berries', name: 'berries', kind: 'food', cap: 20, healPerUnit: 4 },
-    stone: { id: 'stone', name: 'stone', kind: 'material', cap: 5 },
-    cabin: { id: 'cabin', name: 'cabin', kind: 'structure', cap: 1 },
-  },
-  actions: {
-    forage: { id: 'forage', verb: 'forage', noun: 'berries', expCost: 1, producedItem: 'berries', producedAmount: 1, itemCosts: [], isOneTime: false },
-    mine: { id: 'mine', verb: 'mine', noun: 'stone', expCost: 1, producedItem: 'stone', producedAmount: 1, itemCosts: [], isOneTime: false },
-    cabin: { id: 'cabin', verb: 'build', noun: 'a cabin', expCost: 6, producedItem: 'cabin', producedAmount: 1, itemCosts: [{ item: 'stone', amount: 6 }], isOneTime: true, healthDecayMultiplier: 0.5 },
-    // Four units over 0.2 XP: a unit every 0.05, less than one tick's 0.1, so a single tick crosses two thresholds.
-    quick: { id: 'quick', verb: 'craft', noun: 'a quick thing', expCost: 0.2, itemCosts: [{ item: 'stone', amount: 4 }], isOneTime: true },
-  },
-};
-
-/** Ticks to complete `expCost` at multiplier 1. Floating point: ten 0.1s are 0.999..., so +1. */
-const ticksFor = (expCost: number) => Math.floor(expCost / balance.skills.baseTickExp) + 1;
-
+const content = fixture;
+const live = (s: GameState) => setPaused(s, 'none');
+/** Gives rows their chips. Takes the content, so a local variant's rows work too. */
+const earned = (c: Content, s: GameState, ...ids: string[]): GameState =>
+  ({ ...s, completionCounts: { ...s.completionCounts, ...Object.fromEntries(ids.map((id) => [id, unlockAt(c.actions[id]!)])) } });
 /**
- * What step() does minus the clock and health, which are Task 4's: settle, then
- * work the queue if anything can run. Events are accumulated across every tick,
- * because the tick an event happens on is rarely the last one run.
+ * Steps `c` until the predicate holds (bounded), collecting every event. An
+ * idle step returns its input, whose events are the previous tick's, so events
+ * are collected only from a step that changed something.
  */
-function run(state: GameState, n: number): { s: GameState; events: GameEvent[] } {
+function runUntil(c: Content, state: GameState, done: (s: GameState) => boolean, limit = 10_000): { s: GameState; events: GameEvent[] } {
   let s = state;
   const events: GameEvent[] = [];
-  for (let i = 0; i < n; i++) {
-    const settled = settle(s, content);
-    if (settled !== s) events.push(...settled.events);
-    s = settled;
-    const index = firstRunnable(s, content);
-    if (index === -1) continue;
-    s = stepQueue(s, content, index);
-    events.push(...s.events);
+  for (let i = 0; i < limit && !done(s); i++) {
+    const next = step(s, c);
+    if (next !== s) events.push(...next.events);
+    s = next;
   }
   return { s, events };
 }
 
-const ofType = (events: GameEvent[], type: GameEvent['type']) => events.filter((e) => e.type === type);
+const fresh = () => newState(content.roster);
 
-describe('enqueue and remove', () => {
-  it('appends by default and puts front entries first', () => {
-    let s = enqueue(newState(content.roster), content, 'forage');
-    s = enqueue(s, content, 'mine', { front: true });
-    expect(s.queue.map((e) => e.actionId)).toEqual(['mine', 'forage']);
+describe('enqueue', () => {
+  it('a plain order repeats, a Shift order is single, a one-time is always single', () => {
+    expect(enqueue(fresh(), content, 'salvage').queue[0]!.mode).toBe('repeat');
+    expect(enqueue(fresh(), content, 'salvage', { once: true }).queue[0]!.mode).toBe('once');
+    expect(enqueue(fresh(), content, 'hull').queue[0]!.mode).toBe('once');
   });
-  it('holds one entry per action: a second enqueue of anything already queued is a no-op', () => {
-    const once = enqueue(newState(content.roster), content, 'forage');
-    expect(enqueue(once, content, 'forage')).toBe(once);
-    const cabin = enqueue(newState(content.roster), content, 'cabin');
-    expect(enqueue(cabin, content, 'cabin')).toBe(cabin);
+  it('ids count 0, 1, 2 and nextEntryId follows; front puts the order first', () => {
+    let s = enqueue(fresh(), content, 'salvage');
+    s = enqueue(s, content, 'salvage');
+    s = enqueue(s, content, 'fish', { front: true, by: 'auto' });
+    expect(s.queue.map((e) => [e.id, e.actionId])).toEqual([[2, 'fish'], [0, 'salvage'], [1, 'salvage']]);
+    expect(s.nextEntryId).toBe(3);
   });
-  it('a dead run takes no orders: enqueue and removeAction leave it untouched', () => {
-    const queued = enqueue(newState(content.roster), content, 'forage');
-    const dead = { ...queued, dead: true };
-    expect(enqueue(dead, content, 'mine')).toBe(dead);
-    expect(enqueue(dead, content, 'forage', { front: true })).toBe(dead);
-    expect(removeAction(dead, 'forage')).toBe(dead);
-  });
-  it('refuses a one-time action already completed this run', () => {
-    expect(enqueue({ ...newState(content.roster), completedOneTime: ['cabin'] }, content, 'cabin').queue).toHaveLength(0);
-  });
-  it('front on an action already queued moves that entry to the front, keeping its progress', () => {
-    let s = enqueue(newState(content.roster), content, 'forage');
-    s = enqueue(s, content, 'mine');
-    s = run(s, 3).s;                                         // forage has progress
-    s = enqueue(s, content, 'mine', { front: true });
-    expect(s.queue.map((e) => e.actionId)).toEqual(['mine', 'forage']);
-    expect(s.queue[1]!.progress).toBeGreaterThan(0);
-    expect(s.queue).toHaveLength(2);
-  });
-  it('removeAction removes by action id, and is the same object when there is nothing to remove', () => {
-    let s = enqueue(newState(content.roster), content, 'forage');
-    s = enqueue(s, content, 'mine');
-    expect(removeAction(s, 'forage').queue.map((e) => e.actionId)).toEqual(['mine']);
-    expect(removeAction(s, 'cabin')).toBe(s);
+  it('refuses (the same object) a row this port lacks, a done one-time, and a dead state', () => {
+    const s = fresh();
+    expect(enqueue(s, content, 'vault')).toBe(s);
+    const built = { ...s, completedOneTime: ['hull'] };
+    expect(enqueue(built, content, 'hull')).toBe(built);
+    const dead = { ...s, dead: true };
+    expect(enqueue(dead, content, 'salvage')).toBe(dead);
   });
 });
 
-describe('missingInput, fullItem, firstRunnable', () => {
-  it('a free action is always runnable; a costed one needs its due units', () => {
-    const free = enqueue(newState(content.roster), content, 'forage');
-    expect(firstRunnable(free, content)).toBe(0);
-    const broke = enqueue(newState(content.roster), content, 'cabin');
-    expect(missingInput(broke, content, broke.queue[0]!)).toBe('stone');
-    expect(firstRunnable(broke, content)).toBe(-1);
-    expect(firstRunnable({ ...broke, inventory: { stone: 1 } }, content)).toBe(0);
+describe('now refuses what cannot start (spec section 2.5)', () => {
+  it('refuses the hull on an empty pack with Salvage unearned; + appends; automation is accepted', () => {
+    const s = fresh();
+    expect(enqueue(s, content, 'hull', { front: true })).toBe(s);
+    expect(enqueue(s, content, 'hull').queue.map((e) => e.actionId)).toEqual(['hull']);
+    expect(enqueue(s, content, 'hull', { front: true, by: 'auto' }).queue.map((e) => e.actionId)).toEqual(['hull']);
   });
-  it('an entry owes its next unit only once progress reaches that unit\'s threshold', () => {
-    const s = enqueue(newState(content.roster), content, 'cabin');
-    const midway = { ...s.queue[0]!, progress: 1.5, costsConsumed: 2 };   // unit 2 falls due at progress 2
-    expect(missingInput(s, content, midway)).toBeNull();
-    const atThreshold = { ...midway, progress: unitThreshold(content.actions.cabin!, 2) };
-    expect(missingInput(s, content, atThreshold)).toBe('stone');
-    expect(missingInput({ ...s, inventory: { stone: 1 } }, content, atThreshold)).toBeNull();
-  });
-  it('a producer with no room for one more completion is full, and full is not runnable', () => {
-    const s = enqueue({ ...newState(content.roster), inventory: { stone: 5 } }, content, 'mine');
-    expect(fullItem(s, content, s.queue[0]!)).toBe('stone');
-    expect(firstRunnable(s, content)).toBe(-1);
-    expect(fullItem({ ...s, inventory: { stone: 4 } }, content, s.queue[0]!)).toBeNull();
-  });
-  it('sees past the stalled flag: a flagged entry whose input has arrived is runnable', () => {
-    const { s } = run(enqueue({ ...newState(content.roster), inventory: { stone: 1 } }, content, 'cabin'), 30);
-    expect(s.queue[0]!.stalled).toBe(true);
-    expect(firstRunnable(s, content)).toBe(-1);
-    expect(firstRunnable({ ...s, inventory: { stone: 3 } }, content)).toBe(0);
+  it('startBlock says why', () => {
+    const s = fresh();
+    expect(startBlock(s, content, 'hull')).toEqual({ kind: 'short', item: 'scrap', amount: 8, maker: 'salvage', gap: 'unearned' });
+    expect(startBlock({ ...s, inventory: { fish: 5 } }, content, 'fish')).toEqual({ kind: 'full', item: 'fish' });
+    expect(startBlock({ ...s, completedOneTime: ['hull'] }, content, 'hull')).toEqual({ kind: 'done' });
+    expect(startBlock(s, content, 'vault')).toEqual({ kind: 'elsewhere' });
+    const jit = setAutomation(earned(content, s, 'salvage'), content, 'salvage', 'jit');
+    expect(startBlock(jit, content, 'hull')).toBeNull();
   });
 });
 
-describe('settle', () => {
-  it('flags a never-started entry that cannot pay, emits stalled once, and does no work', () => {
-    const s = enqueue(newState(content.roster), content, 'cabin');
-    const once = settle(s, content);
-    expect(once.queue[0]!.stalled).toBe(true);
-    expect(once.events).toEqual([{ type: 'stalled', actionId: 'cabin', item: 'stone' }]);
-    expect(once.queue[0]!.progress).toBe(0);
-    expect(settle(once, content)).toBe(once);
-  });
-  it('unflags a waiting entry the moment it can pay, with resumed', () => {
-    const waiting = settle(enqueue(newState(content.roster), content, 'cabin'), content);
-    const fed = settle({ ...waiting, inventory: { stone: 1 } }, content);
-    expect(fed.queue[0]!.stalled).toBe(false);
-    expect(fed.events).toEqual([{ type: 'resumed', actionId: 'cabin' }]);
-  });
-  it('drops a producer queued onto a full stack, with full, before any work', () => {
-    const s = enqueue({ ...newState(content.roster), inventory: { stone: 5 } }, content, 'mine');
-    const settled = settle(s, content);
-    expect(settled.queue).toHaveLength(0);
-    expect(settled.events).toEqual([{ type: 'full', actionId: 'mine', item: 'stone' }]);
-    expect(settled.skills.mine!.core.exp).toBe(0);
-  });
-  it('is the same object when nothing changes', () => {
-    const s = enqueue(newState(content.roster), content, 'forage');
-    expect(settle(s, content)).toBe(s);
+describe('removeEntry', () => {
+  it('removes that entry only, and the row keeps its work', () => {
+    let s = enqueue(fresh(), content, 'salvage');
+    s = enqueue(s, content, 'salvage');
+    s = { ...s, work: { hull: { progress: 3, costsConsumed: 3 } } };
+    const after = removeEntry(s, 0);
+    expect(after.queue.map((e) => e.id)).toEqual([1]);
+    expect(after.work.hull).toEqual({ progress: 3, costsConsumed: 3 });
+    expect(removeEntry(s, 99)).toBe(s);
   });
 });
 
-describe('running a free repeatable action', () => {
-  it('produces one berries per completion, keeps repeating, and emits completed', () => {
-    let r = run(enqueue(newState(content.roster), content, 'forage'), ticksFor(1));
-    expect(r.s.inventory.berries).toBe(1);
-    expect(r.s.queue).toHaveLength(1);
-    expect(r.events).toContainEqual({ type: 'completed', actionId: 'forage', oneTime: false });
-    r = run(r.s, ticksFor(1));
-    expect(r.s.inventory.berries).toBe(2);
+describe("the spec's walk-through (section 2.3): hull 8 scrap, cap 5", () => {
+  it('salvage, hull, salvage, hull finishes the hull, and the second salvage fetches exactly 3', () => {
+    let s = fresh();
+    for (const id of ['salvage', 'hull', 'salvage', 'hull']) s = enqueue(s, content, id);
+    s = live(s);
+    let peakFirst = 0;
+    let peakSecond = 0;
+    let consumedAtPop = -1;
+    const events: GameEvent[] = [];
+    for (let i = 0; i < 10_000 && s.queue.length > 0; i++) {
+      const next = step(s, content);
+      if (next !== s) events.push(...next.events);
+      if (next.events.some((e) => e.type === 'short' && e.actionId === 'hull') && next !== s) consumedAtPop = next.work.hull?.costsConsumed ?? -1;
+      s = next;
+      if (s.queue[0]?.id === 0) peakFirst = Math.max(peakFirst, s.inventory.scrap ?? 0);
+      if (s.queue[0]?.id === 2) peakSecond = Math.max(peakSecond, s.inventory.scrap ?? 0);
+    }
+    expect(s.completedOneTime).toContain('hull');
+    expect(peakFirst).toBe(balance.inventory.stackCap);
+    expect(events).toContainEqual({ type: 'popped', actionId: 'salvage', reason: 'full' });
+    expect(events).toContainEqual({ type: 'short', actionId: 'hull', item: 'scrap', amount: 3, maker: 'salvage', gap: 'unearned' });
+    expect(consumedAtPop).toBe(5);
+    expect(peakSecond).toBe(3);
+    expect(events).toContainEqual({ type: 'popped', actionId: 'salvage', reason: 'enough' });
+    expect(s.inventory.scrap ?? 0).toBe(0);
   });
-  it('awards tick XP to the verb skill on both ledgers', () => {
-    const s = stepQueue(enqueue(newState(content.roster), content, 'forage'), content, 0);
-    expect(s.skills.forage!.core.exp).toBeCloseTo(balance.skills.baseTickExp, 9);
-    expect(s.skills.forage!.run.exp).toBeCloseTo(balance.skills.baseTickExp, 9);
-    expect(s.skills.mine!.core.exp).toBe(0);
+  it('a single Salvage yields exactly one scrap and leaves', () => {
+    const { s } = runUntil(content, live(enqueue(fresh(), content, 'salvage', { once: true })), (x) => x.queue.length === 0);
+    expect(s.inventory.scrap).toBe(1);
   });
-  it('emits coreLevel when a core level lands', () => {
-    const { s, events } = run(enqueue(newState(content.roster), content, 'forage'), ticksFor(balance.skills.coreMastery.baseExp));
-    expect(s.skills.forage!.core.level).toBe(1);
-    expect(events).toContainEqual({ type: 'coreLevel', skill: 'forage', level: 1 });
-  });
-  it('stops at a full stack: the completion that fills it lands, then the entry leaves with full, and the XP stays', () => {
-    const { s, events } = run(enqueue({ ...newState(content.roster), inventory: { stone: 4 } }, content, 'mine'), 30);
-    expect(s.inventory.stone).toBe(5);
-    expect(s.queue).toHaveLength(0);
-    expect(ofType(events, 'completed')).toHaveLength(1);
-    expect(events).toContainEqual({ type: 'full', actionId: 'mine', item: 'stone' });
-    expect(s.skills.mine!.core.exp).toBeGreaterThan(0);
-  });
-});
-
-describe('the cabin: costs drain into the work, and the stall is not an error', () => {
-  it('spends the first stone just to begin', () => {
-    const s = stepQueue(enqueue({ ...newState(content.roster), inventory: { stone: 5 } }, content, 'cabin'), content, 0);
-    expect(s.inventory.stone).toBe(4);
-    expect(s.queue[0]?.costsConsumed).toBe(1);
-  });
-  it('stalls in place at the unpaid unit\'s threshold, keeping progress, and emits stalled exactly once', () => {
-    const { s, events } = run(enqueue({ ...newState(content.roster), inventory: { stone: 2 } }, content, 'cabin'), 30);
-    const cabin = s.queue[0]!;
-    expect(cabin.stalled).toBe(true);
-    expect(cabin.costsConsumed).toBe(2);
-    expect(cabin.progress).toBe(unitThreshold(content.actions.cabin!, 2));
-    // XP is the progress made, not the ticks spent: the clamped tick earns only what it applied.
-    expect(s.skills.build!.core.exp).toBeCloseTo(cabin.progress, 9);
-    expect(s.skills.build!.run.exp).toBeCloseTo(cabin.progress, 9);
-    expect(s.inventory.stone).toBe(0);
-    expect(ofType(events, 'stalled')).toEqual([{ type: 'stalled', actionId: 'cabin', item: 'stone' }]);
-  });
-  it('runs the first runnable entry behind a stalled one', () => {
-    let { s } = run(enqueue({ ...newState(content.roster), inventory: { stone: 1 } }, content, 'cabin'), 30);
-    expect(s.queue[0]?.stalled).toBe(true);
-    s = enqueue(s, content, 'mine');
-    expect(firstRunnable(s, content)).toBe(1);
-    const r = run(s, ticksFor(1));
-    expect(r.events).toContainEqual({ type: 'completed', actionId: 'mine', oneTime: false });
-  });
-  it('resumes from exactly where it stopped once the stone arrives, and emits resumed', () => {
-    const { s } = run(enqueue({ ...newState(content.roster), inventory: { stone: 1 } }, content, 'cabin'), 30);
-    const before = s.queue[0]!;
-    const r = run({ ...s, inventory: { stone: 5 } }, 1);
-    expect(r.s.queue[0]?.stalled).toBe(false);
-    // Exactly one tick of work on top of where it stopped, and exactly the one owed unit paid: nothing re-paid, nothing skipped.
-    expect(r.s.queue[0]!.progress).toBeCloseTo(before.progress + balance.skills.baseTickExp, 9);
-    expect(r.s.queue[0]!.costsConsumed).toBe(before.costsConsumed + 1);
-    expect(r.s.inventory.stone).toBe(4);
-    expect(r.events).toContainEqual({ type: 'resumed', actionId: 'cabin' });
-  });
-  it('completes as one-time: produces the cabin, slows the clock, leaves the queue, records it', () => {
-    let { s } = run(enqueue({ ...newState(content.roster), inventory: { stone: 5 } }, content, 'cabin'), 70);
-    expect(s.queue[0]?.stalled).toBe(true);   // 6 needed, 5 held: stalls at the last unit
-    s = run({ ...s, inventory: { stone: 1 } }, 20).s;
-    expect(s.inventory.cabin).toBe(1);
-    expect(s.inventory.stone).toBe(0);
-    expect(s.queue).toHaveLength(0);
-    expect(s.completedOneTime).toEqual(['cabin']);
-    expect(s.completionCounts.cabin).toBe(1);
-    expect(s.decayMultiplier).toBe(0.5);
+  it('a repeat Salvage alone fills to the cap and pops full; then time stops (decision #41)', () => {
+    const { s, events } = runUntil(content, live(enqueue(fresh(), content, 'salvage')), (x) => x.queue.length === 0);
+    expect(s.inventory.scrap).toBe(balance.inventory.stackCap);
+    expect(events).toContainEqual({ type: 'popped', actionId: 'salvage', reason: 'full' });
+    expect(step(s, content)).toBe(s);
   });
 });
 
-describe('the run multiplier', () => {
-  it('a one-time build multiplies the decay multiplier, it does not replace it', () => {
-    let { s } = run(enqueue({ ...newState(content.roster), decayMultiplier: 0.5, inventory: { stone: 5 } }, content, 'cabin'), 70);
-    s = run({ ...s, inventory: { stone: 1 } }, 20).s;
-    expect(s.decayMultiplier).toBe(0.25);
+describe('work', () => {
+  it('spends a tick, awards both ledgers and counts the tick in skillStats; bestRun follows the run level', () => {
+    const s = live(enqueue(fresh(), content, 'salvage'));
+    const one = step(s, content);
+    expect(one.runTicks).toBe(1);
+    expect(one.skills.salvage!.core.exp).toBeCloseTo(balance.skills.baseTickExp, 12);
+    expect(one.skills.salvage!.run.exp).toBeCloseTo(balance.skills.baseTickExp, 12);
+    expect(one.skillStats.salvage).toEqual({ ticks: 1, bestRun: 0 });
+    // The raid is 30 XP of Fight: its run ledger reaches level 1 (25 XP) before it completes.
+    const raid = live(enqueue({ ...fresh(), inventory: { pass: 1 } }, content, 'raid'));
+    const { s: later } = runUntil(content, raid, (x) => x.skills.fight!.run.level >= 1);
+    expect(later.skillStats.fight!.bestRun).toBe(1);
+    expect(later.skillStats.fight!.ticks).toBe(later.runTicks);
+  });
+  it('a gear row multiplies the tick once it is done', () => {
+    const geared: Content = { ...content, actions: { ...content.actions, satchel: { ...content.actions.satchel!, gear: { skill: 'rig', multiplier: 2 } } } };
+    const base = { ...fresh(), inventory: { scrap: 5 }, queue: [{ id: 0, actionId: 'hull', mode: 'once' as const, by: 'player' as const }] };
+    const plain = work(base, geared).state;
+    const withGear = work({ ...base, completedOneTime: ['satchel'] }, geared).state;
+    expect(withGear.skills.rig!.core.exp).toBeCloseTo(2 * plain.skills.rig!.core.exp, 12);
   });
 });
 
-describe('progress never runs past an unpaid unit', () => {
-  it('completes on the tick progress reaches expCost exactly (0.1 + 0.1 is exactly 0.2)', () => {
-    const { events } = run(enqueue({ ...newState(content.roster), inventory: { stone: 4 } }, content, 'quick'), 2);
-    expect(ofType(events, 'completed')).toHaveLength(1);
+describe('progress never runs past an unpaid unit (MECHANICS section 2)', () => {
+  const tick = balance.skills.baseTickExp;
+  // Four scrap over two ticks of XP: a unit every half tick, so a single tick crosses two thresholds.
+  const quickBook: Content = {
+    ...content,
+    actions: { ...content.actions, quick: { id: 'quick', verb: 'rig', noun: 'a quick thing', expCost: 2 * tick, itemCosts: [{ item: 'scrap', amount: 4 }], isOneTime: true } },
+    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'quick'] }, content.chapters[1]!],
+  };
+  const quick = quickBook.actions.quick!;
+  const onQuick = (scrap: number): GameState => ({ ...fresh(), inventory: { scrap }, queue: [{ id: 0, actionId: 'quick', mode: 'once', by: 'player' }] });
+  /** work() `n` times on `c`, collecting every event. */
+  const workN = (c: Content, state: GameState, n: number): { s: GameState; events: GameEvent[] } => {
+    let s = state;
+    const events: GameEvent[] = [];
+    for (let i = 0; i < n; i++) {
+      const r = work(s, c);
+      events.push(...r.events);
+      s = r.state;
+    }
+    return { s, events };
+  };
+  it('a tick that crosses two thresholds pays both, and the row completes only once every unit is paid', () => {
+    const one = workN(quickBook, onQuick(4), 1);
+    // The unit to begin, then the two whose thresholds the first tick crossed.
+    expect(one.s.work.quick).toEqual({ progress: tick, costsConsumed: 3 });
+    expect(one.s.inventory.scrap).toBe(1);
+    expect(one.events.some((e) => e.type === 'completed')).toBe(false);
+    const two = workN(quickBook, one.s, 1);
+    expect(two.events).toContainEqual({ type: 'completed', actionId: 'quick', oneTime: true });
+    expect(two.s.inventory.scrap).toBe(0);
+    expect(two.s.completedOneTime).toEqual(['quick']);
   });
-  it('a tick that crosses two thresholds pays both, and every unit is paid before completion', () => {
-    const { s, events } = run(enqueue({ ...newState(content.roster), inventory: { stone: 4 } }, content, 'quick'), 5);
-    expect(ofType(events, 'completed')).toHaveLength(1);
-    expect(s.inventory.stone).toBe(0);
+  it('a tick that crosses an unpayable threshold clamps progress to it, and both ledgers earn only the progress made', () => {
+    const { s, events } = workN(quickBook, onQuick(1), 1);
+    expect(s.work.quick).toEqual({ progress: unitThreshold(quick, 1), costsConsumed: 1 });
+    expect(s.inventory.scrap).toBe(0);
+    // Half a tick of progress before the clamp, not the tick's whole gain: XP is what was made.
+    expect(unitThreshold(quick, 1)).toBeLessThan(tick);
+    expect(s.skills.rig!.core.exp).toBeCloseTo(unitThreshold(quick, 1), 12);
+    expect(s.skills.rig!.run.exp).toBeCloseTo(unitThreshold(quick, 1), 12);
+    expect(events).toEqual([]);
   });
-  it('a tick that crosses an unpayable threshold clamps progress to it and waits owing one unit', () => {
-    const { s } = run(enqueue({ ...newState(content.roster), inventory: { stone: 1 } }, content, 'quick'), 3);
-    expect(s.queue[0]!.stalled).toBe(true);
-    expect(s.queue[0]!.costsConsumed).toBe(1);
-    expect(s.queue[0]!.progress).toBe(unitThreshold(content.actions.quick!, 1));
-    // The one working tick made 0.05 of progress before the clamp, not its 0.1: XP is what was made.
-    expect(s.skills.craft!.core.exp).toBeCloseTo(0.05, 9);
+  it('the completing tick cannot pass the last unpaid unit: it stops below expCost instead of completing', () => {
+    const { s, events } = workN(quickBook, onQuick(3), 2);
+    expect(events.some((e) => e.type === 'completed')).toBe(false);
+    expect(s.completedOneTime).toEqual([]);
+    expect(s.work.quick).toEqual({ progress: unitThreshold(quick, 3), costsConsumed: 3 });
+    expect(s.work.quick!.progress).toBeLessThan(quick.expCost);
+    expect(s.skills.rig!.core.exp).toBeCloseTo(unitThreshold(quick, 3), 12);
   });
-  it('the completing tick cannot pass the last unpaid unit: it waits below expCost instead of completing', () => {
-    const { s, events } = run(enqueue({ ...newState(content.roster), inventory: { stone: 3 } }, content, 'quick'), 5);
-    expect(ofType(events, 'completed')).toHaveLength(0);
-    expect(s.queue[0]!.stalled).toBe(true);
-    expect(s.queue[0]!.costsConsumed).toBe(3);
-    expect(s.queue[0]!.progress).toBeLessThan(content.actions.quick!.expCost);
+  it('the hull stalls at its unpaid unit\'s threshold, keeps its progress there, and XP is the progress made, not the ticks spent', () => {
+    const hull = content.actions.hull!;
+    const onHull: GameState = { ...fresh(), inventory: { scrap: 2 }, queue: [{ id: 0, actionId: 'hull', mode: 'once', by: 'player' }] };
+    // Twice the ticks it takes to reach the unpaid unit: the rest are spent owing it.
+    const { s } = workN(content, onHull, 2 * (Math.floor(unitThreshold(hull, 2) / tick) + 1));
+    expect(s.work.hull).toEqual({ progress: unitThreshold(hull, 2), costsConsumed: 2 });
+    expect(s.inventory.scrap).toBe(0);
+    expect(s.skills.rig!.core.exp).toBeCloseTo(s.work.hull!.progress, 9);
+    expect(s.skills.rig!.run.exp).toBeCloseTo(s.work.hull!.progress, 9);
   });
 });
 
-describe('a verb with no skill state', () => {
-  it('throws: a validated book cannot produce one, so a fixture that does is a bug', () => {
-    const chop: Content = {
+describe('completion', () => {
+  const on = (s: GameState, id: string, mode: 'repeat' | 'once' = 'repeat'): GameState => ({ ...s, queue: [{ id: 0, actionId: id, mode, by: 'player' }], work: { [id]: { progress: content.actions[id]!.expCost - 0.05, costsConsumed: 0 } } });
+  it('counts up completionCounts, and unlocked fires on the completion that reaches unlockAt, not the next', () => {
+    const before = { ...fresh(), completionCounts: { salvage: unlockAt(content.actions.salvage!) - 1 } };
+    const first = work(on(before, 'salvage'), content);
+    expect(first.state.completionCounts.salvage).toBe(unlockAt(content.actions.salvage!));
+    expect(first.events).toContainEqual({ type: 'unlocked', actionId: 'salvage' });
+    const second = work(on(first.state, 'salvage'), content);
+    expect(second.events.some((e) => e.type === 'unlocked')).toBe(false);
+  });
+  it('a one-time earns its chip on the completion that reaches its own threshold, through a once entry', () => {
+    const gate = content.actions.gate!;
+    expect(unlockAt(gate)).toBe(balance.automation.unlockOneTime);
+    const before = { ...fresh(), completionCounts: { gate: unlockAt(gate) - 1 } };
+    const after = work(on(before, 'gate', 'once'), content);
+    expect(after.state.completedOneTime).toEqual(['gate']);
+    expect(after.state.completionCounts.gate).toBe(unlockAt(gate));
+    expect(after.events).toContainEqual({ type: 'unlocked', actionId: 'gate' });
+  });
+  it("the port's event counts its completion on the cast-off path, and the book's finish on the finishing path", () => {
+    const raid = work(on({ ...fresh(), inventory: { pass: 1 } }, 'raid', 'once'), content);
+    expect(raid.events).toContainEqual({ type: 'castOff', chapter: 1 });
+    expect(raid.state.completionCounts.raid).toBe(1);
+    const vault = work(on({ ...fresh(), chapter: 1, completionCounts: { vault: 2 } }, 'vault', 'once'), content);
+    expect(vault.state.finished).toBe(true);
+    expect(vault.state.completionCounts.vault).toBe(3);
+  });
+  it('a product joins acquired on its first completion, once, however many follow', () => {
+    const first = work(on(fresh(), 'salvage'), content).state;
+    expect(first.acquired).toEqual(['scrap']);
+    const second = work(on(first, 'salvage'), content).state;
+    expect(second.inventory.scrap).toBe(2);
+    expect(second.acquired).toEqual(['scrap']);
+  });
+  it('a one-time lands in completedOneTime and leaves; a once entry leaves; a repeat producer stays', () => {
+    const gate = work({ ...on(fresh(), 'gate'), queue: [{ id: 0, actionId: 'gate', mode: 'once', by: 'player' }, { id: 1, actionId: 'fish', mode: 'repeat', by: 'player' }] }, content).state;
+    expect(gate.completedOneTime).toEqual(['gate']);
+    expect(gate.queue.map((e) => e.id)).toEqual([1]);
+    expect(gate.inventory.pass).toBe(1);
+    expect(gate.acquired).toEqual(['pass']);
+    expect(work(on(fresh(), 'fish', 'once'), content).state.queue).toEqual([]);
+    expect(work(on(fresh(), 'fish'), content).state.queue).toHaveLength(1);
+  });
+  it('a repeat consumer stays in the queue after a completion', () => {
+    const polish: Content = {
       ...content,
-      actions: { chop: { id: 'chop', verb: 'chop', noun: 'wood', expCost: 1, itemCosts: [], isOneTime: false } },
+      actions: { ...content.actions, polish: { id: 'polish', verb: 'rig', noun: 'brass', expCost: 1, itemCosts: [{ item: 'scrap', amount: 1 }], isOneTime: false } },
+      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'polish'] }, content.chapters[1]!],
     };
-    const s = enqueue(newState(content.roster), chop, 'chop');
-    expect(() => stepQueue(s, chop, 0)).toThrow(/chop/);
+    const s = { ...fresh(), inventory: { scrap: 2 }, queue: [{ id: 0, actionId: 'polish', mode: 'repeat' as const, by: 'player' as const }], work: { polish: { progress: 0.95, costsConsumed: 1 } } };
+    const after = work(s, polish);
+    expect(after.events).toContainEqual({ type: 'completed', actionId: 'polish', oneTime: false });
+    expect(after.state.queue).toHaveLength(1);
+  });
+  it('the capacity row raises capOf to 10 for the rest of the life', () => {
+    const s = { ...fresh(), inventory: { scrap: 1 }, queue: [{ id: 0, actionId: 'satchel', mode: 'once' as const, by: 'player' as const }], work: { satchel: { progress: 1.95, costsConsumed: 1 } } };
+    const after = work(s, content).state;
+    expect(after.completedOneTime).toContain('satchel');
+    expect(capOf(after, content, 'scrap')).toBe(balance.inventory.stackCap + 5);
+    expect(capOf(after, content, 'fish')).toBe(10);
+  });
+});
+
+describe('supplyVia (section 2.4)', () => {
+  const auto = (c: Content, s: GameState, modes: Record<string, AutoMode>): GameState =>
+    ({ ...earned(c, s, ...Object.keys(modes)), automation: { ...s.automation, ...modes } });
+  const seen = (id: string) => new Set([id]);
+  it('none for an item nothing here makes; unearned; off once earned; ok with the mode once set', () => {
+    expect(supplyVia(fresh(), content, 'eel', seen('x'))).toEqual({ kind: 'gap', maker: null, gap: 'none' });
+    expect(supplyVia(fresh(), content, 'scrap', seen('hull'))).toEqual({ kind: 'gap', maker: 'salvage', gap: 'unearned' });
+    const e = earned(content, fresh(), 'salvage');
+    expect(supplyVia(e, content, 'scrap', seen('hull'))).toEqual({ kind: 'gap', maker: 'salvage', gap: 'off' });
+    expect(supplyVia(setAutomation(e, content, 'salvage', 'mid'), content, 'scrap', seen('hull'))).toEqual({ kind: 'ok', maker: 'salvage', mode: 'mid' });
+  });
+  const withPress = (costs: Content['actions'][string]['itemCosts']): Content => ({
+    ...content,
+    actions: { ...content.actions, press: { id: 'press', verb: 'salvage', noun: 'a press', expCost: 1, producedItem: 'scrap', producedAmount: 1, itemCosts: costs, isOneTime: false } },
+    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'press'] }, content.chapters[1]!],
+  });
+  it('JIT goes before a priority when two rows make the item', () => {
+    const two = withPress([]);
+    const s = auto(two, fresh(), { salvage: 'high', press: 'jit' });
+    expect(supplyVia(s, two, 'scrap', seen('hull'))).toEqual({ kind: 'ok', maker: 'press', mode: 'jit' });
+  });
+  it('with the JIT maker blocked and a low one free, ok names the free one', () => {
+    const two = withPress([{ item: 'pass', amount: 1 }]);   // no pass, and the gate is unearned
+    const s = auto(two, fresh(), { salvage: 'low', press: 'jit' });
+    expect(supplyVia(s, two, 'scrap', seen('hull'))).toEqual({ kind: 'ok', maker: 'salvage', mode: 'low' });
+  });
+  it('a blocked chain two makers deep names the direct maker as blocked and the deepest maker and its gap as cause', () => {
+    // scrap <- press (JIT) costs oil <- well (not yet earned); Salvage unearned
+    const two = withPress([{ item: 'oil', amount: 1 }]);
+    const deep: Content = {
+      ...two,
+      items: { ...two.items, oil: { id: 'oil', name: 'oil', kind: 'material' } },
+      actions: { ...two.actions, well: { id: 'well', verb: 'salvage', noun: 'a well', expCost: 1, producedItem: 'oil', producedAmount: 1, itemCosts: [], isOneTime: false } },
+      chapters: [{ ...two.chapters[0]!, order: [...two.chapters[0]!.order, 'well'] }, two.chapters[1]!],
+    };
+    const s = auto(deep, newState(deep.roster), { press: 'jit' });
+    expect(supplyVia(s, deep, 'scrap', seen('hull'))).toEqual({ kind: 'gap', maker: 'press', gap: 'blocked', cause: { item: 'oil', maker: 'well', gap: 'unearned' } });
+    expect(startBlock(s, deep, 'hull')).toEqual({ kind: 'short', item: 'scrap', amount: 8, maker: 'press', gap: 'blocked', cause: { item: 'oil', maker: 'well', gap: 'unearned' } });
+  });
+  it('a chain three deep carries the deepest cause all the way up', () => {
+    // scrap <- press (JIT) costs oil <- well (JIT) costs ore <- mine (not yet earned); Salvage unearned
+    const two = withPress([{ item: 'oil', amount: 1 }]);
+    const deep: Content = {
+      ...two,
+      items: { ...two.items, oil: { id: 'oil', name: 'oil', kind: 'material' }, ore: { id: 'ore', name: 'ore', kind: 'material' } },
+      actions: {
+        ...two.actions,
+        well: { id: 'well', verb: 'salvage', noun: 'a well', expCost: 1, producedItem: 'oil', producedAmount: 1, itemCosts: [{ item: 'ore', amount: 1 }], isOneTime: false },
+        mine: { id: 'mine', verb: 'salvage', noun: 'a mine', expCost: 1, producedItem: 'ore', producedAmount: 1, itemCosts: [], isOneTime: false },
+      },
+      chapters: [{ ...two.chapters[0]!, order: [...two.chapters[0]!.order, 'well', 'mine'] }, two.chapters[1]!],
+    };
+    const s = auto(deep, newState(deep.roster), { press: 'jit', well: 'jit' });
+    // Deep: the press itself lacks oil, not ore.
+    expect(startBlock(s, deep, 'hull')).toEqual({ kind: 'short', item: 'scrap', amount: 8, maker: 'press', gap: 'blocked', cause: { item: 'ore', maker: 'mine', gap: 'unearned', deep: true } });
+  });
+  it('in a cycle, the maker is blocked with no cause', () => {
+    // scrap <- press (JIT) costs scrap: the press is already on its own chain.
+    const loop = withPress([{ item: 'scrap', amount: 1 }]);
+    const s = auto(loop, newState(loop.roster), { press: 'jit' });
+    expect(supplyVia(s, loop, 'scrap', seen('hull'))).toEqual({ kind: 'gap', maker: 'press', gap: 'blocked' });
+    expect(startBlock(s, loop, 'hull')).toEqual({ kind: 'short', item: 'scrap', amount: 8, maker: 'press', gap: 'blocked' });
+  });
+});
+
+describe('frontBlock (section 2.5)', () => {
+  it('a repeating Salvage at 5 scrap with nothing below needing scrap is full', () => {
+    expect(frontBlock({ ...fresh(), inventory: { scrap: 5 } }, content, 'salvage')).toEqual({ kind: 'full', item: 'scrap' });
+  });
+  it('with the satchel done (cap 10), 6 scrap and a queued row owing 6, it is enough, and now returns the same state; once, null', () => {
+    const base: GameState = { ...fresh(), completedOneTime: ['satchel'], inventory: { scrap: 6 } };
+    const s = { ...enqueue(base, content, 'hull'), work: { hull: { progress: 2, costsConsumed: 2 } } };
+    expect(frontBlock(s, content, 'salvage')).toEqual({ kind: 'enough', item: 'scrap' });
+    expect(enqueue(s, content, 'salvage', { front: true })).toBe(s);
+    expect(frontBlock(s, content, 'salvage', true)).toBeNull();
+    expect(enqueue(s, content, 'salvage', { front: true, once: true }).queue[0]!.actionId).toBe('salvage');
+  });
+  it('Shift+now on that met look-ahead still runs exactly once: one completion, one more scrap, then the hull', () => {
+    const base: GameState = { ...fresh(), completedOneTime: ['satchel'], inventory: { scrap: 6 } };
+    const s = { ...enqueue(base, content, 'hull'), work: { hull: { progress: 2, costsConsumed: 2 } } };
+    expect(capOf(s, content, 'scrap')).toBeGreaterThan(s.inventory.scrap!);
+    const id = s.nextEntryId;
+    const once = live(enqueue(s, content, 'salvage', { front: true, once: true }));
+    expect(once.queue[0]!.id).toBe(id);
+    const { s: after, events } = runUntil(content, once, (x) => x.queue[0]?.id !== id);
+    expect(events.some((e) => e.type === 'popped' && e.actionId === 'salvage')).toBe(false);
+    expect(after.completionCounts.salvage ?? 0).toBe((s.completionCounts.salvage ?? 0) + 1);
+    expect(after.inventory.scrap).toBe(s.inventory.scrap! + content.actions.salvage!.producedAmount!);
+    expect(after.queue.map((e) => e.actionId)).toEqual(['hull']);
+  });
+});
+
+describe('casting off (section 4)', () => {
+  it("the port's event casts off: next port, non-food dumped, queue kept to the new rows, effects and a row's work stay", () => {
+    const s: GameState = live({
+      ...fresh(),
+      inventory: { scrap: 3, pass: 1, fish: 2 },
+      completedOneTime: ['satchel', 'hull'],
+      decayMultiplier: 0.5,
+      // Salvage half-worked: a row that is not done keeps its work across the cast-off.
+      work: { salvage: { progress: 0.5, costsConsumed: 0 }, raid: { progress: 29.95, costsConsumed: 0 } },
+      queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'player' }, { id: 1, actionId: 'salvage', mode: 'repeat', by: 'player' }, { id: 2, actionId: 'fish', mode: 'repeat', by: 'player' }],
+      nextEntryId: 3,
+      provisioned: ['fish'],
+    });
+    const after = step(s, content);
+    expect(after.chapter).toBe(1);
+    expect(after.provisioned).toEqual([]);
+    expect(after.events).toContainEqual({ type: 'castOff', chapter: 1 });
+    expect(after.inventory.scrap).toBeUndefined();
+    expect(after.inventory.pass).toBeUndefined();
+    expect(after.inventory.fish).toBe(2);
+    expect(after.queue).toEqual([]);
+    expect(after.work.salvage).toEqual({ progress: 0.5, costsConsumed: 0 });
+    expect(capOf(after, content, 'eel')).toBe(10);
+    expect(after.decayMultiplier).toBe(0.5);
+    expect(enqueue(after, content, 'eels').queue.map((e) => e.actionId)).toEqual(['eels']);
+    expect(enqueue(after, content, 'salvage')).toBe(after);
+  });
+  it("the last port's event finishes the book and ends the life", () => {
+    const s: GameState = live({ ...fresh(), chapter: 1, runTicks: 500, queue: [{ id: 0, actionId: 'vault', mode: 'once', by: 'player' }], work: { vault: { progress: 0.95, costsConsumed: 0 } }, automation: { fish: 'jit' }, skills: { ...fresh().skills, rig: { core: { level: 2, exp: 1 }, run: { level: 1, exp: 0 } } } });
+    const after = step(s, content);
+    expect(after.dead).toBe(true);
+    expect(after.finished).toBe(true);
+    expect(after.paused).toBe('system');
+    expect(after.events).toContainEqual({ type: 'finished', runTicks: 501 });
+    expect(step(after, content)).toBe(after);
+    const next = rebirth(after);
+    expect(next.chapter).toBe(0);
+    expect(next.finishes).toBe(1);
+    expect(next.life).toBe(after.life + 1);
+    expect(next.automation).toEqual({ fish: 'jit' });
+    expect(next.skills.rig!.core).toEqual(after.skills.rig!.core);
+    expect(deathSummary(after, content)).toMatchObject({ finished: true, finishes: 1, chapter: 1 });
   });
 });

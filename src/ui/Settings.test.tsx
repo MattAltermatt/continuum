@@ -1,0 +1,62 @@
+// @vitest-environment jsdom
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { realClick } from '../test-utils/realClick';
+import { Settings } from './Settings';
+
+describe('Settings', () => {
+  it('the gear opens and closes the panel; Escape and a click outside close it', async () => {
+    render(<Settings onErase={() => {}} speed={1} onSpeed={() => {}} dev={false} />);
+    const gear = screen.getByRole('button', { name: 'settings' });
+    expect(gear).toHaveAttribute('aria-expanded', 'false');
+    await act(() => realClick(gear));
+    expect(screen.getByRole('dialog', { name: 'settings' })).toBeInTheDocument();
+    expect(gear).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await act(() => realClick(gear));
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await act(() => realClick(gear));
+    await act(() => realClick(gear));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+  it('erase save takes two presses: the first arms it, the second erases', async () => {
+    const onErase = vi.fn();
+    render(<Settings onErase={onErase} speed={1} onSpeed={() => {}} dev={false} />);
+    await act(() => realClick(screen.getByRole('button', { name: 'settings' })));
+    await act(() => realClick(screen.getByRole('button', { name: 'erase save' })));
+    expect(onErase).not.toHaveBeenCalled();
+    await act(() => realClick(screen.getByRole('button', { name: 'press again to erase' })));
+    expect(onErase).toHaveBeenCalledTimes(1);
+  });
+  it('the arm lapses after its hold, so a later single press does not erase', () => {
+    // Timing only, so plain clicks under fake timers (realClick needs real ones).
+    vi.useFakeTimers();
+    try {
+      const onErase = vi.fn();
+      render(<Settings onErase={onErase} speed={1} onSpeed={() => {}} dev={false} />);
+      fireEvent.click(screen.getByRole('button', { name: 'settings' }));
+      fireEvent.click(screen.getByRole('button', { name: 'erase save' }));
+      expect(screen.getByRole('button', { name: 'press again to erase' })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(3000));
+      fireEvent.click(screen.getByRole('button', { name: 'erase save' }));
+      expect(onErase).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a dev build shows the speed control and sets speed; a production build has none', async () => {
+    const onSpeed = vi.fn();
+    const { unmount } = render(<Settings onErase={() => {}} speed={1} onSpeed={onSpeed} dev={true} />);
+    await act(() => realClick(screen.getByRole('button', { name: 'settings' })));
+    const group = screen.getByRole('group', { name: 'speed' });
+    expect(group.querySelector('[aria-pressed="true"]')?.textContent).toBe('×1');
+    await act(() => realClick(screen.getByRole('button', { name: '×10' })));
+    expect(onSpeed).toHaveBeenCalledWith(10);
+    unmount();
+    render(<Settings onErase={() => {}} speed={1} onSpeed={onSpeed} dev={false} />);
+    await act(() => realClick(screen.getByRole('button', { name: 'settings' })));
+    expect(screen.queryByRole('group', { name: 'speed' })).toBeNull();
+  });
+});

@@ -12,25 +12,22 @@ building the right thing early.
 
 Death is the loop, not the failure.
 
-> 🚧 **Early.** v0.1 is on screen: three rows that feed each other (forage,
-> mine, build) and a stone hall no first life can finish, the book's three
-> skills (forage, mine, build) with live XP ledgers, a queue whose stalls wait
-> in place and whose producers stop at a full stack, the pack, the health bar
-> and a log. Time passes only while work happens. v0.2 closes the loop: a run
-> dies to a death card that shows what the life bought, the next life keeps
-> core mastery and a larger maximum health, and the HUD shows decay beside the
-> food ceiling, green when the larder covers it. Since then each book declares
-> its own skills (The Salt Road has three) and passes a static validator, and
-> the page folds to fit narrower windows down to 732px. A book now carries a
-> version, a finish and a length, and a headless play measures it from zero:
-> The Salt Road v1 finishes in about 5 days of game time. What is next lives in
-> [the milestones](https://github.com/MattAltermatt/continuum/milestones). The design is
-> [`docs/specs/2026-09-22-books-chapters-verbs.md`](./docs/specs/2026-09-22-books-chapters-verbs.md),
-> [`docs/specs/2026-09-23-v0-2-a-run-you-can-lose.md`](./docs/specs/2026-09-23-v0-2-a-run-you-can-lose.md),
-> [`docs/specs/2026-09-23-books-own-their-skills.md`](./docs/specs/2026-09-23-books-own-their-skills.md)
-> and [`docs/specs/2026-09-23-headless-play.md`](./docs/specs/2026-09-23-headless-play.md),
-> with mockups in [`docs/mockups/`](./docs/mockups/) and plans in
-> [`docs/plans/`](./docs/plans/).
+**▶ Play it:** https://mattaltermatt.github.io/continuum/ (`main`'s tip once it passes
+[CI](./.github/workflows/ci.yml)'s machine gates; your run saves in the browser).
+
+> 🎈 **Playable.** One book, *The Windward Run*: a sky world of floating
+> towns and airships, three ports of call (Port Cinder, the Hollow Isle, the
+> Gilded Fortune), seven skills, and an end, a cliffhanger, after about thirty
+> hours of game time. The queue is a list of orders: only the top runs, one
+> that cannot run is popped, and its progress stays on the row. Rows earn
+> automation by repetition (JIT for exactly the shortfall; top, high, mid, low
+> and last to keep an empty queue fed). Fights hurt, ports cast off, the pack
+> holds five of anything until you find bigger bags, the skill cells open a
+> ledger of their multiplier, and the run saves itself. What is next lives in
+> [the milestones](https://github.com/MattAltermatt/continuum/milestones). The
+> design is [`docs/specs/2026-09-23-the-windward-run.md`](./docs/specs/2026-09-23-the-windward-run.md)
+> on top of the earlier specs in [`docs/specs/`](./docs/specs/), with mockups in
+> [`docs/mockups/`](./docs/mockups/) and plans in [`docs/plans/`](./docs/plans/).
 
 ## Run it
 
@@ -39,7 +36,10 @@ npm install
 npm run dev
 ```
 
-Then open the URL Vite prints (usually <http://localhost:5173>).
+Then open the URL Vite prints (usually <http://localhost:5173>). The game saves
+to the browser's local storage every few seconds and when the tab is hidden;
+the gear's **erase save** starts over. A dev build adds a speed control
+(×1, ×10, ×100) behind the gear, to reach the end while testing.
 
 ```sh
 npm test           # engine + component tests, one shot

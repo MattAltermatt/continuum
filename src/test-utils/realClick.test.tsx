@@ -23,6 +23,12 @@ describe('realClick', () => {
     await act(() => realClick(screen.getByRole('button')));
     expect(onHit).toHaveBeenCalledTimes(1);
   });
+  it('merges an init into every event, so a test can Shift+click', async () => {
+    const seen: boolean[] = [];
+    render(<button type="button" onMouseDown={(e) => seen.push(e.shiftKey)} onMouseUp={(e) => seen.push(e.shiftKey)} onClick={(e) => seen.push(e.shiftKey)}>b</button>);
+    await act(() => realClick(screen.getByRole('button'), { shiftKey: true }));
+    expect(seen).toEqual([true, true, true]);
+  });
   it('MUST FIRE: a node replaced during the gap loses the click, which is the bug the helper exists to catch', async () => {
     const onHit = vi.fn();
     render(<Rebuilt onHit={onHit} />);

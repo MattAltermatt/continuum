@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { Content } from '../data/types';
 import { newState } from './queue';
-import { applyDecay, covers, damagePerTick, decayPerSecond, eat, feeding, foodCeilingPerSecond } from './health';
+import { applyDecay, covers, damagePerTick, decayPerSecond, eat, feeding, foodCeilingPerSecond, foodsByHeal } from './health';
 import { ticksPerSecond, ticksToSeconds } from './time';
 import type { GameState } from './types';
 
@@ -14,9 +14,11 @@ const content: Content = {
   ],
   actions: {},
   items: {
-    berries: { id: 'berries', name: 'berries', kind: 'food', cap: 20, healPerUnit: 4 },
-    stone: { id: 'stone', name: 'stone', kind: 'material', cap: 5 },
+    berries: { id: 'berries', name: 'berries', kind: 'food', healPerUnit: 4 },
+    stone: { id: 'stone', name: 'stone', kind: 'material' },
   },
+  chapters: [],
+  finish: 'none',
 };
 const { baseDamagePerTick, decayGrowthRate, foodCooldownTicks } = balance.health;
 
@@ -100,6 +102,24 @@ describe('eat', () => {
       if ((s.inventory.berries ?? 0) < before) bites.push(t);
     }
     expect(bites).toEqual([0, foodCooldownTicks, foodCooldownTicks * 2]);
+  });
+});
+
+describe('smallest heal first (#45)', () => {
+  const two: Content = {
+    ...content,
+    items: {
+      eel: { id: 'eel', name: 'eel', kind: 'food', healPerUnit: 10 },
+      fish: { id: 'fish', name: 'fish', kind: 'food', healPerUnit: 4 },
+    },
+  };
+  it('foodsByHeal orders by heal, whatever the declaration order', () => {
+    expect(foodsByHeal(two).map((f) => f.id)).toEqual(['fish', 'eel']);
+  });
+  it('one tick of eat at max - 12 bites the fish only: 4, then 8 of room is under the eel\'s 10', () => {
+    const s = eat({ ...newState(content.roster), health: 100 - 12, inventory: { eel: 1, fish: 1 } }, two);
+    expect(s.inventory).toEqual({ eel: 1, fish: 0 });
+    expect(s.health).toBe(92);
   });
 });
 

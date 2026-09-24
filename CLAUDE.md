@@ -61,6 +61,7 @@ only an index so a number can be looked up without a search.
 | [4](https://github.com/MattAltermatt/continuum/issues/4) | The engine never imports from the UI |
 | [31](https://github.com/MattAltermatt/continuum/issues/31) | Mockups are committed artifacts, never scratch |
 | [41](https://github.com/MattAltermatt/continuum/issues/41) | Time passes only while work happens |
+| [68](https://github.com/MattAltermatt/continuum/issues/68) | The game is a sky world, and we are the heroes |
 
 A decision is a **closed and locked** issue. Amending one means reopening it,
 which leaves a trail; editing a heading in a file does not.
@@ -75,7 +76,8 @@ src/
   data/       content definitions (actions, items, skills) — data, not logic
               — a book is a value of the Book type in types.ts;
               src/data/validate.ts is the only check on it, and
-              books.test.ts runs it over every shipped book
+              books.test.ts runs it over every shipped book; the one
+              shipped book is The Windward Run (windward-run.ts)
   ui/         React components
   state/      reducer + context wiring engine to UI
   balance.ts  every tuning number, in one place
@@ -220,6 +222,14 @@ unsubscribed event) ship without asking.
 - Manual verification in Chrome before merge, always. "It compiles" is not
   verification and neither is "tests pass."
 - Delete both ends of a branch as the last step of its merge.
+- **`main` is the build the user plays.** CI's `deploy` job publishes a push
+  to `main` that passed CI's four machine gates to https://mattaltermatt.github.io/continuum/
+  (only while it is still `main`'s tip; `vite.config.ts` builds with a relative
+  base for the sub-path). A merge is a release to the player: after one, watch
+  CI (`/slice-ship` step 7), open the live URL, hard-reload, check the console
+  and that the page's script is the merged build's. A red `deploy` job is a
+  release failure, not a gate failure: "Re-run all jobs" on the tip's run. The
+  production build has no dev handle and no speed control.
 
 ## Gotchas
 
@@ -259,15 +269,54 @@ unsubscribed event) ship without asking.
   with middle and queue side by side under it (`src/styles.css`, two
   `@container` queries on `.screen`, which measure the content box so a
   classic scrollbar cannot tip a breakpoint; mockup 2026-09-23-fold). The floor is the action row, which cannot shrink below
-  712px; under 732 (747 with a classic 15px scrollbar showing) the page
-  scrolls sideways. A phone layout is #62.
+  712px; under 732 (747 where scrollbars are classic 15px ones, whose gutter
+  `scrollbar-gutter: stable` keeps reserved so a long queue growing the page
+  never shifts it) the page scrolls sideways. A phone layout is #62.
 - **`step()` returns the same object when nothing happened.** React skips
   the render on an idle tick, and `useGame` only logs a state that is new. A
   change that spreads the state on every tick breaks both silently.
-- **The dev handle takes only real `GameAction` types.** `window.continuum.dispatch`
-  with an unknown `type` (`'enqueue'` instead of `'queue'`) makes the reducer
-  return `undefined` and blanks the page with an uncaught error in `<App>`. Read
-  the union in `src/state/useGame.ts` before driving it.
+- **The dev handle ignores an unknown action.** `window.continuum.dispatch`
+  with a type the reducer does not know (`'enqueue'` instead of `'queue'`) now
+  leaves the game as it is (#67), so a typo fails quietly: read the union in
+  `src/state/useGame.ts` (`queue` with `front`/`once`, `remove` with `entryId`,
+  `automate`, `tick` with `n`, `reset`, `load`). The handle also has
+  `step(n)`, `speed(n)`, `save()`, `load()` and `erase()`.
+- **The game saves itself.** Key `continuum.save` in local storage, every few
+  seconds and on hide; a save it cannot load is set aside under
+  `continuum.save.aside` (the newest three) and a fresh run starts. Clear it
+  from the gear (erase save), with `continuum.erase()`, or
+  `localStorage.removeItem('continuum.save')`. Two tabs of the game each
+  write the same key, so the last to write wins: a known limit, play in one. `src/test-setup.ts` clears
+  local storage after every test, so jsdom tests never load each other's runs.
+- **Automation acts in one place: `resolve()` in `src/engine/resolve.ts`,** the
+  zero-time pass before a tick spends time. Anything that queues on the game's
+  behalf belongs there (its orders leave with the order they supply through
+  `withoutOrphans` in `automation.ts`, which `removeEntry`, `setAutomation`,
+  the save's `reconcile` and resolve all call), and it must leave the state object untouched when it
+  does nothing, or `step` stops returning the same object on an idle tick.
+  `useGame` also runs it after every action and tick while live (`settled`),
+  so the committed state, the screen and `window.continuum.state()` are the
+  state the next tick will work: a producer that just filled is already gone
+  from the top. Paused, nothing settles.
+- **A queue entry is an order, not a row.** Entries carry their own `id`; a
+  component that lists the queue keys by it. A row's progress lives on the row
+  (`state.work`), so two entries for one row share it and removing one loses
+  nothing.
+- **The loop catches up by real time.** `useGame` dispatches `{ type: 'tick', n }`
+  with the ticks real time says are due, capped at `balance.loop.maxCatchUpMinutes`
+  of game time per wake; one `act()` in a test batches every dispatch inside
+  it, so a test that needs a commit between intervals uses two.
+- **Probing a whole book** (the tuning and the whole-book gate in the Windward
+  Run plan): a temporary `src/zz-probe.test.ts`, outside the purity scan's
+  layers, first line `// @ts-nocheck` (both typecheck programs otherwise
+  reject its `node:fs`), writing its readings to a file (console output is
+  swallowed). Delete it before committing. Read events only from a step that
+  returned a new object: an idle step returns its input with the previous
+  tick's events.
+- **The Salt Road lives on as a test fixture** (`src/test-utils/salt-road.ts`),
+  so component tests written against it did not have to move when the book
+  changed; `testBook` in `src/test-utils/book.ts` is the two-port fixture for
+  the rebuilt screen.
 - **The headless play is a synchronous loop.** A broken bound in
   `src/engine/play.ts` hangs vitest rather than failing it (a per-test timeout
   cannot interrupt synchronous code); CI's `timeout-minutes: 15` is the backstop.

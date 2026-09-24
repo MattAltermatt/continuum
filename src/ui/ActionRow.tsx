@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react';
-import { balance } from '../balance';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { skillOf } from '../data/roster';
-import type { ActionDefinition, ActionId, Content, ItemId } from '../data/types';
-import { consumedOf } from '../engine/costs';
-import { count, room } from '../engine/inventory';
+import type { ActionDefinition, ActionId, Content } from '../data/types';
+import { isUnlocked, modeOf, nextMode, unlockAt } from '../engine/automation';
+import { gearMultiplier } from '../engine/effects';
+import { count } from '../engine/inventory';
+import { frontBlock, startBlock } from '../engine/queue';
+import { stillOwed, workOf } from '../engine/rows';
 import { tickExp } from '../engine/skills';
 import { ticksPerSecond } from '../engine/time';
-import type { GameState } from '../engine/types';
+import type { AutoMode, GameState } from '../engine/types';
 import { duration } from './format';
-import { PLAY, STOP, WARN } from './glyphs';
+import { ARROW, MINUS, PLAY, STOP, WARN } from './glyphs';
 import { ICONS } from './icons';
+import { itemName, needPhrase, rowName, words } from './words';
 
 /**
  * How long the click instruction holds before fading (spec 8.4: "a few
@@ -18,67 +21,105 @@ import { ICONS } from './icons';
  */
 const INSTRUCTION_MS = 3000;
 
-export interface Shortfall { readonly item: ItemId; readonly owed: number; readonly have: number; readonly atCap: boolean }
+/** Effects and hurts read to two decimals: a decay factor of 0.80, a hurt of 0.30 hp/s. Display precision, not tuning. */
+const FACTOR_DECIMALS = 2;
 
-/** What this row still owes of one input: the whole amount unless a queued entry has consumed some, in declared order. */
-function owedOf(action: ActionDefinition, state: GameState, item: ItemId): number {
-  const consumed = state.queue.find((e) => e.actionId === action.id)?.costsConsumed ?? 0;
-  const amount = action.itemCosts.find((c) => c.item === item)?.amount ?? 0;
-  return amount - consumedOf(action, consumed, item);
+/** The chip's word for a mode (spec section 3.1): tiny words, and JIT in capitals. */
+export function modeWord(mode: AutoMode): string {
+  return mode === 'jit' ? 'JIT' : mode;
 }
 
 /**
- * Inputs this row still owes that the pack lacks (spec 8.4). A queued entry
- * owes only what it has not consumed. `atCap` marks a stack that cannot hold
- * more right now, so the instruction does not send the player to its producer.
+ * What the row gives, on the right of the arrow (09-22 section 8.4): the
+ * book's end, a port's casting off, then what it makes (a harvest as "+1
+ * scrap", a made thing by its name) and the effects a one-time leaves.
  */
-export function owedShortfalls(action: ActionDefinition, content: Content, state: GameState): Shortfall[] {
-  const out: Shortfall[] = [];
-  for (const c of action.itemCosts) {
-    const owed = owedOf(action, state, c.item);
-    const have = count(state.inventory, c.item);
-    if (have < owed) out.push({ item: c.item, owed, have, atCap: room(state.inventory, content, c.item) <= 0 });
+export function outputsOf(content: Content, action: ActionDefinition): readonly string[] {
+  if (action.id === content.finish) return ['the end'];
+  if (content.chapters.some((ch) => ch.event === action.id)) return ['casts off'];
+  const out: string[] = [];
+  if (action.producedItem !== undefined) {
+    const harvest = !action.isOneTime && action.itemCosts.length === 0;
+    const n = action.producedAmount ?? 1;
+    out.push(harvest ? `+${n} ${itemName(content, action.producedItem, n)}` : itemName(content, action.producedItem));
   }
+  if (action.healthDecayMultiplier !== undefined) out.push(`decay \u00D7${action.healthDecayMultiplier.toFixed(FACTOR_DECIMALS)}`);
+  if (action.capacityBonus !== undefined) out.push(`stack +${action.capacityBonus}`);
+  if (action.gear !== undefined) out.push(`${skillOf(content, action.gear.skill).name} \u00D7${action.gear.multiplier.toFixed(FACTOR_DECIMALS)}`);
   return out;
 }
 
-function makerOf(content: Content, item: ItemId): string | null {
-  const producer = Object.values(content.actions).find((a) => a.producedItem === item);
-  return producer ? skillOf(content, producer.verb).name : null;
-}
-
-export function ActionRow({ action, content, state, running, onNow, onQueue }: {
+/**
+ * One row (09-22 section 8.4; spec 2026-09-23-the-windward-run sections 2.5,
+ * 3, 6 and 12; mockup 2026-09-23-queue-orders). Play asks the engine's
+ * frontBlock before it dispatches: a refusal flashes the row red, shows the
+ * words, and changes nothing. + always dispatches. A click queues a repeating
+ * order, Shift+click a single one.
+ */
+export function ActionRow({ action, content, state, running, onNow, onQueue, onAutomate }: {
   action: ActionDefinition; content: Content; state: GameState; running: boolean;
-  onNow: (id: ActionId) => void; onQueue: (id: ActionId) => void;
+  onNow: (id: ActionId, once: boolean) => void; onQueue: (id: ActionId, once: boolean) => void;
+  onAutomate: (id: ActionId, mode: AutoMode) => void;
 }) {
   const skill = skillOf(content, action.verb);
   const Icon = ICONS[skill.icon];
-  const perSecond = tickExp(state.skills[action.verb]!) * ticksPerSecond();
-  const shortfalls = owedShortfalls(action, content, state);
-  // A snapshot taken at the click, so an input landing during the hold does not blank it.
-  const [instruction, setInstruction] = useState<readonly Shortfall[] | null>(null);
+  const perSecond = tickExp(state.skills[action.verb]!, gearMultiplier(state, content, action.verb)) * ticksPerSecond();
+  // A snapshot taken at the click: it holds for INSTRUCTION_MS whatever lands meanwhile. A new object per press restarts the hold.
+  const [instruction, setInstruction] = useState<{ readonly text: string } | null>(null);
+  const [refused, setRefused] = useState(false);
   useEffect(() => {
     if (instruction === null) return;
-    const id = setTimeout(() => setInstruction(null), INSTRUCTION_MS);
+    const id = setTimeout(() => { setInstruction(null); setRefused(false); }, INSTRUCTION_MS);
     return () => clearTimeout(id);
   }, [instruction]);
+
   // A completed one-time row stays where it was, marked built, so no row below it moves up.
   const built = action.isOneTime && state.completedOneTime.includes(action.id);
   const inert = running || built || state.dead;
-  const rowName = `${skill.name} ${action.noun}`;
-  const press = (fn: (id: ActionId) => void) => () => {
-    if (built || state.dead) return;
-    fn(action.id);
-    if (shortfalls.length > 0) setInstruction(shortfalls);
+  const name = rowName(content, action.id);
+  const counts = state.completionCounts;
+  const block = startBlock(state, content, action.id);
+
+  const now = (once: boolean) => {
+    if (inert) return;
+    // Only frontBlock knows `enough`; asking startBlock alone would dispatch an order that enqueue then refuses without a word.
+    const refusal = frontBlock(state, content, action.id, once);
+    if (refusal !== null) {
+      setRefused(true);
+      setInstruction({ text: words(content, refusal, { counts }) });
+      return;
+    }
+    setInstruction(null);
+    onNow(action.id, once);
   };
-  const done = state.completionCounts[action.id] ?? 0;
-  const needed = action.isOneTime ? balance.automation.unlockOneTime : balance.automation.unlockRepeatable;
-  const output = action.producedItem
-    ? (action.itemCosts.length === 0 ? `+${action.producedAmount ?? 1} ${action.producedItem}` : action.producedItem)
-    : '';
+  const add = (once: boolean) => {
+    if (built || state.dead) return;
+    onQueue(action.id, once);
+    setInstruction(block?.kind === 'short' ? { text: words(content, block, { counts }) } : null);
+  };
+  // Enter on a focused button is a plain press (a repeating order); Shift+Enter matches Shift+click.
+  const enter = (fn: (once: boolean) => void) => (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    fn(e.shiftKey);
+  };
+
+  const unlocked = isUnlocked(state, action);
+  const mode = modeOf(state, action);
+  const next = nextMode(content, action, mode);
+  // Set, but its row cannot start and nothing along the chain would supply it (accepted risk 3): the chip says so, and so does the row.
+  const waits = unlocked && mode !== 'off' && block?.kind === 'short' ? words(content, block, { counts, waiting: true }) : null;
+  const say = built ? null : instruction !== null ? instruction.text : waits !== null && !running ? waits : null;
+  const done = counts[action.id] ?? 0;
+  const needed = unlockAt(action);
+  const w = workOf(state, action.id);
 
   return (
-    <div className={`item row${running ? ' row--on working' : ''}${built ? ' row--built' : ''}`} data-action={action.id}>
+    <div
+      className={`item row${running ? ' row--on working' : ''}${built ? ' row--built' : ''}${refused ? ' row--refused' : ''}`}
+      data-action={action.id}
+      onAnimationEnd={(e) => { if (e.target === e.currentTarget) setRefused(false); }}
+    >
       <div className="row__c1">
         <Icon aria-hidden="true" />
         <span><b>{skill.name}</b>{' '}{action.noun}{running && <span className="visually-hidden">running</span>}</span>
@@ -86,46 +127,70 @@ export function ActionRow({ action, content, state, running, onNow, onQueue }: {
       <div className="row__c2">
         {built ? (
           <div className="row__say row__built">built</div>
-        ) : instruction !== null ? (
-          <div className="row__say">{instruction.map((c) => (
-            <div key={c.item}>missing {c.owed - c.have} {c.item} · <b>{makerOf(content, c.item) ?? c.item} {c.atCap ? 'more as it builds' : 'some!'}</b></div>
-          ))}</div>
+        ) : say !== null ? (
+          <div className={`row__say${instruction === null ? ' row__say--waits' : ''}`} title={say}>{say}</div>
         ) : (
           <>
-            <div className="row__in">{action.itemCosts.map((c) => {
-              const short = shortfalls.find((f) => f.item === c.item);
-              const owed = owedOf(action, state, c.item);
-              // A queued entry that has consumed part of this input shows what it still owes: "1 of 6 stone".
-              const amount = owed < c.amount ? `${owed} of ${c.amount}` : `${c.amount}`;
-              return <span key={c.item} className={short ? 'row__short' : ''}>{short && `${WARN} `}{amount} {c.item}{short && <small> have {short.have}</small>}</span>;
-            })}</div>
-            <div className="row__arr" aria-hidden="true">→</div>
-            <div className="row__out">{output}</div>
+            <div className="row__in">
+              {(action.needs ?? []).length > 0 && (
+                <div className="row__needs">{(action.needs ?? []).map((n) => (
+                  <span key={n.item} className={`need${count(state.inventory, n.item) < n.amount ? ' need--unmet' : ''}`}>{needPhrase(content, n.item, n.amount)}</span>
+                ))}</div>
+              )}
+              {action.itemCosts.map((c) => {
+                const owed = stillOwed(action, w, c.item);
+                const have = count(state.inventory, c.item);
+                const short = have < owed;
+                // Once part is spent the row owes the rest: "3 of 8 scrap".
+                const amount = owed < c.amount ? `${owed} of ${c.amount}` : `${c.amount}`;
+                return (
+                  <span key={c.item} className={short ? 'row__short' : undefined}>
+                    {short && `${WARN} `}{amount} {itemName(content, c.item, c.amount)}{short && <small> have {have}</small>}
+                  </span>
+                );
+              })}
+              {action.hurts !== undefined && <span className="hurt-text">{MINUS}{action.hurts.toFixed(FACTOR_DECIMALS)} hp/s</span>}
+            </div>
+            <div className="row__arr" aria-hidden="true">{ARROW}</div>
+            <div className="row__out">{outputsOf(content, action).map((o) => <span key={o}>{o}</span>)}</div>
           </>
         )}
       </div>
       <div className="row__c3">
         {/* A built row has no work left: no time, no xp, same width so nothing moves. */}
-        <div className="row__tx">{built ? '\u00a0' : duration(action.expCost / perSecond)}<small>{built ? '\u00a0' : `+${action.expCost.toFixed(1)} xp`}</small></div>
+        <div className="row__tx">{built ? '\u00A0' : duration(action.expCost / perSecond)}<small>{built ? '\u00A0' : `+${action.expCost.toFixed(1)} xp`}</small></div>
         {/* One element in both states, so focus survives the swap; while running it does nothing. */}
         <button
           type="button"
           className={`btn ${running ? 'btn--stop' : 'btn--play'}`}
-          aria-label={`${running ? 'running' : 'do it now'}: ${rowName}`}
+          aria-label={`${running ? 'running' : 'do it now'}: ${name}`}
           aria-disabled={inert ? 'true' : undefined}
-          onClick={inert ? undefined : press(onNow)}
+          onClick={inert ? undefined : (e) => now(e.shiftKey)}
+          onKeyDown={inert ? undefined : enter(now)}
         >{running ? STOP : PLAY}</button>
         <button
           type="button"
           className="btn"
-          aria-label={`add to queue: ${rowName}`}
+          aria-label={`add to queue: ${name}`}
           aria-disabled={built || state.dead ? 'true' : undefined}
-          onClick={press(onQueue)}
+          onClick={(e) => add(e.shiftKey)}
+          onKeyDown={enter(add)}
         >+</button>
-        <span className="auto">
-          <span className="visually-hidden">{done === 0 ? 'automation, not yet earned' : `automation, ${done} of ${needed} to earn`}</span>
-          {done > 0 && <span aria-hidden="true">{done}/{needed}<i style={{ width: `${Math.min(100, (done / needed) * 100)}%` }} /></span>}
-        </span>
+        {unlocked ? (
+          <button
+            type="button"
+            className={`auto auto--btn${mode !== 'off' ? ' auto--lit' : ''}${waits !== null ? ' auto--waits' : ''}`}
+            aria-label={`automation: ${modeWord(mode)}, press for ${modeWord(next)}${waits !== null ? `; ${waits}` : ''}`}
+            aria-disabled={state.dead ? 'true' : undefined}
+            onClick={state.dead ? undefined : () => onAutomate(action.id, next)}
+          ><b aria-hidden="true">{modeWord(mode)}</b></button>
+        ) : (
+          // Earning: a status, not a button (spec 3.1). Blank until the first completion.
+          <span className="auto">
+            <span className="visually-hidden">{done === 0 ? 'automation, not yet earned' : `automation, ${done} of ${needed} to earn`}</span>
+            {done > 0 && <span aria-hidden="true">{done}/{needed}<i style={{ width: `${Math.min(100, (done / needed) * 100)}%` }} /></span>}
+          </span>
+        )}
       </div>
     </div>
   );

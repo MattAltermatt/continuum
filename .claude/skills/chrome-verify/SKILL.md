@@ -51,7 +51,7 @@ Screenshots are the fallback; the handle is the sharp instrument.
 sends any `GameAction`, `step(n)` advances exactly n ticks. `dispatch` and
 `step` commit synchronously, so a `state()` on the next line sees the result.
 `dispatch({ type: 'setHealth', health })` then one `step` is the fast path to
-death; play reaches it through the stone hall in about ten minutes. Death puts
+death; life 1 of The Windward Run lasts about twelve minutes of play. Death puts
 up the **death card**. `state()` stays the dead life (`dead: true`) until
 `dispatch({ type: 'begin' })`, while the screen behind the card already shows
 the next life. If the handle is missing, say so rather than
@@ -61,6 +61,13 @@ falling back to eyeballing numbers off a screenshot.
 the thing most often under test. Advancing the tick count directly is the only
 sane way to verify anything about the late game; sitting and watching is not
 verification, it is waiting.
+
+To reach the later ports or the finish in one pass, seed a save: `save()`,
+edit `localStorage['continuum.save']` (raise `completionCounts` to earn chips,
+raise `skills[id].core.level` to shorten rows), then `load()`. Drive the rest
+with `dispatch({ type: 'queue' | 'automate', ... })` and `step(n)`. The seeded
+numbers make the finish card's before/after levels meaningless; that is the
+seed, not a bug.
 
 Assert the **outcome**, not the arithmetic. *Health decayed faster in the fourth
 minute than the first* is the claim; the exact figure is context.
@@ -83,10 +90,17 @@ that skipped them has not verified anything that matters here.
 - **Nothing may move under the cursor.** Watch a control whose label or number
   changes — a count, a timer, a progress figure — and confirm its neighbours stay
   put. Click A, content widens, A is now where B was, the next click hits B.
-- **A stall must not read as an error.** When an action runs out of materials it
-  stays in the queue, dashed, "waiting on" the input, with its progress and
-  spent units kept, and goes on by itself when the input lands. Confirm it looks
-  like the game saying *you are out of wood*, not like a failure state.
+- **A pop must not read as an error.** When the top entry runs out of an item
+  and no automation supplies it, it leaves the queue and the log says why in
+  words (`needs 15 scrap · Salvage drifting scrap automation is not yet earned · earn it by
+  hand`); its progress and spent units stay on the row for the next entry. A
+  refused "now" flashes the row and shows the same words on it. Confirm both
+  read like the game saying *you are out of scrap*, not like a failure state.
+- **Supply is visible.** With a maker on JIT, queue a row that lacks its item:
+  the maker goes in at the top (`by: 'auto'`), fetches only what is needed, and
+  the row resumes. Automation's own orders are not logged. `state()` is settled
+  like the screen, so the supply shows in `state().queue` right after the
+  dispatch that caused it.
 
 ### 5. Console clean
 

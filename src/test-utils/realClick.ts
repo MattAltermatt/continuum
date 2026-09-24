@@ -14,10 +14,11 @@
  */
 export const REAL_CLICK_GAP_MS = 100;
 
-export async function realClick(el: Element): Promise<void> {
+export async function realClick(el: Element, init: MouseEventInit = {}): Promise<void> {
   // No `view`: under vitest the global `window` is not jsdom's Window, and the
   // MouseEvent constructor rejects it. Handlers here never read `view`.
-  const opts = { bubbles: true, cancelable: true };
+  // `init` joins every event, so a test can Shift+click (spec 2026-09-23-the-windward-run section 2.1).
+  const opts = { bubbles: true, cancelable: true, ...init };
   el.dispatchEvent(new MouseEvent('mousedown', opts));
   await new Promise((r) => setTimeout(r, REAL_CLICK_GAP_MS));
   el.dispatchEvent(new MouseEvent('mouseup', opts));

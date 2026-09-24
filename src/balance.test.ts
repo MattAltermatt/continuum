@@ -49,14 +49,42 @@ describe('balance', () => {
     expect(balance.automation.unlockOneTime).toBe(5);
   });
 
-  it('locks the v0.1 slice content numbers', () => {
-    expect(balance.content.scrub).toEqual({
-      forage: { expCost: 4.2 },
-      mine: { expCost: 6 },
-      cabin: { expCost: 60, stone: 6, decayMultiplier: 0.8 },
-      hall: { expCost: 5000, stone: 500 },
-      berries: { cap: 20, healPerUnit: 4 },
-      stone: { cap: 5 },
+  it('locks The Windward Run content numbers, as tuned by the headless play (plan Task 5 reading)', () => {
+    expect(balance.content.windward).toEqual({
+      fish: { expCost: 4 },
+      cloudFish: { healPerUnit: 4 },
+      salvage: { expCost: 5 },
+      hull: { expCost: 60, scrap: 16, decayMultiplier: 0.8 },
+      net: { expCost: 40, scrap: 12, fishMultiplier: 1.25 },
+      satchel: { expCost: 50, scrap: 20, capacity: 5 },
+      pirates: { expCost: 1450, hurts: 0.3 },
+      eels: { expCost: 8 },
+      skyEel: { healPerUnit: 10 },
+      ruin: { expCost: 7 },
+      wardens: { expCost: 200, hurts: 0.5 },
+      halls: { expCost: 150 },
+      fittings: { expCost: 80, brass: 20, decayMultiplier: 0.8 },
+      chest: { expCost: 70, brass: 24, capacity: 5 },
+      cutlass: { expCost: 60, brass: 16, fightMultiplier: 1.25 },
+      compass: { expCost: 900, hurts: 0.6 },
+      dealers: { expCost: 6 },
+      kitchens: { expCost: 8, chips: 1 },
+      canape: { healPerUnit: 16 },
+      door: { expCost: 120, chips: 15 },
+      dock: { expCost: 100, chips: 15, decayMultiplier: 0.8 },
+      trunk: { expCost: 90, chips: 20, capacity: 5 },
+      enforcers: { expCost: 500, hurts: 1 },
+      salons: { expCost: 300 },
+      varro: { expCost: 400 },
     });
+  });
+
+  it('holds the measuring bot\'s check-in', () => {
+    expect(balance.policy).toEqual({ checkEverySeconds: 30 });
+  });
+
+  it('holds the shared stack cap and the loop catch-up', () => {
+    expect(balance.inventory).toEqual({ stackCap: 5 });
+    expect(balance.loop).toEqual({ maxCatchUpMinutes: 5 });
   });
 });

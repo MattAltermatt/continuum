@@ -4,7 +4,7 @@
  * never into overheal, with a cooldown per food. Pure.
  */
 import { balance } from '../balance';
-import type { Content, ItemId } from '../data/types';
+import type { Content, ItemDefinition, ItemId } from '../data/types';
 import { ticksPerSecond, ticksToMinutes, ticksToSeconds } from './time';
 import { count, take } from './inventory';
 import type { GameState } from './types';
@@ -22,10 +22,17 @@ export function applyDecay(state: GameState): GameState {
   return { ...state, health };
 }
 
+/** Foods smallest heal first (#45): the order they are eaten in and shown in, which never changes. Ties keep declaration order. */
+export function foodsByHeal(content: Content): readonly ItemDefinition[] {
+  return Object.values(content.items)
+    .filter((item) => item.healPerUnit !== undefined)
+    .sort((a, b) => a.healPerUnit! - b.healPerUnit!);
+}
+
 export function eat(state: GameState, content: Content): GameState {
   let { health, inventory } = state;
   const foodCooldowns: Record<string, number> = { ...state.foodCooldowns };
-  for (const item of Object.values(content.items)) {
+  for (const item of foodsByHeal(content)) {
     if (item.healPerUnit === undefined) continue;
     // Count down first, then check: a bite at tick t sets the full cooldown, and
     // the next bite lands at exactly t + foodCooldownTicks.
@@ -76,4 +83,19 @@ export function foodCeilingPerSecond(state: GameState, content: Content): number
  */
 export function covers(state: GameState, content: Content): boolean {
   return foodCeilingPerSecond(state, content) >= decayPerSecond(state);
+}
+
+/** Health a hurting top row takes this second (section 6.1). 0 when the top does not hurt. */
+export function hurtsPerSecond(state: GameState, content: Content): number {
+  const top = state.queue[0];
+  return (top === undefined ? undefined : content.actions[top.actionId]?.hurts) ?? 0;
+}
+
+/** Applied per tick after decay, only on a tick the top works (step calls it after resolve said ready). */
+export function applyHurts(state: GameState, content: Content): GameState {
+  const perTick = hurtsPerSecond(state, content) / ticksPerSecond();
+  if (perTick === 0) return state;
+  const health = state.health - perTick;
+  if (health <= 0) return { ...state, health: 0, dead: true, paused: 'system', events: [...state.events, { type: 'died', runTicks: state.runTicks }] };
+  return { ...state, health };
 }

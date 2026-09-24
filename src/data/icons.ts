@@ -7,6 +7,7 @@ export const ICON_NAMES = [
   'sprout', 'axe', 'pickaxe', 'fishing-rod', 'bow-arrow',
   'wrench', 'house', 'chef-hat',
   'sword', 'route', 'message-circle', 'eye',
+  'recycle', 'sailboat',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];

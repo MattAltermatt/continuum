@@ -1,0 +1,92 @@
+/**
+ * Automation, earned per row (spec 2026-09-23-the-windward-run section 3):
+ * its modes, its unlock, and which row supplies an item. The queue acts on
+ * these (resolve.ts); this file only answers. Pure.
+ */
+import { balance } from '../balance';
+import type { ActionDefinition, ActionId, Content, ItemId } from '../data/types';
+import { chapterOf, isDone } from './rows';
+import type { AutoMode, GameState, QueueEntry } from './types';
+
+/** The priorities, highest first (section 3.1: the user's words for 1 to 5). */
+export const PRIORITIES = ['top', 'high', 'mid', 'low', 'last'] as const;
+
+export function isPriority(mode: AutoMode): boolean {
+  return (PRIORITIES as readonly AutoMode[]).includes(mode);
+}
+
+/** Lower goes first: JIT before every priority (section 3.3); off never. */
+export function rankOf(mode: AutoMode): number {
+  if (mode === 'jit') return -1;
+  const i = (PRIORITIES as readonly AutoMode[]).indexOf(mode);
+  return i === -1 ? Number.POSITIVE_INFINITY : i;
+}
+
+/** Lifetime completions that earn a row its chip (MECHANICS section 6). */
+export function unlockAt(action: ActionDefinition): number {
+  return action.isOneTime ? balance.automation.unlockOneTime : balance.automation.unlockRepeatable;
+}
+
+export function isUnlocked(state: GameState, action: ActionDefinition): boolean {
+  return (state.completionCounts[action.id] ?? 0) >= unlockAt(action);
+}
+
+/** A row's mode as it acts: off until earned, whatever a save holds. */
+export function modeOf(state: GameState, action: ActionDefinition): AutoMode {
+  return isUnlocked(state, action) ? state.automation[action.id] ?? 'off' : 'off';
+}
+
+/** JIT means something only for a row that makes a food, or an item some row costs or needs (section 3.1). */
+export function canJit(content: Content, action: ActionDefinition): boolean {
+  const item = action.producedItem;
+  if (item === undefined) return false;
+  if (content.items[item]?.kind === 'food') return true;
+  return Object.values(content.actions).some((b) =>
+    b.itemCosts.some((c) => c.item === item) || (b.needs ?? []).some((n) => n.item === item));
+}
+
+/** The chip's cycle (section 3.1). */
+export function cycleOf(content: Content, action: ActionDefinition): readonly AutoMode[] {
+  return canJit(content, action) ? ['off', 'jit', ...PRIORITIES] : ['off', ...PRIORITIES];
+}
+
+export function nextMode(content: Content, action: ActionDefinition, mode: AutoMode): AutoMode {
+  const cycle = cycleOf(content, action);
+  return cycle[(cycle.indexOf(mode) + 1) % cycle.length]!;
+}
+
+/** Sets a row's mode. The same state back for an unknown row, a dead run, a row not yet earned, or a mode outside its cycle. */
+export function setAutomation(state: GameState, content: Content, id: ActionId, mode: AutoMode): GameState {
+  const action = content.actions[id];
+  if (action === undefined || state.dead || !isUnlocked(state, action) || !cycleOf(content, action).includes(mode)) return state;
+  const was = state.automation[id] ?? 'off';
+  if (was === mode) return state;
+  const next = { ...state, automation: { ...state.automation, [id]: mode } };
+  if (was !== 'jit') return next;
+  // Off JIT, a food row's automation fills (the orders with a count) are no longer JIT's to run: they leave with
+  // their supply, and the departure's provision is owed again should the row come back to JIT before it.
+  const queue = withoutOrphans(next.queue.filter((e) => e.actionId !== id || e.by !== 'auto' || e.left === undefined));
+  return { ...next, queue, provisioned: next.provisioned.filter((p) => p !== id) };
+}
+
+/**
+ * The queue without supply orders whose order has left, followed down the
+ * chain (code panel rounds three and four): a supply never outlives what it
+ * served, whether the order left by an x, a pause-time edit, or a fill taken
+ * back to the top. The same array when nothing is orphaned.
+ */
+export function withoutOrphans(queue: readonly QueueEntry[]): readonly QueueEntry[] {
+  let q = queue;
+  for (;;) {
+    const kept = q.filter((e) => e.for === undefined || q.some((x) => x.id === e.for));
+    if (kept.length === q.length) return q;
+    q = kept;
+  }
+}
+
+/** The rows here that make `item` and are not done this life (section 2.4). Who of them can supply it is queue.ts's supplyVia. */
+export function makersOf(state: GameState, content: Content, item: ItemId): readonly ActionDefinition[] {
+  return chapterOf(state, content).order
+    .map((id) => content.actions[id]!)
+    .filter((a) => a.producedItem === item && !isDone(state, a));
+}
