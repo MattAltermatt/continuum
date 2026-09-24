@@ -25,8 +25,8 @@ const book: Content = {
     shoal: { id: 'shoal', verb: 'fish', noun: 'the great shoal', expCost: 30, itemCosts: [], isOneTime: true },
   },
   chapters: [
-    { head: { numeral: 'I', chapter: 'One', story: 'A start.' }, order: ['fish', 'net', 'line', 'shoal'], event: 'shoal' },
-    { head: { numeral: 'II', chapter: 'Two', story: 'An end.' }, order: ['eels'], event: 'eels' },
+    { head: { numeral: 'I', chapter: 'One', story: 'A start.' }, pages: [{ name: '', order: ['fish', 'net', 'line', 'shoal'], closes: 'shoal' }] },
+    { head: { numeral: 'II', chapter: 'Two', story: 'An end.' }, pages: [{ name: '', order: ['eels'], closes: 'eels' }] },
   ],
   finish: 'eels',
 };

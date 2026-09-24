@@ -4,7 +4,7 @@ import type { Content } from '../data/types';
 import { ticksToSeconds } from '../engine/time';
 import type { LogEvent } from '../state/useGame';
 import { clock } from './format';
-import { rowName, words } from './words';
+import { pageList, rowName, words } from './words';
 
 export interface Narration { readonly kind: 'story' | 'note'; readonly text: string }
 
@@ -24,6 +24,11 @@ export function narrate(e: LogEvent, content: Content): Narration {
       const head = content.chapters[e.chapter]?.head;
       return { kind: 'note', text: head === undefined ? `Port ${e.chapter + 1}` : `Port ${head.numeral} \u00B7 ${head.chapter}` };
     }
+    // The closing row's beat has printed on its `completed` line; this names the page now turned to.
+    case 'pageTurn': {
+      const name = content.chapters[e.chapter]?.pages[e.page]?.name;
+      return { kind: 'note', text: name === undefined || name === '' ? `Page ${e.page + 1}` : name };
+    }
     case 'finished': return { kind: 'note', text: 'The book is finished' };
     case 'completed': {
       const beat = content.actions[e.actionId]?.beat;
@@ -31,8 +36,11 @@ export function narrate(e: LogEvent, content: Content): Narration {
     }
     case 'coreLevel': return { kind: 'note', text: `${skillOf(content, e.skill).name} reaches Lv ${e.level}` };
     case 'died': return { kind: 'note', text: `Dead at ${clock(ticksToSeconds(e.runTicks))}` };
-    // A fight that backed off (#74) is the one pop logged: the user's "explain that you are about to die".
-    case 'popped': return e.reason === 'hurt'
+    // A fight that backed off (#74) and a closer that left waiting on its page (spec 2026-09-24-pages 4.2) are the pops logged:
+    // the user's "explain that you are about to die", and the rows the closer waits on as its "after:" line names them.
+    case 'popped': return e.reason === 'page'
+      ? { kind: 'note', text: `${rowName(content, e.actionId)} waits on ${pageList(content, e.waits)}` }
+      : e.reason === 'hurt'
       ? { kind: 'note', text: `Backed off from ${rowName(content, e.actionId)}: one more push would end this life. Shift+play fights to the end` }
       // Never logged otherwise (src/state/useGame.ts withLog keeps pops and automation's own orders out); worded only so a stray line is not blank.
       : { kind: 'note', text: `${rowName(content, e.actionId)} leaves the queue` };

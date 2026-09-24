@@ -67,10 +67,10 @@ vocabulary a book's roster draws on, and removes §9's skill points and
 - **Every material has a sink in its chapter, and a big one** (user,
   2026-09-22: "another building that takes 5000 stone or something"). A full
   stack is a moment, not a state; mining is never pointless.
-- **The big event is always a fight,** in one of two flavors:
-  - a literal fight: a Kill action that drains health per tick;
-  - a race: a long action of some other verb, with the decay clock as the
-    enemy.
+- ~~**The big event is always a fight.**~~ Corrected 2026-09-24: never the
+  user's rule ("We could have a book that is all about picking daisies, there
+  is no fighting"). A chapter ends on its last page's closing row, whatever
+  that row is; see [the pages spec](./2026-09-24-pages.md) section 1.1.
 - Whether events inside a chapter are linear is open, and chapter internals
   get their own brainstorm.
 

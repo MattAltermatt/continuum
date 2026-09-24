@@ -10,10 +10,11 @@ import { count } from './inventory';
 import { stops } from './fight';
 import { enqueue, newState, startBlock } from './queue';
 import { rebirth } from './rebirth';
+import { resolve } from './resolve';
 import { setPaused, step } from './tick';
 import { HOURS_PER_DAY, lengthInHours } from '../data/length';
 import { ticksPerHour, ticksPerSecond } from './time';
-import { chapterOf, isDone } from './rows';
+import { isDone, pageOf } from './rows';
 import type { GameState } from './types';
 
 /**
@@ -21,7 +22,7 @@ import type { GameState } from './types';
  * (spec section 5). measure.test.ts locks it together with balance.play, so a
  * bound cannot change without this being looked at.
  */
-export const PLAY_VERSION = 3;
+export const PLAY_VERSION = 4;
 
 /** balance.play's shape with plain numbers, so a test or a caller can pass other bounds. */
 export type PlayBounds = { readonly [K in keyof typeof balance.play]: number };
@@ -111,7 +112,7 @@ export function play(book: Book, policy: Policy, bounds: PlayBounds = balance.pl
  * uses passes time without getting anywhere, so it is not one of them.
  */
 function forward(state: GameState, book: Book): readonly ActionId[] {
-  const rows = chapterOf(state, book).order.map((id) => book.actions[id]!);
+  const rows = pageOf(state, book).order.map((id) => book.actions[id]!);
   const wanted = new Set<string>();
   const moving = new Set<ActionId>(rows.filter((a) => a.isOneTime && !isDone(state, a)).map((a) => a.id));
   for (let grew = true; grew;) {
@@ -197,13 +198,18 @@ export const prioritized: Policy = {
   checkEverySeconds: balance.policy.checkEverySeconds,
   decide: (state, book) => {
     let s = state;
-    const chapter = chapterOf(s, book);
-    for (const id of chapter.order) {
+    const page = pageOf(s, book);
+    for (const id of page.order) {
       const a = book.actions[id]!;
       if (!isUnlocked(s, a) || (s.automation[id] ?? 'off') !== 'off') continue;
-      s = setAutomation(s, book, id, canJit(book, a) ? 'jit' : id === chapter.event ? 'low' : a.isOneTime ? 'high' : 'mid');
+      s = setAutomation(s, book, id, canJit(book, a) ? 'jit' : id === page.closes ? 'low' : a.isOneTime ? 'high' : 'mid');
     }
-    return byHand(s, book, (a) => modeOf(s, a) === 'off');
+    const t = byHand(s, book, (a) => modeOf(s, a) === 'off');
+    // Automation with nothing it can start leaves the queue empty and the clock stopped. A person presses the
+    // next thing then, chip or not, and the press pulls what it lacks (spec 2026-09-24-pages 4.3). Found at
+    // #78 task 6: one-time chips earned before Salvage's left the port idle, and the policy froze.
+    if (t.queue.length === 0 && resolve(t, book).state.queue.length === 0) return byHand(t, book);
+    return t;
   },
 };
 
@@ -214,7 +220,7 @@ function makesFood(book: Book, a: ActionDefinition): boolean {
 /** Foods and makers (key makers included) to JIT as they earn their chips; nothing else is automated. */
 function jitAsEarned(state: GameState, book: Book): GameState {
   let s = state;
-  for (const id of chapterOf(s, book).order) {
+  for (const id of pageOf(s, book).order) {
     const a = book.actions[id]!;
     if (isUnlocked(s, a) && (s.automation[id] ?? 'off') === 'off' && canJit(book, a)) s = setAutomation(s, book, id, 'jit');
   }
@@ -245,8 +251,8 @@ function withMakers(state: GameState, book: Book, rows: readonly ActionDefinitio
  */
 function byHand(state: GameState, book: Book, mine: (a: ActionDefinition) => boolean = () => true): GameState {
   let s = state;
-  const chapter = chapterOf(s, book);
-  const rows = chapter.order.map((id) => book.actions[id]!);
+  const page = pageOf(s, book);
+  const rows = page.order.map((id) => book.actions[id]!);
   const queued = (id: ActionId) => s.queue.some((e) => e.actionId === id);
   const food = rows.find((a) => makesFood(book, a));
   if (food !== undefined && modeOf(s, food) !== 'jit' && count(s.inventory, food.producedItem!) === 0 && !queued(food.id)) {
@@ -272,8 +278,8 @@ function byHand(state: GameState, book: Book, mine: (a: ActionDefinition) => boo
   if (food !== undefined && modeOf(s, food) !== 'jit') s = withMakers(s, book, rows, food);
   // Withhold the event only while the idle fill will take a one-time of this port; withholding it whenever
   // any one-time is unfinished froze a life, since JIT key makers are pulled only through the event's chain.
-  const waiting = rows.some((b) => b.isOneTime && b.id !== chapter.event && !isDone(s, b) && isPriority(modeOf(s, b)) && startBlock(s, book, b.id) === null);
-  const next = rows.find((a) => a.isOneTime && !isDone(s, a) && mine(a) && (a.id !== chapter.event || !waiting));
+  const waiting = rows.some((b) => b.isOneTime && b.id !== page.closes && !isDone(s, b) && isPriority(modeOf(s, b)) && startBlock(s, book, b.id) === null);
+  const next = rows.find((a) => a.isOneTime && !isDone(s, a) && mine(a) && (a.id !== page.closes || !waiting));
   if (next !== undefined && !queued(next.id)) s = withMakers(s, book, rows, next);
   return s;
 }

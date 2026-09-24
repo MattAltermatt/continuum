@@ -5,7 +5,7 @@
  */
 import { balance } from '../balance';
 import type { ActionDefinition, ActionId, Content, ItemId } from '../data/types';
-import { chapterOf, isDone } from './rows';
+import { isDone, pageOf } from './rows';
 import type { AutoMode, GameState, QueueEntry } from './types';
 
 /** The priorities, highest first (section 3.1: the user's words for 1 to 5). */
@@ -36,13 +36,21 @@ export function modeOf(state: GameState, action: ActionDefinition): AutoMode {
   return isUnlocked(state, action) ? state.automation[action.id] ?? 'off' : 'off';
 }
 
-/** JIT means something only for a row that makes a food, or an item some row costs or needs (section 3.1). */
+/**
+ * JIT means something only for a row that makes a food, or an item a row on a
+ * page it shares costs or needs (section 3.1; spec 2026-09-24-pages section 4):
+ * JIT answers demand, and demand from a later page never reaches it, so the
+ * wardens, whose inner door the next page needs, get no JIT chip.
+ */
 export function canJit(content: Content, action: ActionDefinition): boolean {
   const item = action.producedItem;
   if (item === undefined) return false;
   if (content.items[item]?.kind === 'food') return true;
-  return Object.values(content.actions).some((b) =>
-    b.itemCosts.some((c) => c.item === item) || (b.needs ?? []).some((n) => n.item === item));
+  const pages = content.chapters.flatMap((ch) => ch.pages).filter((p) => p.order.includes(action.id));
+  return pages.some((p) => p.order.some((id) => {
+    const b = content.actions[id];
+    return b !== undefined && (b.itemCosts.some((c) => c.item === item) || (b.needs ?? []).some((n) => n.item === item));
+  }));
 }
 
 /** The chip's cycle (section 3.1). */
@@ -62,11 +70,13 @@ export function setAutomation(state: GameState, content: Content, id: ActionId, 
   const was = state.automation[id] ?? 'off';
   if (was === mode) return state;
   const next = { ...state, automation: { ...state.automation, [id]: mode } };
-  if (was !== 'jit') return next;
-  // Off JIT, a food row's automation fills (the orders with a count) are no longer JIT's to run: they leave with
-  // their supply, and the departure's provision is owed again should the row come back to JIT before it.
+  if (was !== 'jit' && mode !== 'off') return next;
+  // A food row's automation fills (the orders with a count) leave when the row leaves JIT, whose fills they are,
+  // and when it goes off from a priority, whose food-at-zero fills they are since #81: off, automation stops
+  // harvesting. They leave with their supply. Leaving JIT also owes the departure's provision again should the
+  // row come back to JIT before it.
   const queue = withoutOrphans(next.queue.filter((e) => e.actionId !== id || e.by !== 'auto' || e.left === undefined));
-  return { ...next, queue, provisioned: next.provisioned.filter((p) => p !== id) };
+  return { ...next, queue, provisioned: was === 'jit' ? next.provisioned.filter((p) => p !== id) : next.provisioned };
 }
 
 /**
@@ -86,7 +96,7 @@ export function withoutOrphans(queue: readonly QueueEntry[]): readonly QueueEntr
 
 /** The rows here that make `item` and are not done this life (section 2.4). Who of them can supply it is queue.ts's supplyVia. */
 export function makersOf(state: GameState, content: Content, item: ItemId): readonly ActionDefinition[] {
-  return chapterOf(state, content).order
+  return pageOf(state, content).order
     .map((id) => content.actions[id]!)
     .filter((a) => a.producedItem === item && !isDone(state, a));
 }

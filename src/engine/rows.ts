@@ -3,7 +3,7 @@
  * automation and the screen (spec 2026-09-23-the-windward-run sections 2-4).
  * Nothing here changes anything. Pure.
  */
-import type { ActionDefinition, ActionId, Chapter, Content, ItemId } from '../data/types';
+import type { ActionDefinition, ActionId, Chapter, Content, ItemId, Page } from '../data/types';
 import { consumedOf, nextCostItem, nextUnitDue, totalUnits, unitThreshold } from './costs';
 import { capOf } from './effects';
 import { count, has, room } from './inventory';
@@ -17,9 +17,40 @@ export function chapterOf(state: GameState, content: Content): Chapter {
   return chapter;
 }
 
-/** Whether the port this life is in has the row (section 4: only its rows are on screen). */
+/**
+ * The page this life is on (spec 2026-09-24-pages section 4): the first page
+ * of the chapter whose closing row is not done. Derived, never stored, so a
+ * save from before pages lands on the right page. After the finish every
+ * closer is done, and the answer is the chapter's last page.
+ */
+export function pageOf(state: GameState, content: Content): Page {
+  const pages = chapterOf(state, content).pages;
+  const page = pages.find((p) => !state.completedOneTime.includes(p.closes)) ?? pages[pages.length - 1];
+  if (page === undefined) throw new Error(`chapter ${state.chapter} has no pages`);
+  return page;
+}
+
+/** The chapter's event: its last page's closing row, which casts off (or, in the last chapter, finishes the book). */
+export function eventOf(chapter: Chapter): ActionId {
+  const last = chapter.pages[chapter.pages.length - 1];
+  if (last === undefined) throw new Error('a chapter with no pages');
+  return last.closes;
+}
+
+/**
+ * A closing row's undone prerequisites (spec 2026-09-24-pages section 4.2):
+ * the other one-time rows of its page not yet done, in page order. Empty for
+ * any row that is not the current page's closer, and once they are all done.
+ */
+export function pageWaits(state: GameState, content: Content, id: ActionId): readonly ActionId[] {
+  const page = pageOf(state, content);
+  if (page.closes !== id) return [];
+  return page.order.filter((r) => r !== id && content.actions[r]?.isOneTime === true && !state.completedOneTime.includes(r));
+}
+
+/** Whether the page this life is on has the row (only its rows are on screen and in play). */
 export function here(state: GameState, content: Content, id: ActionId): boolean {
-  return chapterOf(state, content).order.includes(id);
+  return pageOf(state, content).order.includes(id);
 }
 
 /** The row's kept progress this life (section 2.2). */

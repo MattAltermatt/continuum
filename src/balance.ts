@@ -132,7 +132,11 @@ export const balance = {
       hull: { expCost: 60, scrap: 16, decayMultiplier: 0.8 },
       net: { expCost: 40, scrap: 12, fishMultiplier: 1.25 },
       satchel: { expCost: 50, scrap: 20, capacity: 5 },
+      /** UNDERIVED, the user's pick (#78, reading B in plan 2026-09-24-pages): closes Port Cinder's first page. */
+      sails: { expCost: 20 },
       pirates: { expCost: 1450, hurts: 0.3 },
+      /** UNDERIVED, the user's pick (#78, reading B): closes Port Cinder, casting off. */
+      openSky: { expCost: 30 },
       eels: { expCost: 8 },
       skyEel: { healPerUnit: 10 },
       ruin: { expCost: 7 },

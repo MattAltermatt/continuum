@@ -22,7 +22,7 @@ const content: Content = {
     line: { id: 'line', verb: 'rig', noun: 'a line', expCost: 1, itemCosts: [], isOneTime: true, gear: { skill: 'fish', multiplier: 1.2 } },
     hammer: { id: 'hammer', verb: 'rig', noun: 'a hammer', expCost: 1, itemCosts: [], isOneTime: true, gear: { skill: 'rig', multiplier: 2 } },
   },
-  chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, order: ['fish', 'satchel', 'net', 'line', 'hammer'], event: 'hammer' }],
+  chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, pages: [{ name: '', order: ['fish', 'satchel', 'net', 'line', 'hammer'], closes: 'hammer' }] }],
   finish: 'hammer',
 };
 

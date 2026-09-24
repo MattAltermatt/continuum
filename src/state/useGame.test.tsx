@@ -4,7 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { balance } from '../balance';
 import { testBook } from '../test-utils/book';
 import { saltRoadFixture } from '../test-utils/salt-road';
+import { withOrder } from '../engine/fixture';
+import type { Book } from '../data/types';
 import { LOG_LINES, useGame } from './useGame';
+
+/** The raid's page with only the gate before it, so these fight tests reach the fight once the gate is done (spec 2026-09-24-pages). */
+const gateThenRaid: Book = { ...testBook, chapters: [withOrder(testBook.chapters[0]!, ['fish', 'salvage', 'gate', 'raid']), testBook.chapters[1]!] };
+
+/**
+ * The Salt Road with no Mine on the page: nothing here makes the cabin's stone, so a + on the cabin
+ * still pops short (gap none). On the full page a player's cabin pulls Mine whatever its chip (spec
+ * 2026-09-24-pages section 4.3).
+ */
+const unmined: Book = { ...saltRoadFixture, chapters: [withOrder(saltRoadFixture.chapters[0]!, ['forage', 'cabin', 'hall'])] };
 
 describe('useGame', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -29,10 +41,10 @@ describe('useGame', () => {
   });
 
   it('keeps at most LOG_LINES, newest first, and seq stays unique past the cap (a length-based seq would repeat)', () => {
-    const { result } = renderHook(() => useGame(saltRoadFixture));
+    const { result } = renderHook(() => useGame(unmined));
     // Stall chatter is gone, and coreLevel lines cannot reach the cap in a test's time (the
-    // hundredth core level costs about 1.4M XP). A + on a cabin with no stone, which no automation
-    // supplies, pops on the next tick with one short line: 101 of them, plus lifeBegins, pass the cap.
+    // hundredth core level costs about 1.4M XP). A + on a cabin with no stone, which nothing on the
+    // page makes, pops on the next tick with one short line: 101 of them, plus lifeBegins, pass the cap.
     for (let i = 0; i < LOG_LINES + 1; i++) {
       act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
       act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
@@ -58,7 +70,7 @@ describe('useGame', () => {
   });
 
   it('a fight backing off is logged once per life, however often it backs off (#74 section 3.4)', () => {
-    const { result } = renderHook(() => useGame(testBook));
+    const { result } = renderHook(() => useGame(gateThenRaid));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'gate' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 50));
     expect(result.current.state.inventory.pass).toBe(1);
@@ -86,7 +98,7 @@ describe('useGame', () => {
   });
 
   it('two backed-off orders in one batch log one line (code panel round two)', () => {
-    const { result } = renderHook(() => useGame(testBook));
+    const { result } = renderHook(() => useGame(gateThenRaid));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'gate' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 50));
     act(() => result.current.dispatch({ type: 'pause' }));
@@ -148,12 +160,12 @@ describe('useGame', () => {
   });
 
   it('logs a short the tick it is found, and not repeat completions or pops; an empty queue logs nothing more', () => {
-    const { result } = renderHook(() => useGame(saltRoadFixture));
+    const { result } = renderHook(() => useGame(unmined));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
-    expect(result.current.log[0]!.event).toEqual({ type: 'short', actionId: 'cabin', item: 'stone', amount: 6, maker: 'mine', gap: 'unearned' });
+    expect(result.current.log[0]!.event).toEqual({ type: 'short', actionId: 'cabin', item: 'stone', amount: 6, maker: null, gap: 'none' });
     act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
-    const forageTicks = Math.floor(saltRoadFixture.actions.forage!.expCost / balance.skills.baseTickExp) + 1;
+    const forageTicks = Math.floor(unmined.actions.forage!.expCost / balance.skills.baseTickExp) + 1;
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * forageTicks * (balance.inventory.stackCap + 1)));
     expect(result.current.state.inventory.berries).toBe(balance.inventory.stackCap);
     expect(result.current.state.queue).toEqual([]);
@@ -165,7 +177,7 @@ describe('useGame', () => {
     expect(result.current.log).toHaveLength(lines);
   });
   it('an order settles at once: a + on a cabin nothing can supply leaves with its line in the same commit, and no time passes', () => {
-    const { result } = renderHook(() => useGame(saltRoadFixture));
+    const { result } = renderHook(() => useGame(unmined));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     expect(result.current.state.queue).toEqual([]);
     expect(result.current.log[0]!.event).toMatchObject({ type: 'short', actionId: 'cabin', item: 'stone' });
@@ -193,7 +205,7 @@ describe('useGame', () => {
     expect(result.current.log.some((l) => l.event.type === 'short')).toBe(false);
   });
   it('a shortfall still says why when a different row is what remains queued', () => {
-    const { result } = renderHook(() => useGame(saltRoadFixture, { storage: null }));
+    const { result } = renderHook(() => useGame(unmined, { storage: null }));
     act(() => result.current.dispatch({ type: 'pause' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'forage' }));
@@ -202,16 +214,18 @@ describe('useGame', () => {
     expect(result.current.log[0]!.event).toMatchObject({ type: 'short', actionId: 'cabin' });
   });
   it('two different rows leaving in one go each say why', () => {
-    const { result } = renderHook(() => useGame(saltRoadFixture, { storage: null }));
+    const { result } = renderHook(() => useGame(unmined, { storage: null }));
     act(() => result.current.dispatch({ type: 'pause' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'hall' }));
     act(() => result.current.dispatch({ type: 'resume' }));
     expect(result.current.state.queue).toEqual([]);
-    expect(result.current.log.filter((l) => l.event.type === 'short').map((l) => (l.event as { actionId: string }).actionId).sort()).toEqual(['cabin', 'hall']);
+    // The cabin stops short of stone; the hall, which closes its page, pulls the cabin again and leaves naming it (spec 2026-09-24-pages 4.2).
+    expect(result.current.log.filter((l) => l.event.type === 'short').map((l) => (l.event as { actionId: string }).actionId)).toEqual(['cabin']);
+    expect(result.current.log.filter((l) => l.event.type === 'popped').map((l) => l.event)).toEqual([{ type: 'popped', actionId: 'hall', reason: 'page', waits: ['cabin'] }]);
   });
   it('two orders for one row leaving in one go say it once', () => {
-    const { result } = renderHook(() => useGame(saltRoadFixture, { storage: null }));
+    const { result } = renderHook(() => useGame(unmined, { storage: null }));
     act(() => result.current.dispatch({ type: 'pause' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
@@ -220,7 +234,7 @@ describe('useGame', () => {
     expect(result.current.log.filter((l) => l.event.type === 'short')).toHaveLength(1);
   });
   it('a tick of many stops at the first idle step: the last tick\'s short is not logged again for each idle one', () => {
-    const { result } = renderHook(() => useGame(saltRoadFixture));
+    const { result } = renderHook(() => useGame(unmined));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     act(() => result.current.dispatch({ type: 'tick' }));
     // The cabin popped short with nothing to supply it: the queue is empty, and the state still carries that tick's short.

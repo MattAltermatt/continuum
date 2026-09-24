@@ -6,11 +6,11 @@
  */
 import type { ActionDefinition, ActionId, Content } from '../data/types';
 import { isPriority, modeOf, rankOf, withoutOrphans } from './automation';
-import { anyCalm, automated, delayFor, killers, wouldKill } from './fight';
+import { anyCalm, automated, delayFor, hurtBlock, killers, wouldKill } from './fight';
 import { capOf } from './effects';
 import { count } from './inventory';
 import { enqueue, startBlock, supplyVia } from './queue';
-import { chapterOf, here, isDone, isFull, lookAheadTarget, shortfall, workOf } from './rows';
+import { chapterOf, eventOf, here, isDone, isFull, lookAheadTarget, pageOf, pageWaits, shortfall, workOf } from './rows';
 import type { GameEvent, GameState, QueueEntry } from './types';
 
 /**
@@ -30,7 +30,7 @@ export interface Resolved {
 }
 
 function rowsHere(state: GameState, content: Content): readonly ActionDefinition[] {
-  return chapterOf(state, content).order.map((id) => content.actions[id]!);
+  return pageOf(state, content).order.map((id) => content.actions[id]!);
 }
 
 function makesFood(content: Content, action: ActionDefinition): boolean {
@@ -48,6 +48,11 @@ function serves(state: GameState, e: QueueEntry, target: number): boolean {
     seen.add(cur.id);
   }
   return false;
+}
+
+/** The entry is a player's order, or serves one down its `for` chain at any depth (pulled entries are `by: 'auto'`). */
+function onPlayersChain(state: GameState, e: QueueEntry): boolean {
+  return e.by === 'player' || state.queue.some((p) => p.by === 'player' && serves(state, e, p.id));
 }
 
 /**
@@ -78,7 +83,9 @@ function fillUnderWay(state: GameState, id: ActionId): boolean {
  */
 function foodDue(state: GameState, content: Content, tried: ReadonlySet<ActionId>): ActionId | null {
   for (const a of rowsHere(state, content)) {
-    if (!makesFood(content, a) || tried.has(a.id) || modeOf(state, a) !== 'jit') continue;
+    // Any chip, not only JIT (#81, the user: "if the player runs out of food, and the action is automated, it
+    // goes to the top of this list"): priority food otherwise waited for an empty queue behind a press's chain.
+    if (!makesFood(content, a) || tried.has(a.id) || modeOf(state, a) === 'off') continue;
     if (count(state.inventory, a.producedItem!) > 0) continue;
     if (fillUnderWay(state, a.id)) continue;
     if (startBlock(state, content, a.id) !== null) continue;
@@ -125,7 +132,13 @@ function bestIdle(state: GameState, content: Content, tried: ReadonlySet<ActionI
     if (!isPriority(mode) || tried.has(a.id)) continue;
     const rank = rankOf(mode);
     if (best !== null && rank >= best.rank) continue;
-    if (startBlock(state, content, a.id) !== null) continue;
+    const block = startBlock(state, content, a.id);
+    // A closer waiting on its page is ordered once its next prerequisite can start, and pulls it (spec
+    // 2026-09-24-pages 4.2): a JIT one-time acts only on demand, and the closer's order is that demand. Only
+    // then, so the pull never fails and the chip never re-orders a closer every tick without time passing:
+    // "can start" includes a fight that would not back off (code panel: the salons re-ordered the enforcers
+    // every tick at low health, since startBlock does not model the back-off).
+    if (block !== null && !(block.kind === 'page' && startBlock(state, content, block.waits[0]!) === null && hurtBlock(state, content, block.waits[0]!) === null)) continue;
     best = { id: a.id, rank };
   }
   return best === null ? null : best.id;
@@ -215,6 +228,27 @@ export function resolve(state: GameState, content: Content): Resolved {
       pop(); events.push({ type: 'popped', actionId: top.actionId, reason: 'elsewhere' }); continue;
     }
     if (isDone(s, action)) { pop(); events.push({ type: 'popped', actionId: action.id, reason: 'done' }); continue; }
+    // A closing row waits on its page (spec 2026-09-24-pages section 4.2): it pulls its first undone
+    // prerequisite, one at a time. Already queued below: that order moves up with what serves it, and
+    // stays the player's. Pulled this resolve and gone (short, backed off, full): the chain has failed, and
+    // the closer leaves naming what it waits on, so nothing waits forever at the top.
+    const waits = pageWaits(s, content, action.id);
+    if (waits.length > 0) {
+      const next = waits[0]!;
+      if (tried.has(next)) { pop(); events.push({ type: 'popped', actionId: action.id, reason: 'page', waits }); continue; }
+      const queued = s.queue.find((e) => e.actionId === next);
+      if (queued !== undefined) {
+        // An order of automation's own, moved up, is tied to the closer, so it joins the closer's chain (a
+        // player's closer then supplies it whatever the chips, section 4.3) and leaves with it. The player's
+        // own order keeps its independence: removing the closer never removes it (code panel).
+        const tied = queued.by === 'auto' && queued.for === undefined ? { ...queued, for: top.id } : queued;
+        const group = s.queue.filter((e) => e === queued || serves(s, e, queued.id)).map((e) => (e === queued ? tied : e));
+        s = { ...s, queue: [...group, ...s.queue.filter((e) => e !== queued && !group.includes(e))] };
+        tried.add(next);
+      }
+      else byAutomation(next, 'supply', undefined, top.id);
+      continue;
+    }
     // A fight stops before it kills (#74, spec 2026-09-24 section 3.2), unless Shift forced it: an automated
     // harvest runs once in front of it; with none, but anything else that can run, it leaves the queue with
     // its progress kept; with nothing else, it goes on.
@@ -230,7 +264,7 @@ export function resolve(state: GameState, content: Content): Resolved {
     // The last port's event is the finish, not a departure: nothing to provision for. Provisioning waits
     // until the event could start, so a key its own supply still has to fetch is fetched first and the
     // galley is not eaten on the way (the user: "Before travel, AN food items are stockpiled").
-    const departing = action.id === chapterOf(s, content).event && s.chapter < content.chapters.length - 1;
+    const departing = action.id === eventOf(chapterOf(s, content)) && s.chapter < content.chapters.length - 1;
     if (departing && workOf(s, action.id).progress === 0 && shortfall(s, action) === null) {
       const provision = provisionDue(s, content, tried);
       if (provision !== null) {
@@ -245,6 +279,20 @@ export function resolve(state: GameState, content: Content): Resolved {
     }
     const short = shortfall(s, action);
     if (short === null) return { state: s, events, ready: true, passes: pass + 1 };
+    // A player's order, or anything serving one, pulls what it lacks whatever the chips (spec 2026-09-24-pages
+    // section 4.3, the user: "if the thing can be harvested, it should be harvested"): the first row on the page
+    // that makes the item, queued straight in front as a plain supply order. No `left`: the `for` look-ahead
+    // stops it at what the order owes. Not through readyHigher: the chain in the queue is the order and what it
+    // needs. Pulled already this resolve and gone means the chain has failed, and the order leaves below.
+    if (onPlayersChain(s, top)) {
+      const maker = rowsHere(s, content).find((m) => m.producedItem === short.item && m.id !== action.id && !isDone(s, m));
+      if (maker !== undefined && !tried.has(maker.id)) {
+        supplied.add(maker.id);
+        byAutomation(maker.id, 'supply', undefined, top.id);
+        if (top.forced === true) s = { ...s, queue: [{ ...s.queue[0]!, forced: true }, ...s.queue.slice(1)] };
+        continue;
+      }
+    }
     const supply = supplyVia(s, content, short.item, new Set([action.id]));
     if (supply.kind === 'ok' && !supplied.has(supply.maker)) {
       const first = supply.mode === 'jit' ? null : readyHigher(s, content, tried, rankOf(supply.mode), action.id);

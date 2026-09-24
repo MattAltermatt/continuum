@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { ActionId, Book } from '../data/types';
 import { windwardRun } from '../data/windward-run';
-import { attentive, declaredTicks, play, prioritized, type PlayOutcome, type PlayRun, type Policy } from './play';
+import { attentive, declaredTicks, handsOn, play, prioritized, type PlayOutcome, type PlayRun, type Policy } from './play';
 import { newState } from './queue';
 import { rebirth } from './rebirth';
 import { setPaused, step } from './tick';
@@ -43,7 +43,7 @@ function playRecording(book: Book, policy: Policy): Recorded {
     const next = step(s, book);
     if (next.chapter > s.chapter) {
       const port = book.chapters[s.chapter]!;
-      const undone = port.order.filter((id) => book.actions[id]!.isOneTime && !next.completedOneTime.includes(id));
+      const undone = port.pages.flatMap((p) => p.order).filter((id) => book.actions[id]!.isOneTime && !next.completedOneTime.includes(id));
       castOffs.push({ from: s.chapter, undone });
     }
     if (next.finished) return end('finished', next);
@@ -73,6 +73,7 @@ function once<T>(f: () => T): () => T {
 const attentiveRun = once((): PlayRun => play(windwardRun, attentive));
 const attentiveRecorded = once(() => playRecording(windwardRun, attentive));
 const prioritizedRecorded = once(() => playRecording(windwardRun, prioritized));
+const handsOnRun = once((): PlayRun => play(windwardRun, handsOn));
 
 const minutes = (ticks: number) => ticks / balance.time.ticksPerMinute;
 /** The 1-based life in which chaptersPerLife first reaches `chapter`. */
@@ -104,6 +105,12 @@ describe('The Windward Run, as tuned', { timeout: 60_000 }, () => {
     expect(attentiveRun().outcome).toBe('finished');
   });
 
+  it('every measuring player finishes the paged book, the prioritized one included (spec 2026-09-24-pages section 8)', () => {
+    expect(attentiveRun().outcome).toBe('finished');
+    expect(handsOnRun().outcome).toBe('finished');
+    expect(prioritizedRecorded().outcome).toBe('finished');
+  });
+
   it('the recording loop plays exactly what play() plays', () => {
     const run = attentiveRun();
     const rec = attentiveRecorded();
@@ -118,7 +125,7 @@ describe('The Windward Run, as tuned', { timeout: 60_000 }, () => {
     // The finishing life ends on the finish, so everything else in the union came before it.
     expect(rec.lives.at(-1)!.done.at(-1)).toBe(windwardRun.finish);
     const ever = new Set(rec.lives.flatMap((l) => l.done));
-    const oneTimes = windwardRun.chapters.flatMap((c) => c.order).filter((id) => windwardRun.actions[id]!.isOneTime);
+    const oneTimes = windwardRun.chapters.flatMap((c) => c.pages.flatMap((p) => p.order)).filter((id) => windwardRun.actions[id]!.isOneTime);
     expect(oneTimes.length).toBeGreaterThan(windwardRun.chapters.length);   // more than the three events
     expect(oneTimes.filter((id) => !ever.has(id))).toEqual([]);
   });

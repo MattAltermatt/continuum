@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
-import { fixture } from './fixture';
+import { built, fixture } from './fixture';
 import type { Content } from '../data/types';
 import { unlockAt } from './automation';
 import { damagePerTick, hurtsPerSecond } from './health';
@@ -24,7 +24,8 @@ describe('step', () => {
     expect(step(s, content)).toBe(s);
   });
   it('a top that cannot start pops and says why without the clock, then nothing happens', () => {
-    const s = live(enqueue(fresh(), content, 'hull'));
+    // Automation's order: a player's pulls its maker instead of popping (spec 2026-09-24-pages section 4.3).
+    const s = live(enqueue(fresh(), content, 'hull', { by: 'auto' }));
     const after = step(s, content);
     expect(after.runTicks).toBe(0);
     expect(after.health).toBe(s.health);
@@ -66,7 +67,8 @@ describe('step', () => {
 
 describe('hurts (section 6.1)', () => {
   const hurting: Content = { ...content, actions: { ...content.actions, raid: { ...content.actions.raid!, hurts: 1 } } };
-  const raidOn = (extra: Partial<GameState> = {}): GameState => live({ ...fresh(), inventory: { pass: 1 }, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'player' }], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } }, ...extra });
+  /** The raid closes its page (spec 2026-09-24-pages): the rest of the page is built, so the raid itself runs. */
+  const raidOn = (extra: Partial<GameState> = {}): GameState => live({ ...built(fresh(), 'hull', 'satchel', 'gate'), inventory: { pass: 1 }, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'player' }], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } }, ...extra });
   it('a hurting top loses decay plus its hurt per tick', () => {
     const s = raidOn();
     const after = step(s, hurting);

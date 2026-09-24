@@ -14,7 +14,7 @@ const n = balance.content.windward;
 export const windwardRun: Book = {
   id: 'windward-run',
   name: 'The Windward Run',
-  version: 1,
+  version: 2,
   finish: 'varro',
   /** The author's claim, not tuning (headless-play spec section 3); Task 5 measures it. */
   length: { hours: 30 },
@@ -30,18 +30,26 @@ export const windwardRun: Book = {
   chapters: [
     {
       head: { numeral: 'I', chapter: 'Port Cinder', story: 'A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.' },
-      order: ['fish', 'salvage', 'hull', 'net', 'satchel', 'pirates'],
-      event: 'pirates',
+      pages: [
+        { name: 'Fitting out', order: ['fish', 'salvage', 'hull', 'net', 'satchel', 'sails'], closes: 'sails' },
+        { name: 'Pirates!', order: ['fish', 'pirates'], closes: 'pirates' },
+        { name: 'Casting off', order: ['fish', 'openSky'], closes: 'openSky' },
+      ],
     },
     {
       head: { numeral: 'II', chapter: 'The Hollow Isle', story: 'A ruin the wind forgot. Whatever it guards, it guards still.' },
-      order: ['eels', 'ruin', 'wardens', 'halls', 'fittings', 'chest', 'cutlass', 'compass'],
-      event: 'compass',
+      pages: [
+        { name: 'Landfall', order: ['eels', 'ruin', 'fittings', 'chest', 'cutlass', 'wardens'], closes: 'wardens' },
+        { name: 'The inner halls', order: ['eels', 'halls', 'compass'], closes: 'compass' },
+      ],
     },
     {
       head: { numeral: 'III', chapter: 'The Gilded Fortune', story: 'A casino the size of a city, and one old man somewhere inside it.' },
-      order: ['dealers', 'kitchens', 'door', 'dock', 'trunk', 'enforcers', 'salons', 'varro'],
-      event: 'varro',
+      pages: [
+        { name: 'At the tables', order: ['dealers', 'kitchens', 'dock', 'trunk', 'door'], closes: 'door' },
+        { name: 'Upper decks', order: ['dealers', 'kitchens', 'enforcers', 'salons'], closes: 'salons' },
+        { name: "Varro's table", order: ['dealers', 'kitchens', 'varro'], closes: 'varro' },
+      ],
     },
   ],
   items: {
@@ -74,7 +82,15 @@ export const windwardRun: Book = {
     },
     pirates: {
       id: 'pirates', verb: 'fight', noun: 'the harbor pirates', expCost: n.pirates.expCost, itemCosts: [], isOneTime: true, hurts: n.pirates.hurts,
-      beat: 'The harbor pirates scatter. The town cheers us off the dock, bound for the ruin.',
+      beat: 'The harbor pirates scatter. The dock is ours again.',
+    },
+    sails: {
+      id: 'sails', verb: 'rig', noun: 'the sails', expCost: n.sails.expCost, itemCosts: [], isOneTime: true,
+      beat: 'The sails go up, patched and proud. She is ready to fly.',
+    },
+    openSky: {
+      id: 'openSky', verb: 'rig', noun: 'the ship for the open sky', expCost: n.openSky.expCost, itemCosts: [], isOneTime: true,
+      beat: 'We slip the moorings. The town cheers us off the dock, bound for the ruin.',
     },
     eels: { id: 'eels', verb: 'fish', noun: 'the eel runs', expCost: n.eels.expCost, producedItem: 'sky-eel', producedAmount: 1, itemCosts: [], isOneTime: false },
     ruin: { id: 'ruin', verb: 'salvage', noun: 'the ruin', expCost: n.ruin.expCost, producedItem: 'brass', producedAmount: 1, itemCosts: [], isOneTime: false },

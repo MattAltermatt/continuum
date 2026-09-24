@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { Content } from '../data/types';
 import { capOf } from './effects';
-import { fixture } from './fixture';
+import { fixture, withOrder } from './fixture';
 import { newState } from './queue';
 import { lookAheadTarget, reachOf, shortfall } from './rows';
 import { unitThreshold } from './costs';
@@ -50,7 +50,7 @@ describe('lookAheadTarget (section 2.3)', () => {
     const c: Content = {
       ...content,
       actions: { ...content.actions, stew: { id: 'stew', verb: 'fish', noun: 'a stew', expCost: 1, producedItem: 'eel', producedAmount: 1, itemCosts: [{ item: 'scrap', amount: 1 }], isOneTime: false } },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'stew'] }, content.chapters[1]!],
+      chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'stew']), content.chapters[1]!],
     };
     const roomy = (s: GameState): GameState => ({ ...s, completedOneTime: ['satchel'], inventory: { eel: 7 } });
     it('owes its cost for every completion before its own output is full', () => {

@@ -4,6 +4,7 @@ import type { Book } from '../data/types';
 import { windwardRun } from '../data/windward-run';
 import { PLAY_VERSION, declaredTicks, attentive, handsOn, measure, type PlayFlag, type Policy } from './play';
 import { enqueue } from './queue';
+import { withOrder } from './fixture';
 
 /**
  * Forage feeds, Mine yields stone, a shelter slows decay like The Salt Road's
@@ -17,7 +18,7 @@ function monumentBook(stone: number, expCost: number): Book {
       { id: 'mine', name: 'Mine', icon: 'pickaxe' },
       { id: 'build', name: 'Build', icon: 'house' },
     ],
-    chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, order: ['forage', 'mine', 'shelter', 'monument'], event: 'monument' }],
+    chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, pages: [{ name: '', order: ['forage', 'mine', 'shelter', 'monument'], closes: 'monument' }] }],
     items: {
       berries: { id: 'berries', name: 'berries', kind: 'food', healPerUnit: 4 },
       stone: { id: 'stone', name: 'stone', kind: 'material' },
@@ -47,10 +48,10 @@ function frozenBook(): Book {
 const hour = balance.time.ticksPerMinute * 60;
 const shortLife = (flags: readonly PlayFlag[]) => flags.filter((f): f is Extract<PlayFlag, { kind: 'short-life' }> => f.kind === 'short-life');
 
-/** When the queue is empty, the rows in reverse chapter order: the monument first. Forage comes last, behind whatever pops first, so it is not sane. Measured to finish on a different total (2.16 h against attentive's 1.87 h). */
+/** When the queue is empty, the rows in reverse chapter order: the monument first. Forage comes last, behind whatever pops first, so it is not sane. Measured to finish on a different total (1.86 h against attentive's 1.87 h: the monument closes its page, so it pulls the shelter first as attentive builds it, spec 2026-09-24-pages; it was 2.16 h when the monument could go first). */
 const monumentFirst: Policy = {
   name: 'monument first', sane: false, checkEverySeconds: 0,
-  decide: (s, book) => s.queue.length > 0 ? s : [...book.chapters.flatMap((c) => c.order)].reverse().reduce((acc, id) => enqueue(acc, book, id), s),
+  decide: (s, book) => s.queue.length > 0 ? s : [...book.chapters.flatMap((c) => c.pages.flatMap((p) => p.order))].reverse().reduce((acc, id) => enqueue(acc, book, id), s),
 };
 
 /**
@@ -70,7 +71,7 @@ describe('measure', { timeout: 30_000 }, () => {
     // Change one, and this fails until the other has been looked at: a bound
     // change is a rules change, and a reading must say which rules took it.
     expect({ PLAY_VERSION, bounds: balance.play, policy: balance.policy }).toEqual({
-      PLAY_VERSION: 3,
+      PLAY_VERSION: 4,
       bounds: { maxBookDays: 60, minBookHours: 24, maxLifeMinutes: 60, minLifeMinutes: 10, lengthTolerance: 0.25, hoursShownUpTo: 48 },
       policy: { checkEverySeconds: 30 },
     });
@@ -101,7 +102,7 @@ describe('measure', { timeout: 30_000 }, () => {
     const b = frozenBook();
     const later: Book = {
       ...b,
-      chapters: [{ ...b.chapters[0]!, order: ['forage', 'mine', 'shelter', 'bag', 'monument'] }],
+      chapters: [withOrder(b.chapters[0]!, ['forage', 'mine', 'shelter', 'bag', 'monument'])],
       actions: { ...b.actions, bag: { id: 'bag', verb: 'build', noun: 'a bag', expCost: 1, itemCosts: [], isOneTime: true, capacityBonus: 295 } },
     };
     const r = measure(later, [attentive], 'test');
@@ -113,7 +114,7 @@ describe('measure', { timeout: 30_000 }, () => {
     const b = monumentBook(150, 1500);
     const trap: Book = {
       ...b,
-      chapters: [{ ...b.chapters[0]!, order: ['forage', 'curse', 'mine', 'shelter', 'monument'] }],
+      chapters: [withOrder(b.chapters[0]!, ['forage', 'curse', 'mine', 'shelter', 'monument'])],
       items: { ...b.items, curse: { id: 'curse', name: 'curse', kind: 'key' } },
       actions: { ...b.actions, curse: { id: 'curse', verb: 'build', noun: 'a cursed shrine', expCost: 1, producedItem: 'curse', producedAmount: 1, itemCosts: [], isOneTime: true, healthDecayMultiplier: 3 } },
     };
@@ -144,7 +145,7 @@ describe('measure', { timeout: 30_000 }, () => {
     expect(f[0]!.lives).toBe(under);
   });
   it('an insane policy dying fast is not a short-life flag', () => {
-    const starve: Policy = { name: 'starve', sane: false, checkEverySeconds: 0, decide: (s, book) => attentive.decide(s, { ...book, chapters: [{ ...book.chapters[0]!, order: ['mine', 'monument'] }] }) };
+    const starve: Policy = { name: 'starve', sane: false, checkEverySeconds: 0, decide: (s, book) => attentive.decide(s, { ...book, chapters: [withOrder(book.chapters[0]!, ['mine', 'monument'])] }) };
     const r = measure(monumentBook(150, 1500), [starve], 'test');
     expect(r.runs[0]!.ticksPerLife[0]!).toBeLessThan(balance.play.minLifeMinutes * balance.time.ticksPerMinute);   // it does die fast
     expect(shortLife(r.flags)).toEqual([]);
@@ -178,9 +179,9 @@ describe('measure', { timeout: 30_000 }, () => {
   it('off-length reads the short end against the low side and the long end against the high side', () => {
     const b = monumentBook(150, 1500);
     const pair = [attentive, monumentFirst];
-    // The two policies measure 14% apart (re-measured: 1.87 h and 2.16 h), inside the 25%
-    // tolerance, so the sides are read with a 1% tolerance.
-    const narrow = { ...balance.play, lengthTolerance: 0.01 };
+    // The two policies measure 0.7% apart (re-measured under pages: 1.87 h and 1.86 h), inside the 25%
+    // tolerance, so the sides are read with a 0.1% tolerance.
+    const narrow = { ...balance.play, lengthTolerance: 0.001 };
     const r0 = measure(b, pair, 'test', narrow);
     const { min, max } = r0.range!;
     expect(r0.runs.every((run) => run.outcome === 'finished')).toBe(true);
@@ -210,11 +211,15 @@ describe('measure', { timeout: 30_000 }, () => {
     expect(atFloor.some((f) => f.kind === 'too-short')).toBe(false);
   });
   it('too-short reads the shortest finished run', () => {
-    // a floor between the two runs (re-measured: 1.87 h and 2.16 h): only the short one is under it
-    const r = measure(monumentBook(150, 1500), [attentive, monumentFirst], 'test', { ...balance.play, minBookHours: 2 });
-    expect(r.range!.min).toBeLessThan(declaredTicks({ hours: 2 }));
-    expect(r.range!.max).toBeGreaterThan(declaredTicks({ hours: 2 }));
-    expect(r.flags).toContainEqual({ kind: 'too-short', min: r.range!.min, floor: declaredTicks({ hours: 2 }) });
+    // a floor between the two runs (re-measured under pages: 1.87 h and 1.86 h, too close for a round
+    // number to sit between them for long): only the short one is under it
+    const [a, b] = measure(monumentBook(150, 1500), [attentive, monumentFirst], 'test').runs.map((run) => run.totalTicks);
+    const floor = Math.round((a! + b!) / 2);
+    const hours = floor / hour;
+    const r = measure(monumentBook(150, 1500), [attentive, monumentFirst], 'test', { ...balance.play, minBookHours: hours });
+    expect(r.range!.min).toBeLessThan(declaredTicks({ hours }));
+    expect(r.range!.max).toBeGreaterThan(declaredTicks({ hours }));
+    expect(r.flags).toContainEqual({ kind: 'too-short', min: r.range!.min, floor: declaredTicks({ hours }) });
   });
   // Characterization (plan 2026-09-23-the-windward-run, the reading after code panel round two: 30.69 h and
   // 30.33 h). No flag means the range sits inside 30 h +-25% and over the 24 h floor, and no life is short or
@@ -222,11 +227,17 @@ describe('measure', { timeout: 30_000 }, () => {
   // the same number as the length tolerance (the spec names 25% for both). At today's reading the length flag
   // would fire first; the line bites on its own for a book whose hands-on run is short (a 3-chip canapé with
   // pirates at 520 reads 36.5 h against 24.5 h, no flag). Two whole-book plays: a slow runner gets 60 s.
-  it('The Windward Run v1, end to end', () => {
-    const r = measure(windwardRun, [attentive, handsOn], 'test');
-    expect(r.bookVersion).toBe(1);
+  // Split for #78 (plan task 2): finishing is an ordinary test; the length and the gap are the bands.
+  let reading: ReturnType<typeof measure> | undefined;
+  const windward = () => (reading ??= measure(windwardRun, [attentive, handsOn], 'test'));
+  it('The Windward Run v2, end to end: both players finish, and there is a range', () => {
+    const r = windward();
+    expect(r.bookVersion).toBe(2);
     expect(r.runs.map((run) => run.outcome)).toEqual(['finished', 'finished']);
     expect(r.range).not.toBeNull();
+  }, 60_000);
+  it('The Windward Run v2, end to end: no flag, and automation within the tolerance of hands-on', () => {
+    const r = windward();
     expect(r.flags).toEqual([]);
     const [auto, byHand] = r.runs;
     expect(auto!.totalTicks).toBeLessThanOrEqual(byHand!.totalTicks * (1 + balance.play.lengthTolerance));

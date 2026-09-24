@@ -17,11 +17,13 @@ Death is the loop, not the failure.
 
 > 🎈 **Playable.** One book, *The Windward Run*: a sky world of floating
 > towns and airships, three ports of call (Port Cinder, the Hollow Isle, the
-> Gilded Fortune), seven skills, and an end, a cliffhanger, after about thirty
-> hours of game time. The queue is a list of orders: only the top runs, one
+> Gilded Fortune), each told in pages, seven skills, and an end, a cliffhanger,
+> after about thirty hours of game time. The queue is a list of orders: only the top runs, one
 > that cannot run is popped, and its progress stays on the row. Rows earn
 > automation by repetition (JIT for exactly the shortfall, and to keep food
-> stocked; top, high, mid, low and last to keep an empty queue fed). Fights
+> stocked; top, high, mid, low and last to keep an empty queue fed). Press play
+> on something you cannot do yet and the game queues what it needs first, as
+> deep as it goes; a page's closing row waits for the rest of the page. Fights
 > hurt, and back off before they kill unless Shift forces them. Ports cast off, the pack
 > holds five of anything until you find bigger bags, the skill cells open a
 > ledger of their multiplier, and the run saves itself. What is next lives in
@@ -70,6 +72,8 @@ than merely intended to be.
   roadmap file; the issues *are* the plan.
 - **[`docs/specs/`](./docs/specs/)** — dated design reasoning: what was
   considered and what was rejected, for the decisions big enough to argue about.
+- **[`docs/authoring.md`](./docs/authoring.md)** — how to write a book: pages,
+  closing rows, what to carry from page to page.
 - **[`docs/mockups/`](./docs/mockups/)** — dated, committed mockups. A design
   that only ever existed in a scratch directory cannot be pointed back at.
 

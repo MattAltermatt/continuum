@@ -7,7 +7,7 @@ import { validateBook } from './validate';
 const good: Book = {
   id: 'test', name: 'Test', version: 1, finish: 'hut', length: { hours: 1 },
   roster: [{ id: 'forage', name: 'Forage', icon: 'sprout' }, { id: 'build', name: 'Build', icon: 'house' }],
-  chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, order: ['forage', 'hut'], event: 'hut' }],
+  chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, pages: [{ name: '', order: ['forage', 'hut'], closes: 'hut' }] }],
   items: {
     berries: { id: 'berries', name: 'berries', kind: 'food', healPerUnit: 4 },
     hut: { id: 'hut', name: 'hut', kind: 'key' },
@@ -19,7 +19,7 @@ const good: Book = {
 };
 
 const withActions = (actions: Book['actions'], order?: readonly string[]): Book =>
-  ({ ...good, actions, chapters: [{ ...good.chapters[0]!, order: order ?? Object.keys(actions) }] });
+  ({ ...good, actions, chapters: [{ ...good.chapters[0]!, pages: [{ ...good.chapters[0]!.pages[0]!, order: order ?? Object.keys(actions) }] }] });
 
 describe('validateBook', () => {
   it('accepts a well-formed book', () => {
@@ -71,9 +71,9 @@ describe('validateBook', () => {
   it('rejects a chapter order naming an action the book lacks', () => {
     expect(validateBook(withActions(good.actions, ['forage', 'hut', 'ghost']))).toContainEqual(expect.stringMatching(/ghost/));
   });
-  it('rejects an action that is in no chapter, and one that is in two', () => {
-    expect(validateBook(withActions(good.actions, ['forage']))).toContainEqual(expect.stringMatching(/hut.*no chapter/));
-    const twice: Book = { ...good, chapters: [good.chapters[0]!, { head: { numeral: 'II', chapter: 'Two', story: 'Again.' }, order: ['hut'], event: 'hut' }] };
+  it('rejects an action that is on no page, and one that is in two chapters', () => {
+    expect(validateBook(withActions(good.actions, ['forage']))).toContainEqual(expect.stringMatching(/hut.*on no page/));
+    const twice: Book = { ...good, chapters: [good.chapters[0]!, { head: { numeral: 'II', chapter: 'Two', story: 'Again.' }, pages: [{ name: '', order: ['hut'], closes: 'hut' }] }] };
     expect(validateBook(twice)).toContainEqual(expect.stringMatching(/hut.*more than one chapter/));
   });
   it('rejects a first chapter with no row that needs nothing in hand', () => {
@@ -82,7 +82,7 @@ describe('validateBook', () => {
   });
   it('asks the first chapter to open, not any chapter: a free row in chapter II does not count', () => {
     const head = good.chapters[0]!.head;
-    const b: Book = { ...good, chapters: [{ head, order: ['hut'], event: 'hut' }, { head, order: ['forage'], event: 'forage' }] };
+    const b: Book = { ...good, chapters: [{ head, pages: [{ name: '', order: ['hut'], closes: 'hut' }] }, { head, pages: [{ name: '', order: ['forage'], closes: 'forage' }] }] };
     expect(validateBook(b)).toContainEqual(expect.stringMatching(/first chapter/));
   });
   it('rejects a version that is not a positive integer', () => {
@@ -96,27 +96,26 @@ describe('validateBook', () => {
   it('rejects a finish that is repeatable', () => {
     expect(validateBook({ ...good, finish: 'forage' })).toContainEqual(expect.stringMatching(/finish "forage".*one-time/));
   });
-  it('rejects a finish that is not the last chapter\'s event', () => {
+  it('rejects a finish that is not the last chapter\'s last closing row', () => {
     const shed = { ...good.actions.hut!, id: 'shed', producedItem: undefined, itemCosts: [] };
     const b: Book = {
       ...good, actions: { ...good.actions, shed },
-      chapters: [good.chapters[0]!, { head: { numeral: 'II', chapter: 'Two', story: 'Later.' }, order: ['shed'], event: 'shed' }],
+      chapters: [good.chapters[0]!, { head: { numeral: 'II', chapter: 'Two', story: 'Later.' }, pages: [{ name: '', order: ['shed'], closes: 'shed' }] }],
     };
-    expect(validateBook(b)).toContainEqual('finish "hut" is not the last chapter\'s event');
+    expect(validateBook(b)).toContainEqual('finish "hut" is not the last chapter\'s last closing row');
     // In the last chapter, but not its event.
-    const inside: Book = { ...b, finish: 'hut', chapters: [{ ...b.chapters[1]!, order: ['forage', 'hut', 'shed'], event: 'shed' }] };
-    expect(validateBook(inside)).toContainEqual('finish "hut" is not the last chapter\'s event');
+    const inside: Book = { ...b, finish: 'hut', chapters: [{ ...b.chapters[1]!, pages: [{ name: '', order: ['forage', 'hut', 'shed'], closes: 'shed' }] }] };
+    expect(validateBook(inside)).toContainEqual('finish "hut" is not the last chapter\'s last closing row');
   });
-  it('rejects a chapter event that is not one of its rows, or is repeatable', () => {
-    const outside: Book = { ...good, chapters: [{ ...good.chapters[0]!, event: 'ghost' }] };
-    expect(validateBook(outside)).toContainEqual('chapter 1\'s event "ghost" is not one of its rows');
-    const repeat: Book = { ...good, chapters: [{ ...good.chapters[0]!, event: 'forage' }] };
-    expect(validateBook(repeat)).toContainEqual('chapter 1\'s event "forage" is repeatable; it must be one-time');
+  it('rejects a closing row that is not one of its page\'s rows, or is repeatable', () => {
+    const closing = (closes: string): Book => ({ ...good, chapters: [{ ...good.chapters[0]!, pages: [{ ...good.chapters[0]!.pages[0]!, closes }] }] });
+    expect(validateBook(closing('ghost'))).toContainEqual('chapter 1 page 1 closes on "ghost", which is not one of its rows');
+    expect(validateBook(closing('forage'))).toContainEqual('chapter 1 page 1 closes on "forage", which is repeatable; it must be one-time');
   });
-  it('rejects a chapter event that is not its last one-time row', () => {
+  it('rejects a closing row that is not its page\'s last one-time row', () => {
     const shed = { id: 'shed', verb: 'build', noun: 'a shed', expCost: 1, itemCosts: [], isOneTime: true };
-    const b: Book = { ...good, actions: { ...good.actions, shed }, chapters: [{ ...good.chapters[0]!, order: [...good.chapters[0]!.order, 'shed'] }] };
-    expect(validateBook(b)).toContainEqual('chapter 1\'s event "hut" is not its last one-time row');
+    const b: Book = { ...good, actions: { ...good.actions, shed }, chapters: [{ ...good.chapters[0]!, pages: [{ ...good.chapters[0]!.pages[0]!, order: [...good.chapters[0]!.pages[0]!.order, 'shed'] }] }] };
+    expect(validateBook(b)).toContainEqual('chapter 1 page 1 closes on "hut", which is not its last one-time row');
   });
   it('rejects a row that costs one item twice', () => {
     const b = withActions({ ...good.actions, hut: { ...good.actions.hut!, itemCosts: [{ item: 'berries', amount: 1 }, { item: 'berries', amount: 2 }] } });
@@ -176,12 +175,14 @@ describe('validateBook', () => {
   });
   it('a key amount that is not a positive whole number is reported as that alone, not also as more than one of a key', () => {
     const costs = withActions({ ...good.actions, forage: { ...good.actions.forage!, itemCosts: [{ item: 'hut', amount: 0 }] } });
-    expect(validateBook(costs).filter((p) => p.startsWith('row "forage"'))).toEqual(['row "forage" costs 0 of "hut", which is not a positive whole number']);
+    // The page rule also reads a cost nothing on the page makes; this test is about the amount alone.
+    const amountOnly = (p: string) => p.startsWith('row "forage"') && !p.includes(' on chapter ');
+    expect(validateBook(costs).filter(amountOnly)).toEqual(['row "forage" costs 0 of "hut", which is not a positive whole number']);
     const needs = withActions({ ...good.actions, forage: { ...good.actions.forage!, needs: [{ item: 'hut', amount: 0 }] } });
-    expect(validateBook(needs).filter((p) => p.startsWith('row "forage"'))).toEqual(['row "forage" needs 0 of "hut", which is not a positive whole number']);
+    expect(validateBook(needs).filter(amountOnly)).toEqual(['row "forage" needs 0 of "hut", which is not a positive whole number']);
     // And a whole amount past one is the key rule's alone.
     const two = withActions({ ...good.actions, forage: { ...good.actions.forage!, needs: [{ item: 'hut', amount: 2 }] } });
-    expect(validateBook(two).filter((p) => p.startsWith('row "forage"'))).toEqual(['row "forage" needs 2 of the key "hut", and a key is held once']);
+    expect(validateBook(two).filter(amountOnly)).toEqual(['row "forage" needs 2 of the key "hut", and a key is held once']);
   });
   it('rejects a produced amount that is not a positive whole number, and says nothing of one left out', () => {
     for (const producedAmount of [0, -1, 0.5, Number.NaN]) {
@@ -229,5 +230,112 @@ describe('validateBook', () => {
     expect(validateBook({ ...good, length: { days: max + 1 } })).toContainEqual(expect.stringMatching(/cannot be loaded/));
     expect(validateBook({ ...good, length: { hours: (max + 1) * 24 } })).toContainEqual(expect.stringMatching(/cannot be loaded/));
     expect(validateBook({ ...good, length: { days: max } })).toEqual([]);
+  });
+});
+
+/** Two pages: page 1 builds a gate from wood and closes on it; page 2 needs the pass the gate made. */
+const paged: Book = {
+  ...good,
+  items: {
+    ...good.items,
+    wood: { id: 'wood', name: 'wood', kind: 'material' },
+    pass: { id: 'pass', name: 'a pass', kind: 'key' },
+    chart: { id: 'chart', name: 'a chart', kind: 'key' },
+  },
+  actions: {
+    ...good.actions,
+    chop: { id: 'chop', verb: 'forage', noun: 'wood', expCost: 1, producedItem: 'wood', producedAmount: 1, itemCosts: [], isOneTime: false },
+    gate: { id: 'gate', verb: 'build', noun: 'a gate', expCost: 2, producedItem: 'pass', producedAmount: 1, itemCosts: [{ item: 'wood', amount: 2 }], isOneTime: true },
+    hut: { ...good.actions.hut!, needs: [{ item: 'pass', amount: 1 }] },
+  },
+  chapters: [{ head: good.chapters[0]!.head, pages: [
+    { name: 'one', order: ['forage', 'chop', 'gate'], closes: 'gate' },
+    { name: 'two', order: ['forage', 'hut'], closes: 'hut' },
+  ] }],
+};
+const pages = (...ps: Book['chapters'][number]['pages']): Book => ({ ...paged, chapters: [{ ...paged.chapters[0]!, pages: ps }] });
+const [one, two] = paged.chapters[0]!.pages as [Book['chapters'][number]['pages'][number], Book['chapters'][number]['pages'][number]];
+
+describe('validateBook: pages (spec 2026-09-24-pages section 4.1)', () => {
+  it('accepts a two-page chapter whose second page needs what the first page\'s closer made', () => {
+    expect(validateBook(paged)).toEqual([]);
+  });
+  it('rejects a chapter with no pages, and a page with no rows', () => {
+    expect(validateBook(pages())).toContainEqual('chapter 1 has no pages');
+    expect(validateBook(pages(one, two, { name: 'three', order: [], closes: 'hut' }))).toContainEqual('chapter 1 page 3 has no rows');
+  });
+  it('rejects a row listed twice on one page', () => {
+    expect(validateBook(pages({ ...one, order: ['forage', 'chop', 'chop', 'gate'] }, two))).toContainEqual('row "chop" is listed twice on chapter 1 page 1');
+  });
+  it('rejects a one-time row on two pages, and lets a repeatable be carried', () => {
+    expect(validateBook(pages(one, { ...two, order: ['forage', 'gate', 'hut'] }))).toContainEqual('one-time row "gate" is on more than one page');
+    expect(validateBook(pages(one, { ...two, order: ['forage', 'chop', 'hut'] }))).toEqual([]);
+  });
+  it('rejects a cost made only on an earlier page: a dropped harvest cannot restock it', () => {
+    const b: Book = { ...paged, actions: { ...paged.actions, hut: { ...paged.actions.hut!, itemCosts: [{ item: 'wood', amount: 1 }] } } };
+    expect(validateBook(b)).toContainEqual('row "hut" on chapter 1 page 2 costs "wood", which no row on the page but its closer makes');
+  });
+  it('gives food no exception: it is eaten every tick, so an earlier page\'s stock is not a supply', () => {
+    expect(validateBook(pages(one, { ...two, order: ['chop', 'hut'] }))).toContainEqual('row "hut" on chapter 1 page 2 costs "berries", which no row on the page but its closer makes');
+  });
+  it('rejects a need that only the page\'s own closer makes, since the closer runs last', () => {
+    const b: Book = {
+      ...pages({ ...one, order: ['forage', 'chop', 'shed', 'gate'] }, two),
+      actions: { ...paged.actions, shed: { id: 'shed', verb: 'build', noun: 'a shed', expCost: 1, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: true } },
+    };
+    expect(validateBook(b)).toContainEqual('row "shed" on chapter 1 page 1 needs "pass", which nothing on the page but its closer, or a one-time on an earlier page, makes');
+  });
+  it('rejects a one-time that needs what only a one-time listed after it makes', () => {
+    const b: Book = {
+      ...pages({ ...one, order: ['forage', 'chop', 'dig', 'map', 'gate'] }, two),
+      actions: {
+        ...paged.actions,
+        map: { id: 'map', verb: 'build', noun: 'a map', expCost: 1, producedItem: 'chart', producedAmount: 1, itemCosts: [], isOneTime: true },
+        dig: { id: 'dig', verb: 'build', noun: 'a dig', expCost: 1, itemCosts: [], needs: [{ item: 'chart', amount: 1 }], isOneTime: true },
+      },
+    };
+    expect(validateBook(b)).toContainEqual('row "dig" on chapter 1 page 1 needs "chart", which only a one-time listed after it makes');
+    // The other way round is fine.
+    expect(validateBook({ ...b, ...pages({ ...one, order: ['forage', 'chop', 'map', 'dig', 'gate'] }, two), actions: b.actions })).toEqual([]);
+  });
+  it('rejects a need an earlier page makes only by a repeatable: that stock is not sure to be held', () => {
+    const b: Book = { ...paged, actions: { ...paged.actions, hut: { ...paged.actions.hut!, needs: [{ item: 'wood', amount: 2 }] } } };
+    expect(validateBook(b)).toContainEqual('row "hut" on chapter 1 page 2 needs "wood", which nothing on the page but its closer, or a one-time on an earlier page, makes');
+  });
+  it('rejects a need above the base stack cap: it has to fit before any capacity row', () => {
+    const n = balance.inventory.stackCap + 1;
+    const b: Book = { ...paged, actions: { ...paged.actions, hut: { ...paged.actions.hut!, needs: [{ item: 'berries', amount: n }] } } };
+    expect(validateBook(b)).toContainEqual(`row "hut" needs ${n} of "berries", more than a stack holds at the base cap (${balance.inventory.stackCap})`);
+  });
+  it('accepts a need of exactly the base stack cap', () => {
+    const n = balance.inventory.stackCap;
+    const b: Book = { ...paged, actions: { ...paged.actions, hut: { ...paged.actions.hut!, needs: [{ item: 'pass', amount: 1 }, { item: 'berries', amount: n }] } } };
+    expect(validateBook(b)).toEqual([]);
+  });
+  it('asks the first chapter\'s first page to open: a free row on its second page does not count', () => {
+    // Page 1's only row is the gate, which costs wood; the free rows are all on page 2.
+    const b = pages({ ...one, order: ['gate'] }, { ...two, order: ['forage', 'chop', 'hut'] });
+    expect(validateBook(b)).toContainEqual('the first chapter\'s first page has no row that needs nothing in hand');
+    expect(validateBook(paged)).not.toContainEqual('the first chapter\'s first page has no row that needs nothing in hand');
+  });
+  it('rejects a one-time that costs what only a one-time listed after it makes', () => {
+    const b: Book = {
+      ...pages({ ...one, order: ['forage', 'chop', 'shed', 'map', 'gate'] }, two),
+      actions: {
+        ...paged.actions,
+        map: { id: 'map', verb: 'build', noun: 'a map', expCost: 1, producedItem: 'chart', producedAmount: 1, itemCosts: [], isOneTime: true },
+        shed: { id: 'shed', verb: 'build', noun: 'a shed', expCost: 1, itemCosts: [{ item: 'chart', amount: 1 }], isOneTime: true },
+      },
+    };
+    expect(validateBook(b)).toContainEqual('row "shed" on chapter 1 page 1 costs "chart", which only a one-time listed after it makes');
+    // The other way round is fine.
+    expect(validateBook({ ...b, ...pages({ ...one, order: ['forage', 'chop', 'map', 'shed', 'gate'] }, two), actions: b.actions })).toEqual([]);
+  });
+  it('rejects a need on a repeatable row that nothing on the page makes', () => {
+    const b: Book = { ...paged, actions: { ...paged.actions, chop: { ...paged.actions.chop!, needs: [{ item: 'chart', amount: 1 }] } } };
+    expect(validateBook(b)).toContainEqual('row "chop" on chapter 1 page 1 needs "chart", which nothing on the page but its closer, or a one-time on an earlier page, makes');
+  });
+  it('asks the finish to be the last chapter\'s last closing row, not its first page\'s', () => {
+    expect(validateBook({ ...paged, finish: 'gate' })).toContainEqual('finish "gate" is not the last chapter\'s last closing row');
   });
 });

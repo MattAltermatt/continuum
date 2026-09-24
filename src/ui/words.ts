@@ -35,6 +35,15 @@ export function itemName(content: Content, item: ItemId, amount?: number): strin
   return amount === 1 && it.one !== undefined ? it.one : it.name;
 }
 
+/**
+ * The rows a closer waits on, by their nouns and in page order: "the hull, a
+ * trawl net, a canvas satchel". The row's "after:" line and the log's `page`
+ * line both read this, so they never disagree.
+ */
+export function pageList(content: Content, ids: readonly ActionId[]): string {
+  return ids.map((id) => content.actions[id]?.noun ?? id).join(', ');
+}
+
 /** "needs 3 scrap", or "needs the star chart" for a key, or for any item named without an amount. */
 export function needPhrase(content: Content, item: ItemId, amount?: number): string {
   const key = content.items[item]?.kind === 'key';
@@ -77,6 +86,8 @@ export function words(content: Content, block: StartBlock, opts: WordsOptions = 
     case 'enough': return `${itemName(content, block.item)}: enough for what is queued`;
     case 'done': return 'already done';
     case 'elsewhere': return 'not in this port';
+    // A closer at rest while its page is unfinished (spec 2026-09-24-pages section 4.2): never a refusal, since a press pulls them.
+    case 'page': return `after: ${pageList(content, block.waits)}`;
     case 'hurt': return 'too hurt to fight: one more push would end this life \u00B7 Shift+play fights to the end';
   }
 }

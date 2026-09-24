@@ -19,7 +19,7 @@ const book: Content = {
     fish: { id: 'fish', verb: 'fish', noun: 'the cloud shallows', expCost: 4, producedItem: 'cloud-fish', producedAmount: 1, itemCosts: [], isOneTime: false },
     net: { id: 'net', verb: 'tinker', noun: 'a trawl net', expCost: 40, itemCosts: [], isOneTime: true, gear: { skill: 'fish', multiplier: 1.25 } },
   },
-  chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, order: ['fish', 'net'], event: 'net' }],
+  chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, pages: [{ name: '', order: ['fish', 'net'], closes: 'net' }] }],
   finish: 'net',
 };
 const fishDef = book.roster[0]!;

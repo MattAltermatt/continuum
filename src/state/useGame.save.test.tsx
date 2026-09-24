@@ -24,7 +24,7 @@ const longBook: Book = {
   roster: [{ id: 'build', name: 'Build', icon: 'house' }],
   items: {},
   actions: { long: { id: 'long', verb: 'build', noun: 'a long thing', expCost: 1e9, itemCosts: [], isOneTime: true } },
-  chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, order: ['long'], event: 'long' }],
+  chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, pages: [{ name: '', order: ['long'], closes: 'long' }] }],
 };
 
 const interval = balance.time.tickIntervalMs;

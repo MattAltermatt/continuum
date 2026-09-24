@@ -119,11 +119,11 @@ describe('the save', () => {
       version: 2,
       roster: [...testBook.roster, { id: 'sing', name: 'Sing', icon: 'message-circle' }],
       actions: {
-        ...Object.fromEntries(Object.entries(testBook.actions).filter(([id]) => first!.order.includes(id))),
+        ...Object.fromEntries(Object.entries(testBook.actions).filter(([id]) => first!.pages[0]!.order.includes(id))),
         shanty: { id: 'shanty', verb: 'sing', noun: 'a shanty', expCost: 1, itemCosts: [], isOneTime: false },
       },
-      chapters: [{ ...first!, order: [...first!.order, 'shanty'] }],
-      finish: first!.event,
+      chapters: [{ ...first!, pages: [{ ...first!.pages[0]!, order: [...first!.pages[0]!.order, 'shanty'] }] }],
+      finish: first!.pages[0]!.closes,
     };
     expect(validateBook(onePort)).toEqual([]);
     const loaded = loadSave(saveText(run, testBook), onePort);

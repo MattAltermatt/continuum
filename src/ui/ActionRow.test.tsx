@@ -3,10 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { balance } from '../balance';
 import { cycleOf, unlockAt } from '../engine/automation';
+import { built, withOrder } from '../engine/fixture';
 import { enqueue, newState } from '../engine/queue';
 import type { AutoMode, GameState } from '../engine/types';
 import type { Book } from '../data/types';
-import { testBook as book } from '../test-utils/book';
+import { pagedTestBook as paged, testBook as book } from '../test-utils/book';
 import { realClick } from '../test-utils/realClick';
 import { ActionRow, outputsOf } from './ActionRow';
 import { STOP, WARN } from './glyphs';
@@ -16,9 +17,15 @@ const fresh = (): GameState => newState(book.roster);
 const earned = (s: GameState, id: string, n: number): GameState => ({ ...s, completionCounts: { ...s.completionCounts, [id]: n } });
 const auto = (s: GameState, id: string, mode: AutoMode): GameState => ({ ...s, automation: { ...s.automation, [id]: mode } });
 
-function row(state: GameState, id: string, running = false) {
+/**
+ * The first port with no Salvage on the page: nothing here makes the hull's scrap, so play on the hull is still
+ * refused. On the full page a player's order pulls Salvage whatever its chip (spec 2026-09-24-pages section 4.3).
+ */
+const unsalvaged: Book = { ...book, chapters: [withOrder(book.chapters[0]!, ['fish', 'hull', 'satchel', 'net', 'gate', 'raid']), book.chapters[1]!] };
+
+function row(state: GameState, id: string, running = false, content: Book = book) {
   const spies = { onNow: vi.fn(), onQueue: vi.fn(), onAutomate: vi.fn() };
-  const view = (s: GameState, r = running) => <ActionRow action={book.actions[id]!} content={book} state={s} running={r} {...spies} />;
+  const view = (s: GameState, r = running) => <ActionRow action={content.actions[id]!} content={content} state={s} running={r} {...spies} />;
   const r = render(view(state));
   const el = () => r.container.querySelector(`[data-action="${id}"]`)!;
   return { ...r, ...spies, el, rerenderWith: (s: GameState, run = running) => r.rerender(view(s, run)) };
@@ -59,7 +66,8 @@ describe('ActionRow: what the row reads', () => {
     expect(screen.getByText('+8.0 xp')).toBeInTheDocument();
   });
   it('the middle chunk reads needs, then hurts, then the arrow and the output; an unmet need is in hurt text', () => {
-    const r = row(fresh(), 'raid');
+    const past = (s: GameState) => built(s, 'hull', 'satchel', 'net', 'gate');
+    const r = row(past(fresh()), 'raid');
     const c2 = r.el().querySelector('.row__c2')!;
     expect([...c2.children].map((e) => e.className)).toEqual(['row__in', 'row__arr', 'row__out']);
     const inputs = [...c2.querySelector('.row__in')!.children];
@@ -67,7 +75,7 @@ describe('ActionRow: what the row reads', () => {
     expect(screen.getByText('needs a pass')).toHaveClass('need', 'need--unmet');
     expect(c2.querySelector('.row__out')).toHaveTextContent('casts off');
     r.unmount();
-    row({ ...fresh(), inventory: { pass: 1 } }, 'raid');
+    row(past({ ...fresh(), inventory: { pass: 1 } }), 'raid');
     expect(screen.getByText('needs a pass')).not.toHaveClass('need--unmet');
   });
   it('an input part spent reads what is still owed; short of it, a warning and what the pack has', () => {
@@ -115,17 +123,17 @@ describe('ActionRow: what the row reads', () => {
 
 describe('ActionRow: play and +', () => {
   it('a refused play flashes the row red, shows the words, and dispatches nothing', async () => {
-    const r = row(fresh(), 'hull');
+    const r = row(fresh(), 'hull', false, unsalvaged);
     await act(() => realClick(play()));
     expect(r.onNow).not.toHaveBeenCalled();
     expect(r.el()).toHaveClass('row--refused');
-    expect(r.el().querySelector('.row__say')).toHaveTextContent(`needs 8 scrap \u00B7 Salvage scrap automation is not yet earned (0/${N}) \u00B7 earn it by hand`);
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('nothing here makes scrap');
     // An animation that ends on a child (the play button's own flash) bubbles up and does not end the row's.
     animationEnd(play());
     expect(r.el()).toHaveClass('row--refused');
     animationEnd(r.el());
     expect(r.el()).not.toHaveClass('row--refused');
-    expect(r.el().querySelector('.row__say')).toHaveTextContent(/needs 8 scrap/);
+    expect(r.el().querySelector('.row__say')).toHaveTextContent(/nothing here makes scrap/);
   });
   it('play asks frontBlock, so a producer whose look-ahead is already met is refused with "enough"; Shift+click is a single run and passes', async () => {
     const s = { ...enqueue(fresh(), book, 'satchel'), inventory: { scrap: 3 } };
@@ -138,7 +146,8 @@ describe('ActionRow: play and +', () => {
     expect(r.onNow).toHaveBeenCalledWith('salvage', true);
   });
   it('play on a fight that would back off is refused with the words that name Shift+play; Shift+play passes (#74)', async () => {
-    const s = { ...fresh(), inventory: { pass: 1 }, health: 0.5 };
+    // The raid's page built (spec 2026-09-24-pages): the fight is checked once it could start.
+    const s = built({ ...fresh(), inventory: { pass: 1 }, health: 0.5 }, 'hull', 'satchel', 'net', 'gate');
     const r = row(s, 'raid');
     await act(() => realClick(play()));
     expect(r.onNow).not.toHaveBeenCalled();
@@ -148,25 +157,32 @@ describe('ActionRow: play and +', () => {
     expect(r.onNow).toHaveBeenCalledWith('raid', true);
   });
   it('+ on a fight that would stop dispatches and says why, with no flash (#74: + did nothing visible)', async () => {
-    const r = row({ ...fresh(), inventory: { pass: 1 }, health: 0.5 }, 'raid');
+    const r = row(built({ ...fresh(), inventory: { pass: 1 }, health: 0.5 }, 'hull', 'satchel', 'net', 'gate'), 'raid');
     await act(() => realClick(plus()));
     expect(r.onQueue).toHaveBeenCalledWith('raid', false);
     expect(r.el()).not.toHaveClass('row--refused');
     expect(r.el().querySelector('.row__say')).toHaveTextContent('too hurt to fight: one more push would end this life \u00B7 Shift+play fights to the end');
   });
   it('a set chip on a fight that would kill does not wait and is not refused: automated, it fights on (the user, 2026-09-24)', async () => {
-    const s = { ...fresh(), inventory: { pass: 1 }, health: 0.5, completionCounts: { raid: unlockAt(book.actions.raid!) }, automation: { raid: 'high' as const } };
+    const s = built({ ...fresh(), inventory: { pass: 1 }, health: 0.5, completionCounts: { raid: unlockAt(book.actions.raid!) }, automation: { raid: 'high' as const } }, 'hull', 'satchel', 'net', 'gate');
     const r = row(s, 'raid');
     expect(r.el().querySelector('.row__say')).toBeNull();
     await act(() => realClick(play()));
     expect(r.onNow).toHaveBeenCalledWith('raid', false);
   });
-  it('+ always dispatches, and for a short row shows the same words with no flash', async () => {
-    const r = row(fresh(), 'hull');
+  it('+ always dispatches, and for a row nothing on the page supplies shows the refusal\'s words with no flash', async () => {
+    const r = row(fresh(), 'hull', false, unsalvaged);
     await act(() => realClick(plus()));
     expect(r.onQueue).toHaveBeenCalledWith('hull', false);
     expect(r.el()).not.toHaveClass('row--refused');
-    expect(r.el().querySelector('.row__say')).toHaveTextContent(`needs 8 scrap \u00B7 Salvage scrap automation is not yet earned (0/${N}) \u00B7 earn it by hand`);
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('nothing here makes scrap');
+  });
+  it('+ on a row short of what a row on the page makes says nothing: the order pulls the maker, chip unearned (spec 2026-09-24-pages 4.3)', async () => {
+    const r = row(fresh(), 'hull');
+    await act(() => realClick(plus()));
+    expect(r.onQueue).toHaveBeenCalledWith('hull', false);
+    expect(r.el().querySelector('.row__say')).toBeNull();
+    expect(r.el().querySelector('.row__in')).toHaveTextContent(/8 scrap/);
   });
   it('Shift+click passes once on both buttons; a plain click does not', async () => {
     const r = row(fresh(), 'fish');
@@ -186,7 +202,7 @@ describe('ActionRow: play and +', () => {
     expect(r.onQueue.mock.calls).toEqual([['fish', false]]);
   });
   it('Enter on play is refused like a click: nothing dispatched, the row flashes', () => {
-    const r = row(fresh(), 'hull');
+    const r = row(fresh(), 'hull', false, unsalvaged);
     fireEvent.keyDown(play(), { key: 'Enter' });
     expect(r.onNow).not.toHaveBeenCalled();
     expect(r.el()).toHaveClass('row--refused');
@@ -198,7 +214,7 @@ describe('ActionRow: the instruction holds, then fades', () => {
   afterEach(() => vi.useRealTimers());
 
   it('the words hold for a few seconds and go, and the flash goes with them if no animation ended it', () => {
-    const r = row(fresh(), 'hull');
+    const r = row(fresh(), 'hull', false, unsalvaged);
     act(() => { play().click(); });
     expect(r.el()).toHaveClass('row--refused');
     act(() => { vi.runAllTimers(); });
@@ -207,10 +223,10 @@ describe('ActionRow: the instruction holds, then fades', () => {
     expect(r.el().querySelector('.row__in')).toHaveTextContent(/8 scrap/);
   });
   it('the instruction is a snapshot: it holds even if the scrap lands during the hold', () => {
-    const r = row(fresh(), 'hull');
+    const r = row(fresh(), 'hull', false, unsalvaged);
     act(() => { plus().click(); });
     r.rerenderWith({ ...fresh(), inventory: { scrap: 5 } });
-    expect(r.el().querySelector('.row__say')).toHaveTextContent(/needs 8 scrap/);
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('nothing here makes scrap');
   });
   it('no instruction when play succeeds', () => {
     const r = row(fresh(), 'fish');
@@ -277,12 +293,13 @@ describe('ActionRow: the automation chip', () => {
   });
   it('the waiting words give way to a running row and to an instruction', async () => {
     const s = auto(earned(fresh(), 'hull', balance.automation.unlockOneTime), 'hull', 'high');
-    const r = row(s, 'hull', true);
+    const r = row(s, 'hull', true, unsalvaged);
     expect(r.el().querySelector('.row__say')).toBeNull();
     expect(chip()).toHaveClass('auto--waits');
     r.rerenderWith(s, false);
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('waits: nothing here makes scrap');
     await act(() => realClick(plus()));
-    expect(r.el().querySelector('.row__say')).toHaveTextContent(`needs 8 scrap \u00B7 Salvage scrap automation is not yet earned (0/${N}) \u00B7 earn it by hand`);
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('nothing here makes scrap');
     expect(r.el().querySelector('.row__say')).not.toHaveClass('row__say--waits');
   });
   it('no waiting look while the chip is off, nor once automation would supply the row', () => {
@@ -295,5 +312,41 @@ describe('ActionRow: the automation chip', () => {
     expect(chip()).not.toHaveClass('auto--waits');
     expect(r.el().querySelector('.row__say')).toBeNull();
     expect(r.el().querySelector('.row__in')).toHaveTextContent(/8 scrap/);
+  });
+});
+
+describe('ActionRow: pages (spec 2026-09-24-pages)', () => {
+  it('the tag: the end for the finish, casts off for a chapter\'s last closer, turns the page for any other closer', () => {
+    expect(outputsOf(paged, paged.actions.vault!)).toEqual(['the end']);
+    expect(outputsOf(paged, paged.actions.raid!)).toEqual(['casts off']);
+    expect(outputsOf(paged, paged.actions.gate!)).toEqual(['turns the page']);
+    // Not a closer: what it makes, as before.
+    expect(outputsOf(paged, paged.actions.satchel!)).toEqual(['stack +5']);
+  });
+  it('a closer with its page unfinished says, at rest and with no press, what it comes after, in page order', () => {
+    const r = row(fresh(), 'gate', false, paged);
+    const say = r.el().querySelector('.row__say');
+    expect(say).toHaveTextContent('after: the hull, a satchel, a net');
+    expect(say).toHaveClass('row__say--waits');
+    expect(r.el().querySelector('.row__in')).toBeNull();
+    r.rerenderWith(built(fresh(), 'hull', 'net'));
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('after: a satchel');
+    r.rerenderWith(built(fresh(), 'hull', 'satchel', 'net'));
+    expect(r.el().querySelector('.row__say')).toBeNull();
+    expect(r.el().querySelector('.row__out')).toHaveTextContent('turns the page');
+  });
+  it('a row that is not a closer, and a closer running, say no "after:"', () => {
+    const r = row(fresh(), 'hull', false, paged);
+    expect(r.el().querySelector('.row__say')).toBeNull();
+    r.unmount();
+    const on = row(fresh(), 'gate', true, paged);
+    expect(on.el().querySelector('.row__say')).toBeNull();
+  });
+  it('play on a closer with its page unfinished is not refused: it dispatches, since the press pulls its page', async () => {
+    const r = row(fresh(), 'gate', false, paged);
+    await act(() => realClick(play()));
+    expect(r.onNow).toHaveBeenCalledWith('gate', false);
+    expect(r.el()).not.toHaveClass('row--refused');
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('after: the hull, a satchel, a net');
   });
 });

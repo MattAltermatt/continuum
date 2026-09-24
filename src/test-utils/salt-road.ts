@@ -19,7 +19,7 @@ export const saltRoadFixture: Book = {
     { id: 'build', name: 'Build', icon: 'house' },
   ],
   chapters: [
-    { head: { numeral: 'I', chapter: 'The Scrub', story: 'Dry country. The pass is watched.' }, order: ['forage', 'mine', 'cabin', 'hall'], event: 'hall' },
+    { head: { numeral: 'I', chapter: 'The Scrub', story: 'Dry country. The pass is watched.' }, pages: [{ name: '', order: ['forage', 'mine', 'cabin', 'hall'], closes: 'hall' }] },
   ],
   items: {
     berries: { id: 'berries', name: 'berries', kind: 'food', healPerUnit: 4 },

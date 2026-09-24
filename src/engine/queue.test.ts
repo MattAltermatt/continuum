@@ -4,7 +4,7 @@ import type { Content } from '../data/types';
 import { setAutomation, unlockAt } from './automation';
 import { unitThreshold } from './costs';
 import { capOf } from './effects';
-import { fixture } from './fixture';
+import { built, fixture, withOrder } from './fixture';
 import { enqueue, frontBlock, newState, removeEntry, startBlock, supplyVia, work } from './queue';
 import { deathSummary, rebirth } from './rebirth';
 import { setPaused, step } from './tick';
@@ -49,17 +49,25 @@ describe('enqueue', () => {
   it('refuses (the same object) a row this port lacks, a done one-time, and a dead state', () => {
     const s = fresh();
     expect(enqueue(s, content, 'vault')).toBe(s);
-    const built = { ...s, completedOneTime: ['hull'] };
-    expect(enqueue(built, content, 'hull')).toBe(built);
+    const hullDone = { ...s, completedOneTime: ['hull'] };
+    expect(enqueue(hullDone, content, 'hull')).toBe(hullDone);
     const dead = { ...s, dead: true };
     expect(enqueue(dead, content, 'salvage')).toBe(dead);
   });
 });
 
 describe('now refuses what cannot start (spec section 2.5)', () => {
-  it('refuses the hull on an empty pack with Salvage unearned; + appends; automation is accepted', () => {
+  it('refuses the hull on an empty pack when nothing on the page makes scrap; + appends; automation is accepted', () => {
+    // With Salvage on the page, play is accepted whatever its chip: resolve pulls it (spec 2026-09-24-pages 4.3).
+    expect(enqueue(fresh(), content, 'hull', { front: true }).queue.map((e) => e.actionId)).toEqual(['hull']);
+    const bare: Content = { ...content, chapters: [withOrder(content.chapters[0]!, ['fish', 'hull', 'satchel', 'gate', 'raid']), content.chapters[1]!] };
+    const s = newState(bare.roster);
+    expect(enqueue(s, bare, 'hull', { front: true })).toBe(s);
+    expect(enqueue(s, bare, 'hull').queue.map((e) => e.actionId)).toEqual(['hull']);
+    expect(enqueue(s, bare, 'hull', { front: true, by: 'auto' }).queue.map((e) => e.actionId)).toEqual(['hull']);
+  });
+  it('on the fixture page, + appends and automation\'s play is accepted', () => {
     const s = fresh();
-    expect(enqueue(s, content, 'hull', { front: true })).toBe(s);
     expect(enqueue(s, content, 'hull').queue.map((e) => e.actionId)).toEqual(['hull']);
     expect(enqueue(s, content, 'hull', { front: true, by: 'auto' }).queue.map((e) => e.actionId)).toEqual(['hull']);
   });
@@ -89,7 +97,9 @@ describe('removeEntry', () => {
 describe("the spec's walk-through (section 2.3): hull 8 scrap, cap 5", () => {
   it('salvage, hull, salvage, hull finishes the hull, and the second salvage fetches exactly 3', () => {
     let s = fresh();
-    for (const id of ['salvage', 'hull', 'salvage', 'hull']) s = enqueue(s, content, id);
+    // The hulls are automation's orders, which pop short with Salvage unearned as the walk-through reads; a
+    // player's hull would pull Salvage in front of it instead (spec 2026-09-24-pages section 4.3).
+    for (const id of ['salvage', 'hull', 'salvage', 'hull']) s = enqueue(s, content, id, id === 'hull' ? { by: 'auto' } : {});
     s = live(s);
     let peakFirst = 0;
     let peakSecond = 0;
@@ -132,8 +142,8 @@ describe('work', () => {
     expect(one.skills.salvage!.core.exp).toBeCloseTo(balance.skills.baseTickExp, 12);
     expect(one.skills.salvage!.run.exp).toBeCloseTo(balance.skills.baseTickExp, 12);
     expect(one.skillStats.salvage).toEqual({ ticks: 1, bestRun: 0 });
-    // The raid is 30 XP of Fight: its run ledger reaches level 1 (25 XP) before it completes.
-    const raid = live(enqueue({ ...fresh(), inventory: { pass: 1 } }, content, 'raid'));
+    // The raid is 30 XP of Fight: its run ledger reaches level 1 (25 XP) before it completes. The rest of its page is built, so only the raid runs.
+    const raid = live(enqueue({ ...built(fresh(), 'hull', 'satchel', 'gate'), inventory: { pass: 1 } }, content, 'raid'));
     const { s: later } = runUntil(content, raid, (x) => x.skills.fight!.run.level >= 1);
     expect(later.skillStats.fight!.bestRun).toBe(1);
     expect(later.skillStats.fight!.ticks).toBe(later.runTicks);
@@ -153,7 +163,7 @@ describe('progress never runs past an unpaid unit (MECHANICS section 2)', () => 
   const quickBook: Content = {
     ...content,
     actions: { ...content.actions, quick: { id: 'quick', verb: 'rig', noun: 'a quick thing', expCost: 2 * tick, itemCosts: [{ item: 'scrap', amount: 4 }], isOneTime: true } },
-    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'quick'] }, content.chapters[1]!],
+    chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'quick']), content.chapters[1]!],
   };
   const quick = quickBook.actions.quick!;
   const onQuick = (scrap: number): GameState => ({ ...fresh(), inventory: { scrap }, queue: [{ id: 0, actionId: 'quick', mode: 'once', by: 'player' }] });
@@ -256,7 +266,7 @@ describe('completion', () => {
     const polish: Content = {
       ...content,
       actions: { ...content.actions, polish: { id: 'polish', verb: 'rig', noun: 'brass', expCost: 1, itemCosts: [{ item: 'scrap', amount: 1 }], isOneTime: false } },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'polish'] }, content.chapters[1]!],
+      chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'polish']), content.chapters[1]!],
     };
     const s = { ...fresh(), inventory: { scrap: 2 }, queue: [{ id: 0, actionId: 'polish', mode: 'repeat' as const, by: 'player' as const }], work: { polish: { progress: 0.95, costsConsumed: 1 } } };
     const after = work(s, polish);
@@ -286,7 +296,7 @@ describe('supplyVia (section 2.4)', () => {
   const withPress = (costs: Content['actions'][string]['itemCosts']): Content => ({
     ...content,
     actions: { ...content.actions, press: { id: 'press', verb: 'salvage', noun: 'a press', expCost: 1, producedItem: 'scrap', producedAmount: 1, itemCosts: costs, isOneTime: false } },
-    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'press'] }, content.chapters[1]!],
+    chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'press']), content.chapters[1]!],
   });
   it('JIT goes before a priority when two rows make the item', () => {
     const two = withPress([]);
@@ -305,7 +315,7 @@ describe('supplyVia (section 2.4)', () => {
       ...two,
       items: { ...two.items, oil: { id: 'oil', name: 'oil', kind: 'material' } },
       actions: { ...two.actions, well: { id: 'well', verb: 'salvage', noun: 'a well', expCost: 1, producedItem: 'oil', producedAmount: 1, itemCosts: [], isOneTime: false } },
-      chapters: [{ ...two.chapters[0]!, order: [...two.chapters[0]!.order, 'well'] }, two.chapters[1]!],
+      chapters: [withOrder(two.chapters[0]!, [...two.chapters[0]!.pages[0]!.order, 'well']), two.chapters[1]!],
     };
     const s = auto(deep, newState(deep.roster), { press: 'jit' });
     expect(supplyVia(s, deep, 'scrap', seen('hull'))).toEqual({ kind: 'gap', maker: 'press', gap: 'blocked', cause: { item: 'oil', maker: 'well', gap: 'unearned' } });
@@ -322,7 +332,7 @@ describe('supplyVia (section 2.4)', () => {
         well: { id: 'well', verb: 'salvage', noun: 'a well', expCost: 1, producedItem: 'oil', producedAmount: 1, itemCosts: [{ item: 'ore', amount: 1 }], isOneTime: false },
         mine: { id: 'mine', verb: 'salvage', noun: 'a mine', expCost: 1, producedItem: 'ore', producedAmount: 1, itemCosts: [], isOneTime: false },
       },
-      chapters: [{ ...two.chapters[0]!, order: [...two.chapters[0]!.order, 'well', 'mine'] }, two.chapters[1]!],
+      chapters: [withOrder(two.chapters[0]!, [...two.chapters[0]!.pages[0]!.order, 'well', 'mine']), two.chapters[1]!],
     };
     const s = auto(deep, newState(deep.roster), { press: 'jit', well: 'jit' });
     // Deep: the press itself lacks oil, not ore.
@@ -369,7 +379,8 @@ describe('casting off (section 4)', () => {
     const s: GameState = live({
       ...fresh(),
       inventory: { scrap: 3, pass: 1, fish: 2 },
-      completedOneTime: ['satchel', 'hull'],
+      // The raid closes its page (spec 2026-09-24-pages): the rest of the page is built.
+      completedOneTime: ['satchel', 'hull', 'gate'],
       decayMultiplier: 0.5,
       // Salvage half-worked: a row that is not done keeps its work across the cast-off.
       work: { salvage: { progress: 0.5, costsConsumed: 0 }, raid: { progress: 29.95, costsConsumed: 0 } },

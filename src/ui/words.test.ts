@@ -63,17 +63,28 @@ describe('words', () => {
     expect(words(book, short({ item: 'scrap', amount: 8, maker: 'salvage', gap: 'off' }), { waiting: true })).toBe('waits: Salvage drifting scrap automation is off');
     expect(words(book, short({ item: 'scrap', amount: 8, maker: null, gap: 'none' }), { waiting: true })).toBe('waits: nothing here makes scrap');
   });
-  it('writes what the engine reports: at the Fortune with nothing built, Varro names the first thing a hand can do', () => {
-    const s = { ...newState(book.roster), chapter: 2 };
-    const block = startBlock(s, book, 'varro');
-    expect(block).toEqual({ kind: 'short', item: 'varros-table', amount: 1, maker: 'salons', gap: 'blocked', cause: { item: 'chips', maker: 'dealers', gap: 'unearned', deep: true } });
-    expect(words(book, block!, { counts: s.completionCounts }))
-      .toBe(`needs Varro's table \u00B7 Search the salons can't run: further down, needs chips \u00B7 Talk to the dealers automation is not yet earned (0/${N}) \u00B7 earn it by hand`);
+  it('writes what the engine reports: on Upper decks without the deck pass, the enforcers say nothing here makes one', () => {
+    // The Fortune is paged (spec 2026-09-24-pages): the door that gave the pass is on the page behind us.
+    const s = { ...newState(book.roster), chapter: 2, completedOneTime: ['dock', 'trunk', 'door'] };
+    const block = startBlock(s, book, 'enforcers');
+    expect(block).toEqual({ kind: 'short', item: 'deck-pass', amount: 1, maker: null, gap: 'none' });
+    expect(words(book, block!, { counts: s.completionCounts })).toBe('nothing here makes a deck pass');
+    // The page's closer, meanwhile, waits on them.
+    expect(startBlock(s, book, 'salons')).toEqual({ kind: 'page', waits: ['enforcers'] });
   });
   it('writes what the engine reports: a fresh life\'s hull is short of scrap and its maker has no chip', () => {
     const s = newState(testBook.roster);
     const block = startBlock(s, testBook, 'hull');
     expect(block).toEqual({ kind: 'short', item: 'scrap', amount: 8, maker: 'salvage', gap: 'unearned' });
     expect(words(testBook, block!, { counts: s.completionCounts })).toBe(`needs 8 scrap \u00B7 Salvage scrap automation is not yet earned (0/${N}) \u00B7 earn it by hand`);
+  });
+  it('page: after, then the rows waited on by their nouns, in the order given', () => {
+    expect(words(book, { kind: 'page', waits: ['hull', 'net', 'satchel'] })).toBe('after: the hull, a trawl net, a canvas satchel');
+    expect(words(book, { kind: 'page', waits: ['cutlass'] })).toBe('after: a cutlass');
+  });
+  it('writes what the engine reports: a fresh life\'s sails come after the hull, the net and the satchel', () => {
+    const block = startBlock(newState(book.roster), book, 'sails');
+    expect(block).not.toBeNull();
+    expect(words(book, block!)).toBe('after: the hull, a trawl net, a canvas satchel');
   });
 });

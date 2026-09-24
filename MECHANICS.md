@@ -144,17 +144,27 @@ Death clears every row's progress.
 
 Before any time passes (decision #41), in order:
 
-1. A row the current port does not have is dropped.
-2. A fight about to kill backs off (section 4, Hurts), unless it was forced.
-3. A producer that is full, or a repeating producer that has fetched what the
+1. A row the current page does not have is dropped.
+2. A page's closing row whose page still has one-time rows undone pulls the
+   first of them in front of it, for it (section 7); one already queued below
+   moves up with the orders that serve it, staying the player's. One pulled
+   this pass and gone again means the page cannot be built now: the closer
+   leaves, and says what it waits on.
+3. A fight about to kill backs off (section 4, Hurts), unless it was forced.
+4. A producer that is full, or a repeating producer that has fetched what the
    entries below it need (the look-ahead, below), pops.
-4. A top entry that lacks an item (a cost unit it owes, or an unmet need) is
-   **supplied** if automation can make the item (section 6): the maker goes in
-   at the top for exactly the shortfall. Otherwise it pops, and says why:
-   nothing here makes it, its maker's automation is off or not yet earned, or
-   its maker is blocked itself (naming the deepest cause down the chain).
-5. An empty queue is filled by automation (section 6): JIT rows first, then
-   the priorities.
+5. A top entry that lacks an item (a cost unit it owes, or an unmet need) is
+   **supplied**. A player's order, or anything serving one, takes the first
+   row on the page that makes the item, whatever that row's automation: the
+   player's press queues its whole chain, deepest first. Automation's own
+   orders are supplied only if automation can make the item (section 6). The
+   maker goes in at the top for exactly the shortfall. Otherwise the entry
+   pops, and says why: nothing here makes it, its maker's automation is off or
+   not yet earned, or its maker is blocked itself (naming the deepest cause
+   down the chain).
+6. An empty queue is filled by automation (section 6): JIT rows first, then
+   the priorities. A closing row on a priority is ordered only once its next
+   prerequisite can start, so its pull never fails.
 
 This repeats until the top can run or the queue is empty; an empty queue stops
 the clock.
@@ -175,10 +185,10 @@ entry runs exactly one completion. So `salvage, hull, salvage, hull` with an
 salvage fetches exactly 3, and the hull finishes; and `dealers, kitchens`, both
 repeating, fetches a chip for every canapé the kitchens can still make.
 
-"Now" refuses a row that cannot run and that no automation would supply
-(following the chain), and a producer whose look-ahead from the top is already
-met, and a fight that would stop at once (section 4, Hurts); + appends even
-then.
+"Now" refuses a row short of something nothing on the page makes, a
+producer whose look-ahead from the top is already met, and a fight that would
+stop at once (section 4, Hurts); a closing row waiting on its page is accepted
+and checked for the fight when it would start. + appends even then.
 
 ### On completion
 
@@ -483,14 +493,16 @@ needs. A newly earned chip starts at off.
 
 - **JIT, just in time.** When the top entry lacks the item this row makes, it
   goes in at the top at once, for exactly the shortfall (the look-ahead makes it
-  exact), skipping every priority. A JIT **food** row is queued the moment its
-  food runs out, with a count: the completions to the cap from what was on hand
+  exact), skipping every priority. A **food** row on any chip, JIT or a
+  priority (#81), is queued at the top the moment its food runs out, even in the
+  middle of a press's chain, with a count: the completions to the cap from what was on hand
   (so a fill that eating outpaces still ends; while food is at zero a new one
   follows). A fill the player buries under a play press (an order of the
   player's above it) goes back to the top if the food is out, and so does a
   fill for a food whose only order is the player's own, below anything but its
-  own supply; taken off JIT, a food row's fill leaves with its supply, and the
-  departure's provision is owed again. And when a port's big event is on top, unstarted and able to start
+  own supply; taken off JIT, or turned off from a priority, a food row's fill
+  leaves with its supply (off, automation stops harvesting), and leaving JIT
+  owes the departure's provision again. And when a port's big event is on top, unstarted and able to start
   (its own supply, a key it needs, already fetched), every JIT food below its
   cap is **provisioned** first, once per food per departure (never before the
   book's finish, which is not a departure).
@@ -513,12 +525,25 @@ Supply follows the chain: a maker that is automated but cannot run itself does
 not count, and "now" refuses up front what no chain can close. Nothing refills
 while the player has paused.
 
-## 7. Ports, casting off, and the finish
+## 7. Ports, pages, casting off, and the finish
 
-A book is a line of chapters, its **ports**. Only the current port's rows are on
-screen and can be queued. Completing a port's big event (its last one-time row)
-**casts off**: the next port's rows are the rows, every non-food item is dumped
-(provisions ride along), and the queue keeps only orders the new port has. The
+A book is a line of chapters, its **ports**, and each port is a line of
+**pages**. Only the current page's rows are on screen and can be queued. A page
+ends on its **closing row**, a one-time row that cannot start until every
+other one-time row on the page is done; completing it turns the page. Pages
+replace one another: each lists its own rows, and a row (food, usually) may be
+listed on several pages of its port, carrying its progress. Turning a page
+keeps the items and the automation and drops queued orders for rows the new
+page does not list. The page is never stored: it is the first page of the port
+whose closing row is not done, so a new life is on page 1. A gate in a story
+is written as a page boundary, never as a condition on a row
+([spec](./docs/specs/2026-09-24-pages.md)). JIT is offered only on a row whose
+output a row on a page it shares spends.
+
+A port's last page's closing row is its event, whatever that row is.
+Completing it **casts off**: the next port's first page is the page, every
+non-food item is dumped (provisions ride along), and the queue keeps only
+orders the new page has. The
 effects completed rows applied stay for the life. The last port's event is the
 book's **finish**: the life ends there, a finish card shows the book's last
 line, and the next life starts again at the first port with core ledgers,

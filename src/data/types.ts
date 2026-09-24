@@ -61,12 +61,23 @@ export interface ItemDefinition {
   readonly healPerUnit?: number;
 }
 
-/** A port of call (section 4): its head, its rows in display order, and its big event. */
+/**
+ * A page of a chapter (spec 2026-09-24-pages section 4): its rows in display
+ * order, and the closing row that turns it. Only the current page's rows are
+ * in play.
+ */
+export interface Page {
+  /** Shown after the chapter's name. */
+  readonly name: string;
+  readonly order: readonly ActionId[];
+  /** A one-time row in `order`, its last one-time row. It waits for the page's other one-times; completing it turns the page. */
+  readonly closes: ActionId;
+}
+
+/** A port of call (section 4): its head and its pages. Its last page's closing row casts off; in the last chapter it is the book's finish. */
 export interface Chapter {
   readonly head: ChapterHead;
-  readonly order: readonly ActionId[];
-  /** Completing it casts off; in the last chapter it is the book's finish. A one-time row in `order`. */
-  readonly event: ActionId;
+  readonly pages: readonly Page[];
 }
 
 export interface Content {

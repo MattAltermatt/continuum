@@ -288,6 +288,13 @@ unsubscribed event) ship without asking.
   `localStorage.removeItem('continuum.save')`. Two tabs of the game each
   write the same key, so the last to write wins: a known limit, play in one. `src/test-setup.ts` clears
   local storage after every test, so jsdom tests never load each other's runs.
+- **The page is derived, never stored** (spec 2026-09-24-pages). `pageOf` in
+  `src/engine/rows.ts` is the chapter's first page whose closing row is not done,
+  so nothing resets it and no save carries it. Two readers of "the event" differ:
+  the page rule, `delayFor` and the play policy read `pageOf(...).closes`;
+  departure (provisioning, `castOff`, the "casts off" tag) reads `eventOf(chapter)`,
+  the last page's closer. A test not about pages starts past them with `built()`
+  from `src/engine/fixture.ts`; `pagedBook` there is the two-page fixture.
 - **Automation acts in one place: `resolve()` in `src/engine/resolve.ts`,** the
   zero-time pass before a tick spends time. Anything that queues on the game's
   behalf belongs there (its orders leave with the order they supply through
@@ -297,7 +304,10 @@ unsubscribed event) ship without asking.
   `useGame` also runs it after every action and tick while live (`settled`),
   so the committed state, the screen and `window.continuum.state()` are the
   state the next tick will work: a producer that just filled is already gone
-  from the top. Paused, nothing settles. **`src/engine/property.test.ts`**
+  from the top. Its supply path branches on who an order is for: a player's
+  order, or anything serving one down its `for` chain, pulls the page's maker
+  whatever the chips (spec 2026-09-24-pages 4.3); automation's own orders go
+  through the chips. Paused, nothing settles. **`src/engine/property.test.ts`**
   (seeded random play at every port, invariants checked after every action
   and tick) is the guard for this area: five code panel rounds each found a
   queue defect the previous round's fix had made, and it fails on every one of

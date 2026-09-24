@@ -3,7 +3,7 @@ import { balance } from '../balance';
 import type { Content } from '../data/types';
 import { validateBook } from '../data/validate';
 import { setAutomation, unlockAt } from './automation';
-import { fixture } from './fixture';
+import { built, fixture, withOrder } from './fixture';
 import { enqueue, newState, removeEntry, startBlock } from './queue';
 import { resolve, topWorks } from './resolve';
 import { setPaused, step } from './tick';
@@ -35,6 +35,25 @@ function runUntil(c: Content, state: GameState, done: (s: GameState) => boolean,
   return { s, events, states };
 }
 const fresh = () => newState(content.roster);
+/**
+ * The raid closes its page and waits on the page's other one-time rows (spec
+ * 2026-09-24-pages section 4.2). A test about the raid, not about its page,
+ * starts past them.
+ */
+const ready = () => built(fresh(), 'hull', 'satchel', 'gate');
+/**
+ * Chapter I with the raid's page short of the satchel, whose capacity bonus,
+ * once built, would move the food cap the fill and provision tests count to.
+ */
+const unpacked: Content = { ...content, chapters: [withOrder(content.chapters[0]!, ['fish', 'salvage', 'hull', 'gate', 'raid']), content.chapters[1]!] };
+/** Past the raid's page in `unpacked`. */
+const unpackedReady = () => built(fresh(), 'hull', 'gate');
+/**
+ * Chapter I with the raid on a page it does not close: a test about how the
+ * raid's pass is supplied reaches the supply path, which a closer's page
+ * prerequisite would otherwise go around.
+ */
+const unclosed: Content = { ...content, chapters: [withOrder(content.chapters[0]!, ['fish', 'salvage', 'hull', 'gate', 'raid', 'satchel'], 'satchel'), content.chapters[1]!] };
 const automated = (events: GameEvent[]) => events.filter((e): e is Extract<GameEvent, { type: 'automated' }> => e.type === 'automated');
 const entry = (id: number, actionId: string, mode: QueueEntry['mode'] = 'repeat'): QueueEntry => ({ id, actionId, mode, by: 'player' });
 
@@ -58,9 +77,11 @@ describe('JIT supply (section 3.2)', () => {
 
 describe('off, unearned, none (section 2.4)', () => {
   it('a hull whose maker is off pops with gap off; unearned with gap unearned', () => {
-    const off = step(live(enqueue(withModes(fresh(), content, { salvage: 'off' }), content, 'hull')), content);
+    // Automation's order: a player's order pulls its maker whatever the chip (spec 2026-09-24-pages section 4.3);
+    // automation's still goes through the chips, and this is that path.
+    const off = step(live(enqueue(withModes(fresh(), content, { salvage: 'off' }), content, 'hull', { by: 'auto' })), content);
     expect(off.events).toContainEqual({ type: 'short', actionId: 'hull', item: 'scrap', amount: 8, maker: 'salvage', gap: 'off' });
-    const unearned = step(live(enqueue(fresh(), content, 'hull')), content);
+    const unearned = step(live(enqueue(fresh(), content, 'hull', { by: 'auto' })), content);
     expect(unearned.events).toContainEqual({ type: 'short', actionId: 'hull', item: 'scrap', amount: 8, maker: 'salvage', gap: 'unearned' });
   });
   it('a row costing an item nothing makes pops with gap none and no maker', () => {
@@ -68,7 +89,7 @@ describe('off, unearned, none (section 2.4)', () => {
       ...content,
       items: { ...content.items, ore: { id: 'ore', name: 'ore', kind: 'material' } },
       actions: { ...content.actions, forge: { id: 'forge', verb: 'rig', noun: 'a forge', expCost: 1, itemCosts: [{ item: 'ore', amount: 2 }], isOneTime: true } },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'forge'] }, content.chapters[1]!],
+      chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'forge']), content.chapters[1]!],
     };
     const s = live(enqueue(newState(forge.roster), forge, 'forge'));
     expect(step(s, forge).events).toContainEqual({ type: 'short', actionId: 'forge', item: 'ore', amount: 2, maker: null, gap: 'none' });
@@ -77,8 +98,10 @@ describe('off, unearned, none (section 2.4)', () => {
 
 describe("the user's priority example (section 3.3)", () => {
   it('Fish on high fills first, then Salvage on mid supplies the hull', () => {
+    // The hull is automation's order: the example is about what the chips order (a player's hull pulls Salvage
+    // directly, whatever the ranks, spec 2026-09-24-pages section 4.3).
     const base = { ...withModes(fresh(), content, { fish: 'high', salvage: 'mid' }), inventory: { fish: 3 } };
-    const { s, events } = runUntil(content, live(enqueue(base, content, 'hull')), (x) => x.completedOneTime.includes('hull'));
+    const { s, events } = runUntil(content, live(enqueue(base, content, 'hull', { by: 'auto' })), (x) => x.completedOneTime.includes('hull'));
     const auto = automated(events);
     expect(auto[0]).toEqual({ type: 'automated', actionId: 'fish', why: 'supply' });
     expect(events).toContainEqual({ type: 'popped', actionId: 'fish', reason: 'full' });
@@ -94,8 +117,8 @@ describe("the user's priority example (section 3.3)", () => {
 
 describe('JIT food (section 3.2)', () => {
   it('food at zero goes in on top at once; the raid keeps its work; one order only; the raid resumes where it was', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'jit' }), inventory: { pass: 1 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } } };
-    const first = step(live(base), content);
+    const base: GameState = { ...withModes(unpackedReady(), unpacked, { fish: 'jit' }), inventory: { pass: 1 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } } };
+    const first = step(live(base), unpacked);
     expect(first.events[0]).toEqual({ type: 'automated', actionId: 'fish', why: 'food' });
     expect(first.queue.map((e) => e.actionId)).toEqual(['fish', 'raid']);
     expect(first.queue[0]).toMatchObject({ by: 'auto', mode: 'repeat', left: 5 });
@@ -103,21 +126,21 @@ describe('JIT food (section 3.2)', () => {
     let s = first;
     while ((s.inventory.fish ?? 0) === 0) {
       expect(s.queue).toHaveLength(2);
-      s = step(s, content);
+      s = step(s, unpacked);
     }
     // The fill leaves inside work() on its fifth completion (`left`): the raid is back on top at exactly 5.
-    const { s: filled } = runUntil(content, s, (x) => x.queue[0]?.actionId === 'raid');
+    const { s: filled } = runUntil(unpacked, s, (x) => x.queue[0]?.actionId === 'raid');
     expect(filled.inventory.fish).toBe(balance.inventory.stackCap);
     expect(filled.work.raid!.progress).toBe(5);
-    expect(step(filled, content).work.raid!.progress).toBeCloseTo(5 + balance.skills.baseTickExp, 12);
+    expect(step(filled, unpacked).work.raid!.progress).toBeCloseTo(5 + balance.skills.baseTickExp, 12);
   });
 });
 
 describe('a food fill ends even when eating takes fish during it (MECHANICS section 6 targetCount)', () => {
   it('a slow local fish, eaten as it lands: exactly left completions, then the row behind it runs', () => {
     // 6 XP is 61 ticks at level 0, longer than the 50-tick cooldown: every fish is eaten the tick it lands.
-    const slow: Content = { ...content, actions: { ...content.actions, fish: { ...content.actions.fish!, expCost: 6 } } };
-    const base: GameState = { ...withModes(newState(slow.roster), slow, { fish: 'jit' }), health: 20, inventory: { pass: 1 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } } };
+    const slow: Content = { ...unpacked, actions: { ...unpacked.actions, fish: { ...unpacked.actions.fish!, expCost: 6 } } };
+    const base: GameState = { ...withModes(built(newState(slow.roster), 'hull', 'gate'), slow, { fish: 'jit' }), health: 20, inventory: { pass: 1 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } } };
     let s = step(live(base), slow);
     const fillId = s.queue[0]!.id;
     expect(s.queue[0]).toMatchObject({ actionId: 'fish', by: 'auto', left: 5 });
@@ -141,8 +164,8 @@ describe('a food fill ends even when eating takes fish during it (MECHANICS sect
 
 describe('fillLeft counts what is on hand', () => {
   it('with 2 fish and a cap of 5, the fill is queued with left 3', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'jit' }), inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
-    const first = step(live(base), content);
+    const base: GameState = { ...withModes(unpackedReady(), unpacked, { fish: 'jit' }), inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
+    const first = step(live(base), unpacked);
     expect(first.events[0]).toEqual({ type: 'automated', actionId: 'fish', why: 'provision' });
     expect(first.queue[0]).toMatchObject({ actionId: 'fish', by: 'auto', left: balance.inventory.stackCap - 2 });
   });
@@ -150,14 +173,14 @@ describe('fillLeft counts what is on hand', () => {
 
 describe('provisions happen once per departure', () => {
   it('eating outpaces the provision: one provision event, then the raid starts below the cap', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'jit' }), health: 20, inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
-    const { s, events } = runUntil(content, live(base), (x) => (x.work.raid?.progress ?? 0) > 0);
+    const base: GameState = { ...withModes(unpackedReady(), unpacked, { fish: 'jit' }), health: 20, inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
+    const { s, events } = runUntil(unpacked, live(base), (x) => (x.work.raid?.progress ?? 0) > 0);
     expect(automated(events).filter((e) => e.why === 'provision')).toHaveLength(1);
     expect(s.provisioned).toEqual(['fish']);
     expect(s.inventory.fish ?? 0).toBeLessThan(balance.inventory.stackCap);
     expect(s.dead).toBe(false);
     // Task 4: casting off clears it, so the next port's departure provisions again.
-    const { s: away } = runUntil(content, s, (x) => x.chapter === 1 || x.dead);
+    const { s: away } = runUntil(unpacked, s, (x) => x.chapter === 1 || x.dead);
     expect(away.dead).toBe(false);
     expect(away.chapter).toBe(1);
     expect(away.provisioned).toEqual([]);
@@ -170,7 +193,7 @@ describe('an unsupplied JIT food stays idle', () => {
       ...content,
       items: { ...content.items, bread: { id: 'bread', name: 'bread', kind: 'food', healPerUnit: 6 } },
       actions: { ...content.actions, bake: { id: 'bake', verb: 'rig', noun: 'bread', expCost: 1, producedItem: 'bread', producedAmount: 1, itemCosts: [{ item: 'scrap', amount: 1 }], isOneTime: false } },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'bake'] }, content.chapters[1]!],
+      chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'bake']), content.chapters[1]!],
     };
     const s = live(withModes(newState(bakery.roster), bakery, { bake: 'jit' }));
     expect(step(s, bakery)).toBe(s);
@@ -189,7 +212,8 @@ describe("an auto food entry under a player's now is not doubled", () => {
 
 describe('a higher row already queued is not queued again', () => {
   it('Fish on high queued below the hull, Salvage on mid: supplying the hull queues Salvage, not a second Fish', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'high', salvage: 'mid' }), queue: [entry(0, 'hull', 'once'), entry(1, 'fish')], nextEntryId: 2 };
+    // A fish in the pack, so Fish is a producer here and not food at zero (which goes to the top, #81).
+    const base: GameState = { ...withModes(fresh(), content, { fish: 'high', salvage: 'mid' }), inventory: { fish: 1 }, queue: [{ ...entry(0, 'hull', 'once'), by: 'auto' }, entry(1, 'fish')], nextEntryId: 2 };
     const next = step(live(base), content);
     expect(automated([...next.events])[0]).toEqual({ type: 'automated', actionId: 'salvage', why: 'supply' });
     expect(next.queue.filter((e) => e.actionId === 'fish')).toHaveLength(1);
@@ -213,15 +237,15 @@ describe('a supply step never takes a one-time', () => {
 
 describe('provisions before casting off (section 3.2)', () => {
   it('the unstarted event waits while JIT food fills to the cap, then runs', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'jit' }), inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
-    const first = step(live(base), content);
+    const base: GameState = { ...withModes(unpackedReady(), unpacked, { fish: 'jit' }), inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
+    const first = step(live(base), unpacked);
     expect(first.events[0]).toEqual({ type: 'automated', actionId: 'fish', why: 'provision' });
-    const { s } = runUntil(content, first, (x) => x.queue[0]?.actionId === 'raid');
+    const { s } = runUntil(unpacked, first, (x) => x.queue[0]?.actionId === 'raid');
     expect(s.inventory.fish).toBe(balance.inventory.stackCap);
-    expect(step(s, content).work.raid!.progress).toBeGreaterThan(0);
+    expect(step(s, unpacked).work.raid!.progress).toBeGreaterThan(0);
   });
   it('a started event is not provisioned for', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'jit' }), inventory: { pass: 1, fish: 4 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1, work: { raid: { progress: 1, costsConsumed: 0 } } };
+    const base: GameState = { ...withModes(ready(), content, { fish: 'jit' }), inventory: { pass: 1, fish: 4 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1, work: { raid: { progress: 1, costsConsumed: 0 } } };
     const next = step(live(base), content);
     expect(automated([...next.events])).toEqual([]);
     expect(next.work.raid!.progress).toBeGreaterThan(1);
@@ -230,8 +254,12 @@ describe('provisions before casting off (section 3.2)', () => {
 
 describe('provisioning waits for the event\'s own supply', () => {
   it('the raid short its pass, the gate on JIT: the gate is supplied first, the fish provisioned after, then the raid runs', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'jit', gate: 'jit' }), inventory: { fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
-    const { s, events } = runUntil(content, live(base), (x) => (x.work.raid?.progress ?? 0) > 0);
+    // The raid must be the departure to be provisioned for, so it closes its page; a one-time gate on that page
+    // would come as a page prerequisite, and a player's raid would pull it whatever its chip (spec 2026-09-24-pages
+    // sections 4.2, 4.3). A repeatable gate and automation's own raid leave the JIT supply as the only way the pass comes.
+    const open: Content = { ...unpacked, actions: { ...unpacked.actions, gate: { ...unpacked.actions.gate!, isOneTime: false } } };
+    const base: GameState = { ...withModes(built(fresh(), 'hull'), open, { fish: 'jit', gate: 'jit' }), inventory: { fish: 2 }, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'auto' }], nextEntryId: 1 };
+    const { s, events } = runUntil(open, live(base), (x) => (x.work.raid?.progress ?? 0) > 0);
     expect(automated(events).map((e) => `${e.why}:${e.actionId}`)).toEqual(['supply:gate', 'provision:fish']);
     expect(s.inventory.fish).toBe(balance.inventory.stackCap);
   });
@@ -252,7 +280,7 @@ describe('a food fill the player buried under a play press (code panel round two
     expect(s.inventory.fish ?? 0).toBeGreaterThan(0);
   });
   it('food on hand: the provision replaces the buried fill before the event starts', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'jit' }), inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once'), { id: 1, actionId: 'fish', mode: 'repeat', by: 'auto', left: 3 }], nextEntryId: 2 };
+    const base: GameState = { ...withModes(ready(), content, { fish: 'jit' }), inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once'), { id: 1, actionId: 'fish', mode: 'repeat', by: 'auto', left: 3 }], nextEntryId: 2 };
     const next = step(live(base), content);
     expect(automated([...next.events])).toEqual([{ type: 'automated', actionId: 'fish', why: 'provision' }]);
     expect(next.provisioned).toEqual(['fish']);
@@ -264,7 +292,7 @@ describe('a supply order is tied to the order it supplies (code panel round thre
   const stewed: Content = {
     ...content,
     actions: { ...content.actions, stew: { id: 'stew', verb: 'fish', noun: 'a stew', expCost: 1, producedItem: 'eel', producedAmount: 1, itemCosts: [{ item: 'scrap', amount: 1 }], isOneTime: false } },
-    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'stew'] }, content.chapters[1]!],
+    chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'stew']), content.chapters[1]!],
   };
   const base = (queue: QueueEntry[], inventory: Record<string, number> = { fish: 5, eel: 5 }): GameState => ({ ...withModes(newState(stewed.roster), stewed, { stew: 'jit', salvage: 'jit', fish: 'jit' }), inventory, queue, nextEntryId: 20 });
   it('JIT supply names the order it supplies', () => {
@@ -320,7 +348,8 @@ describe('a supply order is tied to the order it supplies (code panel round thre
     expect(fills.size).toBeLessThanOrEqual(2);
   });
   it('a better-ranked producer queued ahead of a food fill\'s supply goes first, and the state is settled', () => {
-    const s = live({ ...withModes(newState(stewed.roster), stewed, { stew: 'jit', salvage: 'mid', fish: 'high' }), inventory: {} });
+    // A fish in the pack: Fish goes first as the better-ranked producer, not as food at zero (#81).
+    const s = live({ ...withModes(newState(stewed.roster), stewed, { stew: 'jit', salvage: 'mid', fish: 'high' }), inventory: { fish: 1 } });
     const once = resolve(s, stewed).state;
     expect(once.queue.map((e) => `${e.actionId}:${e.by}`)).toEqual(['fish:auto', 'stew:auto']);
     expect(resolve(once, stewed).state).toBe(once);
@@ -347,7 +376,7 @@ describe('a supply order is tied to the order it supplies (code panel round thre
         saw: { id: 'saw', verb: 'rig', noun: 'planks', expCost: 1, producedItem: 'plank', producedAmount: 1, itemCosts: [{ item: 'scrap', amount: 1 }], isOneTime: false },
         stew: { id: 'stew', verb: 'fish', noun: 'a stew', expCost: 1, producedItem: 'eel', producedAmount: 1, itemCosts: [{ item: 'plank', amount: 1 }], isOneTime: false },
       },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'saw', 'stew'] }, content.chapters[1]!],
+      chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'saw', 'stew']), content.chapters[1]!],
     };
     const s = live({ ...withModes(newState(sawn.roster), sawn, { stew: 'jit', saw: 'jit', salvage: 'jit' }), inventory: { fish: 5 }, queue: [entry(0, 'stew')], nextEntryId: 1 });
     const once = resolve(s, sawn).state;
@@ -357,18 +386,18 @@ describe('a supply order is tied to the order it supplies (code panel round thre
   it('a better-ranked producer that goes first and leaves at once does not cost the maker its supply', () => {
     // The raid needs the pass (gate on mid); Salvage on high goes first, but the hull below owes 3 scrap and 4 are held,
     // so Salvage leaves at once: the gate must still supply the raid, and the raid is not dropped.
-    const s: GameState = { ...withModes(fresh(), content, { gate: 'mid', salvage: 'high' }), inventory: { scrap: 4, fish: 5 }, work: { hull: { progress: 5, costsConsumed: 5 } }, queue: [entry(0, 'raid', 'once'), entry(1, 'hull', 'once')], nextEntryId: 2 };
-    const r = resolve(live(s), content);
+    const s: GameState = { ...withModes(fresh(), unclosed, { gate: 'mid', salvage: 'high' }), inventory: { scrap: 4, fish: 5 }, work: { hull: { progress: 5, costsConsumed: 5 } }, queue: [entry(0, 'raid', 'once'), entry(1, 'hull', 'once')], nextEntryId: 2 };
+    const r = resolve(live(s), unclosed);
     expect(r.events.some((e) => e.type === 'short')).toBe(false);
     expect(r.state.queue.map((e) => `${e.actionId}:${e.by}`)).toEqual(['gate:auto', 'raid:player', 'hull:player']);
     expect(r.state.queue[0]!.for).toBe(0);
-    expect(resolve(r.state, content).state).toBe(r.state);
+    expect(resolve(r.state, unclosed).state).toBe(r.state);
   });
   it('a food that another row costs: its fill does not stop it supplying that row\'s fill in the same resolve', () => {
     const chained: Content = {
       ...content,
       actions: { ...content.actions, stew: { id: 'stew', verb: 'fish', noun: 'a stew', expCost: 1, producedItem: 'eel', producedAmount: 1, itemCosts: [{ item: 'fish', amount: 2 }], isOneTime: false } },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'stew'] }, content.chapters[1]!],
+      chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'stew']), content.chapters[1]!],
     };
     const s = live(withModes(newState(chained.roster), chained, { fish: 'jit', stew: 'jit' }));
     const r = resolve(s, chained);
@@ -389,7 +418,7 @@ describe('a supply order is tied to the order it supplies (code panel round thre
     expect(moved.provisioned).toEqual(['fish']);
   });
   it('taken off JIT and back with the event waiting unstarted: the provision comes again', () => {
-    const s: GameState = { ...withModes(fresh(), content, { fish: 'jit' }), inventory: { pass: 1, fish: 2 }, provisioned: ['fish'], queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
+    const s: GameState = { ...withModes(ready(), content, { fish: 'jit' }), inventory: { pass: 1, fish: 2 }, provisioned: ['fish'], queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
     const back = setAutomation(setAutomation(s, content, 'fish', 'top'), content, 'fish', 'jit');
     expect(automated([...step(live(back), content).events])).toEqual([{ type: 'automated', actionId: 'fish', why: 'provision' }]);
   });
@@ -409,7 +438,7 @@ describe('JIT food through a JIT input: the first bite after one maker completio
     const stewed: Content = {
       ...content,
       actions: { ...content.actions, stew: { id: 'stew', verb: 'fish', noun: 'a stew', expCost: 1, producedItem: 'eel', producedAmount: 1, itemCosts: [{ item: 'scrap', amount: 1 }], isOneTime: false } },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'stew'] }, content.chapters[1]!],
+      chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'stew']), content.chapters[1]!],
     };
     const base: GameState = { ...withModes(newState(stewed.roster), stewed, { stew: 'jit', salvage: 'jit' }), inventory: { fish: 5 } };
     const { s, states } = runUntil(stewed, live(base), (x) => (x.inventory.eel ?? 0) > 0);
@@ -425,23 +454,24 @@ describe('priority rules (section 3.3)', () => {
   const stewed: Content = {
     ...content,
     actions: { ...content.actions, stew: { id: 'stew', verb: 'fish', noun: 'a stew', expCost: 1, producedItem: 'eel', producedAmount: 1, itemCosts: [{ item: 'scrap', amount: 1 }], isOneTime: false } },
-    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'stew'] }, content.chapters[1]!],
+    chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'stew']), content.chapters[1]!],
   };
   it('the idle fill breaks a tie by the port\'s row order', () => {
-    const first = step(live(withModes(fresh(), content, { salvage: 'mid', fish: 'mid' })), content);
+    const first = step(live({ ...withModes(fresh(), content, { salvage: 'mid', fish: 'mid' }), inventory: { fish: 1 } }), content);
     expect(first.events[0]).toEqual({ type: 'automated', actionId: 'fish', why: 'idle' });
   });
   it('a better-ranked producer that is short itself does not go before the supply', () => {
-    const base = withModes(newState(stewed.roster), stewed, { stew: 'high', salvage: 'mid' });
-    const next = step(live(enqueue(base, stewed, 'hull')), stewed);
+    const base = { ...withModes(newState(stewed.roster), stewed, { stew: 'high', salvage: 'mid' }), inventory: { eel: 1 } };
+    // Automation's hull: a player's pulls its maker directly and never meets the ranking (spec 2026-09-24-pages 4.3).
+    const next = step(live(enqueue(base, stewed, 'hull', { by: 'auto' })), stewed);
     expect(automated([...next.events])[0]).toEqual({ type: 'automated', actionId: 'salvage', why: 'supply' });
   });
   it('an equally ranked producer does not go before the supply', () => {
-    const next = step(live(enqueue(withModes(fresh(), content, { fish: 'mid', salvage: 'mid' }), content, 'hull')), content);
+    const next = step(live(enqueue({ ...withModes(fresh(), content, { fish: 'mid', salvage: 'mid' }), inventory: { fish: 1 } }, content, 'hull', { by: 'auto' })), content);
     expect(automated([...next.events])[0]).toEqual({ type: 'automated', actionId: 'salvage', why: 'supply' });
   });
   it('a food on a priority is not provisioned: only JIT food is', () => {
-    const base: GameState = { ...withModes(fresh(), content, { fish: 'high' }), inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
+    const base: GameState = { ...withModes(ready(), content, { fish: 'high' }), inventory: { pass: 1, fish: 2 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1 };
     const next = step(live(base), content);
     expect(automated([...next.events])).toEqual([]);
     expect(next.work.raid!.progress).toBeGreaterThan(0);
@@ -474,15 +504,22 @@ describe('a chain that cannot close (review focus 2)', () => {
   const press: Content = {
     ...content,
     actions: { ...content.actions, press: { id: 'press', verb: 'salvage', noun: 'a press', expCost: 1, producedItem: 'scrap', producedAmount: 1, itemCosts: [{ item: 'pass', amount: 1 }], isOneTime: false } },
-    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'press'] }, content.chapters[1]!],
+    chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'press']), content.chapters[1]!],
   };
   const base = withModes(newState(press.roster), press, { press: 'jit' });
-  it('startBlock reads blocked; now refuses it', () => {
+  it('startBlock reads blocked; play is still accepted, and the chain goes round the press through Salvage', () => {
+    // A player's press pulls the first row on the page that makes scrap, whatever its chip (spec 2026-09-24-pages 4.3).
     expect(startBlock(base, press, 'satchel')).toEqual({ kind: 'short', item: 'scrap', amount: 2, maker: 'press', gap: 'blocked', cause: { item: 'pass', maker: 'gate', gap: 'unearned' } });
-    expect(enqueue(base, press, 'satchel', { front: true })).toBe(base);
+    const s = live(enqueue(base, press, 'satchel', { front: true }));
+    expect(s.queue.map((e) => e.actionId)).toEqual(['satchel']);
+    const q = resolve(s, press).state.queue;
+    expect(q.map((e) => e.actionId)).toEqual(['salvage', 'satchel']);
+    expect(q[0]).toMatchObject({ by: 'auto', for: q[1]!.id });
   });
-  it('queued by +, the first step pops it once without queuing the press, and the next step is idle', () => {
-    const s = live(enqueue(base, press, 'satchel'));
+  it('queued by automation, the first step pops it once without queuing the press, and the next step is idle', () => {
+    // Automation's order: a player's (queued by +) pulls Salvage, the first row on the page that makes scrap,
+    // whatever its chip (spec 2026-09-24-pages section 4.3), so its chain closes. Automation's goes through the chips.
+    const s = live(enqueue(base, press, 'satchel', { by: 'auto' }));
     const first = step(s, press);
     expect(first.events.filter((e) => e.type === 'short')).toEqual([{ type: 'short', actionId: 'satchel', item: 'scrap', amount: 2, maker: 'press', gap: 'blocked', cause: { item: 'pass', maker: 'gate', gap: 'unearned' } }]);
     expect(first.events.some((e) => e.type === 'automated')).toBe(false);
@@ -496,12 +533,12 @@ describe('a chain that cannot close (review focus 2)', () => {
 });
 
 describe('a maker the player would run by hand that cannot start by hand either', () => {
-  const hungry: Content = { ...content, actions: { ...content.actions, gate: { ...content.actions.gate!, needs: [{ item: 'scrap', amount: 1 }] } } };
+  const hungry: Content = { ...unclosed, actions: { ...unclosed.actions, gate: { ...unclosed.actions.gate!, needs: [{ item: 'scrap', amount: 1 }] } } };
   it('the raid short its pass, the gate unearned and short of scrap: the block names what stops the gate', () => {
     expect(startBlock(newState(hungry.roster), hungry, 'raid')).toEqual({ kind: 'short', item: 'pass', amount: 1, maker: 'gate', gap: 'blocked', cause: { item: 'scrap', maker: 'salvage', gap: 'unearned' } });
   });
   it('an unearned maker that can start by hand keeps its plain reason', () => {
-    expect(startBlock(fresh(), content, 'raid')).toEqual({ kind: 'short', item: 'pass', amount: 1, maker: 'gate', gap: 'unearned' });
+    expect(startBlock(fresh(), unclosed, 'raid')).toEqual({ kind: 'short', item: 'pass', amount: 1, maker: 'gate', gap: 'unearned' });
   });
 });
 
@@ -537,7 +574,7 @@ describe('a content cycle', () => {
       a: { id: 'a', verb: 'rig', noun: 'a', expCost: 1, producedItem: 'aItem', producedAmount: 1, itemCosts: [{ item: 'bItem', amount: 1 }], isOneTime: false },
       b: { id: 'b', verb: 'rig', noun: 'b', expCost: 1, producedItem: 'bItem', producedAmount: 1, itemCosts: [{ item: 'aItem', amount: 1 }], isOneTime: false },
     },
-    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'a', 'b'] }, content.chapters[1]!],
+    chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'a', 'b']), content.chapters[1]!],
   };
   it('both off, as every row starts a life: the block ends, and names no row already on the chain', () => {
     expect(startBlock(newState(cycle.roster), cycle, 'a')).toEqual({ kind: 'short', item: 'bItem', amount: 1, maker: 'b', gap: 'blocked' });
@@ -546,7 +583,7 @@ describe('a content cycle', () => {
     const press: Content = {
       ...content,
       actions: { ...content.actions, press: { id: 'press', verb: 'salvage', noun: 'a press', expCost: 1, producedItem: 'pass', producedAmount: 1, itemCosts: [{ item: 'pass', amount: 1 }], isOneTime: false }, gate: { ...content.actions.gate!, producedItem: undefined } },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'press'] }, content.chapters[1]!],
+      chapters: [withOrder(unclosed.chapters[0]!, [...unclosed.chapters[0]!.pages[0]!.order, 'press']), content.chapters[1]!],
     };
     expect(startBlock(newState(press.roster), press, 'raid')).toEqual({ kind: 'short', item: 'pass', amount: 1, maker: 'press', gap: 'blocked' });
   });
@@ -559,7 +596,7 @@ describe('a content cycle', () => {
         a: { id: 'a', verb: 'rig', noun: 'a', expCost: 1, producedItem: 'aItem', producedAmount: 1, itemCosts: [{ item: 'bItem', amount: 1 }], isOneTime: false },
         b: { id: 'b', verb: 'rig', noun: 'b', expCost: 1, producedItem: 'bItem', producedAmount: 1, itemCosts: [{ item: 'aItem', amount: 1 }], isOneTime: false },
       },
-      chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'a', 'b'] }, content.chapters[1]!],
+      chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'a', 'b']), content.chapters[1]!],
     };
     let s = live(enqueue(withModes(newState(cyc.roster), cyc, { a: 'jit', b: 'jit' }), cyc, 'a'));
     for (let i = 0; i < 100; i++) {
@@ -595,7 +632,7 @@ describe('resolve on a settled state', () => {
     const cases: GameState[] = [
       live(enqueue(fresh(), content, 'salvage')),
       live(fresh()),
-      live({ ...fresh(), inventory: { pass: 1 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } } }),
+      live({ ...ready(), inventory: { pass: 1 }, queue: [entry(0, 'raid', 'once')], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } } }),
       live(enqueue({ ...fresh(), inventory: { scrap: 3 } }, content, 'hull')),
     ];
     for (const s of cases) {
@@ -617,7 +654,7 @@ describe('an empty queue does what JIT can (#77)', () => {
   const charted: Content = {
     ...content,
     actions: { ...content.actions, chart: { id: 'chart', verb: 'rig', noun: 'a chart', expCost: 1, itemCosts: [], isOneTime: true } },
-    chapters: [{ ...content.chapters[0]!, order: [...content.chapters[0]!.order, 'chart'] }, content.chapters[1]!],
+    chapters: [withOrder(content.chapters[0]!, [...content.chapters[0]!.pages[0]!.order, 'chart']), content.chapters[1]!],
   };
   const idle = (events: GameEvent[]) => automated(events).filter((e) => e.why === 'idle').map((e) => e.actionId);
 
@@ -638,13 +675,18 @@ describe('an empty queue does what JIT can (#77)', () => {
     expect(resolve(live(withModes(fresh(), content, { salvage: 'jit' })), content).state.queue).toEqual([]);
   });
   it('a JIT one-time waits for demand too: the gate is not run on an empty queue, only for the raid that needs its pass', () => {
-    const s = live(withModes(fresh(), content, { gate: 'jit' }));
-    expect(step(s, content)).toBe(s);
-    const r = resolve(live(enqueue(s, content, 'raid')), content);
-    expect(r.state.queue[0]).toMatchObject({ actionId: 'gate', by: 'auto' });
+    // On `unclosed` the raid closes nothing, so the gate is no page prerequisite of it; and the raid is automation's
+    // own order, which a player's would not be: a player's pulls the gate whatever its chip (spec 2026-09-24-pages 4.3).
+    const s = live(withModes(built(fresh(), 'hull'), unclosed, { gate: 'jit' }));
+    expect(step(s, unclosed)).toBe(s);
+    const raided: GameState = { ...s, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'auto' }], nextEntryId: 1 };
+    const r = resolve(raided, unclosed);
+    expect(r.state.queue.map((e) => e.actionId)).toEqual(['gate', 'raid']);
+    expect(r.state.queue[0]).toMatchObject({ by: 'auto', for: 0 });
+    expect(r.events).toContainEqual({ type: 'automated', actionId: 'gate', why: 'supply' });
   });
   it('a JIT food goes before a JIT producer earlier in the row order', () => {
-    const reordered: Content = { ...content, chapters: [{ ...content.chapters[0]!, order: ['salvage', 'fish', 'hull', 'satchel', 'gate', 'raid'] }, content.chapters[1]!] };
+    const reordered: Content = { ...content, chapters: [withOrder(content.chapters[0]!, ['salvage', 'fish', 'hull', 'satchel', 'gate', 'raid']), content.chapters[1]!] };
     const s = live({ ...withModes(fresh(), reordered, { salvage: 'jit', fish: 'jit' }), inventory: { fish: 2 } });
     const r = resolve(s, reordered);
     expect(idle([...r.events])[0]).toBe('fish');
@@ -698,7 +740,7 @@ describe('an empty queue does what JIT can (#77)', () => {
   });
 
   it('casting off clears the food turn: the next port\'s first empty queue may feed (code panel)', () => {
-    const s = live({ ...fresh(), inventory: { pass: 1 }, idleFed: true, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'player' }], nextEntryId: 1,
+    const s = live({ ...ready(), inventory: { pass: 1 }, idleFed: true, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'player' }], nextEntryId: 1,
       work: { raid: { progress: content.actions.raid!.expCost - 1e-9, costsConsumed: 0 } } });
     const after = step(s, content);
     expect(after.chapter).toBe(1);

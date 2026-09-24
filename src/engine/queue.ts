@@ -11,7 +11,7 @@ import { isUnlocked, makersOf, modeOf, rankOf, unlockAt, withoutOrphans } from '
 import { nextCostItem, nextUnitDue, unitThreshold } from './costs';
 import { capOf, gearMultiplier } from './effects';
 import { add, count, has, take, type Inventory } from './inventory';
-import { chapterOf, here, isDone, isFull, lookAheadTarget, NO_WORK, shortfall, workOf } from './rows';
+import { chapterOf, eventOf, here, isDone, isFull, lookAheadTarget, NO_WORK, pageWaits, shortfall, workOf } from './rows';
 import { award, newSkill, tickExp } from './skills';
 import type { AutoMode, GameEvent, GameState, QueueEntry, SkillState, SkillStats, SupplyCause, SupplyGap, Work } from './types';
 
@@ -61,6 +61,8 @@ export function newState(roster: readonly SkillDefinition[]): GameState {
 export type StartBlock =
   | { readonly kind: 'elsewhere' }
   | { readonly kind: 'done' }
+  /** A closing row whose page still has one-time rows undone (spec 2026-09-24-pages section 4.2), in page order. */
+  | { readonly kind: 'page'; readonly waits: readonly ActionId[] }
   | { readonly kind: 'full'; readonly item: ItemId }
   | { readonly kind: 'enough'; readonly item: ItemId }
   /** The play button's and the row's alone (fight.ts hurtBlock): a fight that would stop (#74). */
@@ -127,6 +129,8 @@ function blockOf(state: GameState, content: Content, id: ActionId, seen: Readonl
   const action = content.actions[id];
   if (action === undefined || !here(state, content, id)) return { kind: 'elsewhere' };
   if (isDone(state, action)) return { kind: 'done' };
+  const waits = pageWaits(state, content, id);
+  if (waits.length > 0) return { kind: 'page', waits };
   if (isFull(state, content, action)) return { kind: 'full', item: action.producedItem! };
   const short = shortfall(state, action);
   if (short === null) return null;
@@ -152,6 +156,10 @@ export function startBlock(state: GameState, content: Content, id: ActionId, avo
  */
 export function frontBlock(state: GameState, content: Content, id: ActionId, once = false): StartBlock | null {
   const block = startBlock(state, content, id);
+  // A closer that waits on its page is honoured, not refused: resolve pulls what it waits on (spec 2026-09-24-pages section 4.2).
+  if (block?.kind === 'page') return null;
+  // So is a row short of what a row on the page makes, whatever that row's chip: resolve pulls the maker (section 4.3).
+  if (block?.kind === 'short' && makersOf(state, content, block.item).some((m) => m.id !== id)) return null;
   const action = content.actions[id];
   if (block !== null || once || action === undefined || action.isOneTime || action.producedItem === undefined) return block;
   const probe: GameState = { ...state, queue: [{ id: -1, actionId: id, mode: 'repeat', by: 'player' }, ...state.queue] };
@@ -244,7 +252,20 @@ function complete(state: GameState, content: Content, action: ActionDefinition, 
   const top = s.queue[0];
   if (action.isOneTime || top?.mode === 'once' || (top?.left !== undefined && top.left <= 1)) s = { ...s, queue: s.queue.slice(1) };
   else if (top?.left !== undefined) s = { ...s, queue: [{ ...top, left: top.left - 1 }, ...s.queue.slice(1)] };
-  return action.id === chapterOf(s, content).event ? castOff(s, content, events) : s;
+  const chapter = chapterOf(s, content);
+  if (action.id === eventOf(chapter)) return castOff(s, content, events);
+  const turned = chapter.pages.findIndex((p) => p.closes === action.id);
+  return turned < 0 ? s : turnPage(s, chapter.pages[turned + 1]!.order, turned + 1, events);
+}
+
+/**
+ * A page's closing row turns the page (spec 2026-09-24-pages section 2): the
+ * queue keeps only orders the new page lists, and their supplies. Items and
+ * automation stay; the chips act only on rows here anyway.
+ */
+function turnPage(state: GameState, order: readonly ActionId[], page: number, events: GameEvent[]): GameState {
+  events.push({ type: 'pageTurn', chapter: state.chapter, page });
+  return { ...state, queue: withoutOrphans(state.queue.filter((e) => order.includes(e.actionId))) };
 }
 
 /**
@@ -259,7 +280,7 @@ function castOff(state: GameState, content: Content, events: GameEvent[]): GameS
     return { ...state, dead: true, finished: true, paused: 'system' };
   }
   const chapter = state.chapter + 1;
-  const order = content.chapters[chapter]!.order;
+  const order = content.chapters[chapter]!.pages[0]!.order;
   const inventory = Object.fromEntries(Object.entries(state.inventory).filter(([id]) => content.items[id]?.kind === 'food'));
   events.push({ type: 'castOff', chapter });
   return { ...state, chapter, inventory, provisioned: [], idleFed: false, queue: state.queue.filter((e) => order.includes(e.actionId)) };

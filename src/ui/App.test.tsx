@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { balance } from '../balance';
 import { windwardRun } from '../data/windward-run';
+import { built } from '../engine/fixture';
 import { newState } from '../engine/queue';
 import { ticksPerSecond, ticksToSeconds } from '../engine/time';
 import { realClick } from '../test-utils/realClick';
@@ -144,10 +145,21 @@ describe('App', () => {
     const handle = window.continuum!;
     const hurts = balance.content.windward.pirates.hurts;
     expect(screen.getByLabelText('rates')).not.toHaveTextContent(/fight/);
+    // The pirates are on Port Cinder's second page, so the first is built (spec 2026-09-24-pages); then the fight runs.
+    act(() => { handle.dispatch({ type: 'load', model: { state: built(handle.state(), 'hull', 'net', 'satchel', 'sails'), log: [], nextSeq: 0 } }); });
     act(() => { handle.dispatch({ type: 'queue', actionId: 'pirates', front: true }); handle.step(1); });
     expect(screen.getByLabelText('rates')).toHaveTextContent(`fight\u2212${hurts.toFixed(2)} hp/s`);
     act(() => { screen.getByRole('button', { name: 'pause' }).click(); });
     expect(screen.getByLabelText('rates')).not.toHaveTextContent(/fight/);
+  });
+  it('on Port Cinder\'s second page the chapter shows that page: its name in the running head, only its rows listed', () => {
+    render(<App />);
+    const handle = window.continuum!;
+    act(() => { handle.dispatch({ type: 'load', model: { state: built(handle.state(), 'hull', 'net', 'satchel', 'sails'), log: [], nextSeq: 0 } }); });
+    const chapter = screen.getByLabelText('chapter');
+    expect(chapter.querySelector('.head__line')).toHaveTextContent(/· Pirates!$/);
+    const rows = [...chapter.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? '').filter((n) => n.startsWith('add to queue: '));
+    expect(rows).toEqual(['add to queue: Fish the cloud shallows', 'add to queue: Fight the harbor pirates']);
   });
   it('an earned chip pressed sets the row\'s automation', async () => {
     render(<App />);

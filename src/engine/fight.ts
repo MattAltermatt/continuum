@@ -11,7 +11,7 @@ import { modeOf, rankOf } from './automation';
 import { gearMultiplier } from './effects';
 import { applyDecay, eat } from './health';
 import { frontBlock, startBlock, type StartBlock } from './queue';
-import { chapterOf, shortfall, workOf } from './rows';
+import { pageOf, pageWaits, shortfall, workOf } from './rows';
 import { tickExp } from './skills';
 import { ticksPerSecond } from './time';
 import type { GameState } from './types';
@@ -21,7 +21,7 @@ export function hurts(action: ActionDefinition | undefined): boolean {
 }
 
 function rowsHere(state: GameState, content: Content): readonly ActionDefinition[] {
-  return chapterOf(state, content).order.map((id) => content.actions[id]!);
+  return pageOf(state, content).order.map((id) => content.actions[id]!);
 }
 
 function makesFood(content: Content, a: ActionDefinition): boolean {
@@ -115,7 +115,7 @@ function survives(state: GameState, content: Content, a: ActionDefinition): bool
 export function delayFor(state: GameState, content: Content, tried: ReadonlySet<ActionId>, fight?: ActionDefinition): ActionId | null {
   const avoid = hurting(state, content);
   const above = fight !== undefined && automated(state, fight) ? rankOf(modeOf(state, fight)) : null;
-  const event = chapterOf(state, content).event;
+  const event = pageOf(state, content).closes;
   const eligible = (a: ActionDefinition) => a.producedItem !== undefined && !a.isOneTime
     || (above !== null && a.id !== event && rankOf(modeOf(state, a)) < above);
   const ready = rowsHere(state, content).filter((a) =>
@@ -169,5 +169,7 @@ export function playBlock(state: GameState, content: Content, id: ActionId, once
   const block = frontBlock(state, content, id, once);
   const action = content.actions[id];
   if (block !== null || action === undefined || (once && hurts(action))) return block;
+  // A closer that waits on its page is checked for the fight when it would start, not now (spec 2026-09-24-pages section 4.2).
+  if (pageWaits(state, content, id).length > 0) return null;
   return hurtBlock(state, content, id);
 }

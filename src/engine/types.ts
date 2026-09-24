@@ -58,6 +58,8 @@ export interface SupplyCause { readonly item: ItemId; readonly maker: ActionId |
 export type GameEvent =
   /** The top entry left without working: its row is not here, is done, is full, or has fetched what is needed. */
   | { readonly type: 'popped'; readonly actionId: ActionId; readonly reason: 'elsewhere' | 'done' | 'full' | 'enough' | 'hurt' }
+  /** A closing row left: a prerequisite it pulled could not be done this pass (spec 2026-09-24-pages section 4.2). `waits` is what it waits on. */
+  | { readonly type: 'popped'; readonly actionId: ActionId; readonly reason: 'page'; readonly waits: readonly ActionId[] }
   /** The top entry left because it lacks an item and nothing supplies it; `cause` is the deepest reason when its maker is blocked. */
   | { readonly type: 'short'; readonly actionId: ActionId; readonly item: ItemId; readonly amount: number; readonly maker: ActionId | null; readonly gap: SupplyGap; readonly cause?: SupplyCause }
   /** Automation queued a row: to supply the top, food at zero, provisions before casting off, or an empty queue. */
@@ -68,6 +70,8 @@ export type GameEvent =
   | { readonly type: 'unlocked'; readonly actionId: ActionId }
   /** The chapter's big event completed; `chapter` is the index now entered (section 4). */
   | { readonly type: 'castOff'; readonly chapter: number }
+  /** A page's closing row completed; `page` is the index now turned to, in `chapter` (spec 2026-09-24-pages). */
+  | { readonly type: 'pageTurn'; readonly chapter: number; readonly page: number }
   | { readonly type: 'died'; readonly runTicks: number }
   /** The book's finish completed; the life is over (section 9). */
   | { readonly type: 'finished'; readonly runTicks: number };

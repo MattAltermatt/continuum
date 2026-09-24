@@ -83,7 +83,8 @@ function withLog(model: Model, state: GameState): Model {
     said.add(e.actionId);
     return true;
   };
-  const news = (e: GameEvent) => hurt(e) || (!(e.type === 'completed' && !e.oneTime) && e.type !== 'popped' && e.type !== 'automated'
+  // A closer leaving because its page's chain failed is news: it names what it waits on (spec 2026-09-24-pages section 4.2).
+  const news = (e: GameEvent) => hurt(e) || (e.type === 'popped' && e.reason === 'page') || (!(e.type === 'completed' && !e.oneTime) && e.type !== 'popped' && e.type !== 'automated'
     && !(e.type === 'short' && state.queue.some((q) => q.actionId === e.actionId)));
   const later = (k: number, id: ActionId) => state.events.slice(k + 1).some((f) => f.type === 'short' && f.actionId === id);
   const worth = state.events.filter((e, k) => news(e) && !(e.type === 'short' && later(k, e.actionId)));

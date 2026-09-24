@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { Book } from '../data/types';
+import { windwardRun } from '../data/windward-run';
 import { canJit } from './automation';
 import { declaredTicks, attentive, formatGameTime, freezeCause, handsOn, play, prioritized, type Policy } from './play';
-import { fixture } from './fixture';
+import { fixture, withOrder } from './fixture';
 import { stops } from './fight';
 import { unlockAt } from './automation';
 import { enqueue, newState } from './queue';
 import { setPaused, step } from './tick';
+import type { GameState } from './types';
 
 const hour = balance.time.ticksPerMinute * 60;
 
@@ -23,7 +25,7 @@ function monumentBook(stone: number, expCost: number): Book {
       { id: 'mine', name: 'Mine', icon: 'pickaxe' },
       { id: 'build', name: 'Build', icon: 'house' },
     ],
-    chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, order: ['forage', 'mine', 'shelter', 'monument'], event: 'monument' }],
+    chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, pages: [{ name: '', order: ['forage', 'mine', 'shelter', 'monument'], closes: 'monument' }] }],
     items: {
       berries: { id: 'berries', name: 'berries', kind: 'food', healPerUnit: 4 },
       stone: { id: 'stone', name: 'stone', kind: 'material' },
@@ -37,6 +39,16 @@ function monumentBook(stone: number, expCost: number): Book {
       monument: { id: 'monument', verb: 'build', noun: 'a monument', expCost, producedItem: 'monument', producedAmount: 1, itemCosts: [{ item: 'stone', amount: stone }], isOneTime: true },
     },
   };
+}
+
+/**
+ * The monument book with no shelter on the monument's page, so the monument,
+ * which closes the page, waits on nothing (spec 2026-09-24-pages section 4.2):
+ * for a test about when the policy is asked, not about the page.
+ */
+function bareMonument(stone: number, expCost: number): Book {
+  const b = monumentBook(stone, expCost);
+  return { ...b, chapters: [withOrder(b.chapters[0]!, ['forage', 'mine', 'monument'])] };
 }
 
 /** The monument costs gold, which nothing produces: Forage and Mine fill, then nothing can run. */
@@ -102,7 +114,7 @@ describe('play', { timeout: 30_000 }, () => {
       name: 'one at a time', sane: false, checkEverySeconds: 1000,
       decide: (s, book) => { const id = rows[calls]; calls += 1; return id === undefined ? s : enqueue(s, book, id); },
     };
-    const run = play(monumentBook(3, 30), oneAtATime);
+    const run = play(bareMonument(3, 30), oneAtATime);
     expect(run.outcome).toBe('finished');
     expect(run.lives).toBe(1);
     expect(calls).toBe(2);   // the first ask, and the ask the stall triggered
@@ -120,7 +132,7 @@ describe('play', { timeout: 30_000 }, () => {
         return emptyAsks === 1 ? enqueue(s, book, 'mine') : emptyAsks === 2 ? enqueue(s, book, 'monument') : s;
       },
     };
-    const run = play(monumentBook(3, 30), twoAsks);
+    const run = play(bareMonument(3, 30), twoAsks);
     expect(run.outcome).toBe('finished');
     expect(emptyAsks).toBe(2);
   });
@@ -178,7 +190,7 @@ describe('play', { timeout: 30_000 }, () => {
     // Two one-times before the event: only the first (and its stone maker) goes in; the second waits for a later ask.
     const base = monumentBook(150, 1500);
     const shed = { id: 'shed', verb: 'build', noun: 'a shed', expCost: 6, itemCosts: [{ item: 'stone', amount: 2 }], isOneTime: true };
-    const b: Book = { ...base, actions: { ...base.actions, shed }, chapters: [{ ...base.chapters[0]!, order: ['forage', 'mine', 'shelter', 'shed', 'monument'] }] };
+    const b: Book = { ...base, actions: { ...base.actions, shed }, chapters: [withOrder(base.chapters[0]!, ['forage', 'mine', 'shelter', 'shed', 'monument'])] };
     // A berry on hand, so the hungry branch (food first, then return) does not fire.
     const asked = attentive.decide(setPaused({ ...newState(b.roster), inventory: { berries: 1 } }, 'none'), b);
     expect(asked.queue.map((e) => e.actionId)).toEqual(['forage', 'mine', 'shelter']);
@@ -212,8 +224,8 @@ describe('play', { timeout: 30_000 }, () => {
     const two: Book = {
       ...b,
       chapters: [
-        { head: b.chapters[0]!.head, order: ['forage', 'mine', 'shelter'], event: 'shelter' },
-        { head: { numeral: 'II', chapter: 'Two', story: 'Later.' }, order: ['forage2', 'mine2', 'monument'], event: 'monument' },
+        { head: b.chapters[0]!.head, pages: [{ name: '', order: ['forage', 'mine', 'shelter'], closes: 'shelter' }] },
+        { head: { numeral: 'II', chapter: 'Two', story: 'Later.' }, pages: [{ name: '', order: ['forage2', 'mine2', 'monument'], closes: 'monument' }] },
       ],
       actions: { ...b.actions, forage2: { ...b.actions.forage!, id: 'forage2' }, mine2: { ...b.actions.mine!, id: 'mine2' } },
     };
@@ -253,7 +265,7 @@ describe('play', { timeout: 30_000 }, () => {
     // instead, so a raid that would kill stops (case 2) rather than carrying on as the only row (case 3).
     const book: Book = { ...fixture, id: 'raid-book', name: 'Raid', version: 1, length: { hours: 1 },
       actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, hurts: 1 } },
-      chapters: [{ ...fixture.chapters[0]!, order: ['fish', 'salvage', 'raid'] }, fixture.chapters[1]!] };
+      chapters: [withOrder(fixture.chapters[0]!, ['fish', 'salvage', 'raid']), fixture.chapters[1]!] };
     const low = (fish: number) => setPaused({ ...newState(book.roster), health: 0.3, inventory: { pass: 1, fish }, work: { raid: { progress: 5, costsConsumed: 0 } } }, 'none');
     it('is a freeze the policy caused, found only by Shift+play: the plain press backs off, the forced one fights', () => {
       const s = low(0);
@@ -304,7 +316,7 @@ describe('play', { timeout: 30_000 }, () => {
     const b = monumentBook(100000, 1e9);
     const endless: Book = {
       ...b,
-      chapters: [{ ...b.chapters[0]!, order: ['forage', 'balm', 'mine', 'shelter', 'monument'] }],
+      chapters: [withOrder(b.chapters[0]!, ['forage', 'balm', 'mine', 'shelter', 'monument'])],
       actions: { ...b.actions, balm: { id: 'balm', verb: 'forage', noun: 'balm', expCost: 1, itemCosts: [], isOneTime: false, healthDecayMultiplier: 0.5 } },
     };
     // The attentive player queues food and one-times, never a repeatable that makes nothing: this one runs the balm.
@@ -331,5 +343,19 @@ describe('game time', () => {
     expect(formatGameTime(97 * hour)).toBe('4 days');
     expect(formatGameTime(233 * hour)).toBe('10 days');
     expect(formatGameTime(278 * hour)).toBe('12 days');
+  });
+});
+
+describe('prioritized, when automation leaves the queue empty (#78 task 6)', () => {
+  it('presses the next one-time by hand, chip or not, and time passes: the freeze a halved-costs book reached', () => {
+    // The state the probe froze in: the hull, net and satchel chipped high, Salvage not yet earned, fish full.
+    const book = windwardRun;
+    const chips = { hull: 'high', net: 'high', satchel: 'high', sails: 'low', fish: 'jit' } as const;
+    const counts = Object.fromEntries(Object.keys(chips).map((id) => [id, unlockAt(book.actions[id]!)]));
+    const s: GameState = setPaused({ ...newState(book.roster), completionCounts: counts, automation: chips, inventory: { 'cloud-fish': balance.inventory.stackCap } }, 'none');
+    expect(step(s, book).runTicks).toBe(s.runTicks);
+    const decided = prioritized.decide(s, book);
+    expect(decided.queue.map((e) => e.actionId)).toContain('hull');
+    expect(step(decided, book).runTicks).toBeGreaterThan(s.runTicks);
   });
 });

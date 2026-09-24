@@ -4,7 +4,7 @@ import { skillOf } from '../data/roster';
 import { windwardRun } from '../data/windward-run';
 import { decayPerSecond, foodCeilingPerSecond, hurtsPerSecond } from '../engine/health';
 import { topWorks } from '../engine/resolve';
-import { chapterOf } from '../engine/rows';
+import { chapterOf, pageOf } from '../engine/rows';
 import { ticksPerSecond, ticksToSeconds } from '../engine/time';
 import { installDevHandle } from '../state/devHandle';
 import { useGame } from '../state/useGame';
@@ -84,7 +84,7 @@ export function App() {
         <div className="columns__chapter">
           <div inert={inert}>
             <ChapterPanel
-              content={windwardRun} book={windwardRun.name} chapter={chapterOf(screen, windwardRun)} state={screen} runningActionId={runningActionId}
+              content={windwardRun} book={windwardRun.name} chapter={chapterOf(screen, windwardRun)} page={pageOf(screen, windwardRun)} state={screen} runningActionId={runningActionId}
               onNow={(id, once) => dispatch({ type: 'queue', actionId: id, front: true, once })}
               onQueue={(id, once) => dispatch({ type: 'queue', actionId: id, once })}
               onAutomate={(id, mode) => dispatch({ type: 'automate', actionId: id, mode })}

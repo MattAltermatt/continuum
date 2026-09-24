@@ -6,7 +6,7 @@ import { gearMultiplier } from '../engine/effects';
 import { count } from '../engine/inventory';
 import { playBlock } from '../engine/fight';
 import { startBlock } from '../engine/queue';
-import { stillOwed, workOf } from '../engine/rows';
+import { eventOf, stillOwed, workOf } from '../engine/rows';
 import { tickExp } from '../engine/skills';
 import { ticksPerSecond } from '../engine/time';
 import type { AutoMode, GameState } from '../engine/types';
@@ -32,12 +32,14 @@ export function modeWord(mode: AutoMode): string {
 
 /**
  * What the row gives, on the right of the arrow (09-22 section 8.4): the
- * book's end, a port's casting off, then what it makes (a harvest as "+1
+ * book's end, a port's casting off, any other page's turning (spec
+ * 2026-09-24-pages), then what it makes (a harvest as "+1
  * scrap", a made thing by its name) and the effects a one-time leaves.
  */
 export function outputsOf(content: Content, action: ActionDefinition): readonly string[] {
   if (action.id === content.finish) return ['the end'];
-  if (content.chapters.some((ch) => ch.event === action.id)) return ['casts off'];
+  if (content.chapters.some((ch) => eventOf(ch) === action.id)) return ['casts off'];
+  if (content.chapters.some((ch) => ch.pages.some((p) => p.closes === action.id))) return ['turns the page'];
   const out: string[] = [];
   if (action.producedItem !== undefined) {
     const harvest = !action.isOneTime && action.itemCosts.length === 0;
@@ -97,9 +99,11 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
   const add = (once: boolean) => {
     if (built || state.dead) return;
     onQueue(action.id, once);
-    // A fight that will stop the moment it reaches the top says so here too (code panel: + did nothing visible).
-    const fight = playBlock(state, content, action.id, once);
-    setInstruction(block?.kind === 'short' ? { text: words(content, block, { counts }) } : fight?.kind === 'hurt' ? { text: words(content, fight) } : null);
+    // What play would refuse, + says (code panel: + did nothing visible): a fight that will stop the moment it reaches
+    // the top, and a row nothing on the page supplies. A shortfall a row on the page makes is not said: the order pulls
+    // that row when it reaches the top, whatever its chip (spec 2026-09-24-pages section 4.3).
+    const refusal = playBlock(state, content, action.id, once);
+    setInstruction(refusal?.kind === 'short' || refusal?.kind === 'hurt' ? { text: words(content, refusal, { counts }) } : null);
   };
   // Enter on a focused button is a plain press (a repeating order); Shift+Enter matches Shift+click.
   const enter = (fn: (once: boolean) => void) => (e: KeyboardEvent<HTMLButtonElement>) => {
@@ -113,7 +117,9 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
   const next = nextMode(content, action, mode);
   // Set, but its row cannot start and nothing along the chain would supply it (accepted risk 3): the chip says so, and so does the row.
   const waits = unlocked && mode !== 'off' && block?.kind === 'short' ? words(content, block, { counts, waiting: true }) : null;
-  const say = built ? null : instruction !== null ? instruction.text : waits !== null && !running ? waits : null;
+  // A closer whose page is unfinished says what it comes after, at rest (spec 2026-09-24-pages section 4.2).
+  const after = block?.kind === 'page' ? words(content, block) : null;
+  const say = built ? null : instruction !== null ? instruction.text : running ? null : waits ?? after;
   const done = counts[action.id] ?? 0;
   const needed = unlockAt(action);
   const w = workOf(state, action.id);

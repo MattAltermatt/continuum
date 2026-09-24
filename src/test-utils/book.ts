@@ -7,7 +7,7 @@
  * nothing in the app imports this file.
  */
 import type { Book } from '../data/types';
-import { fixture } from '../engine/fixture';
+import { fixture, withOrder } from '../engine/fixture';
 
 export const testBook: Book = {
   ...fixture,
@@ -26,7 +26,24 @@ export const testBook: Book = {
     vault: { ...fixture.actions.vault!, beat: 'The vault opens on nothing but a note. The lights go out.' },
   },
   chapters: [
-    { ...fixture.chapters[0]!, order: ['fish', 'salvage', 'hull', 'satchel', 'net', 'gate', 'raid'] },
-    { ...fixture.chapters[1]!, order: ['eels', 'salvage2', 'vault'] },
+    withOrder(fixture.chapters[0]!, ['fish', 'salvage', 'hull', 'satchel', 'net', 'gate', 'raid']),
+    withOrder(fixture.chapters[1]!, ['eels', 'salvage2', 'vault']),
+  ],
+};
+
+/**
+ * The same book with its first port in two pages (spec 2026-09-24-pages): the
+ * gate closes "Fitting out" and turns the page, the raid closes "The raid" and
+ * casts off. For the screen's page tests: the running head, the "after:" line
+ * and the three tags.
+ */
+export const pagedTestBook: Book = {
+  ...testBook,
+  chapters: [
+    { ...testBook.chapters[0]!, pages: [
+      { name: 'Fitting out', order: ['fish', 'salvage', 'hull', 'satchel', 'net', 'gate'], closes: 'gate' },
+      { name: 'The raid', order: ['fish', 'raid'], closes: 'raid' },
+    ] },
+    testBook.chapters[1]!,
   ],
 };

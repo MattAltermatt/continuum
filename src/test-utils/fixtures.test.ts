@@ -11,6 +11,6 @@ describe('test fixtures', () => {
     expect(validateBook(testBook)).toEqual([]);
     expect(testBook.actions.raid!.hurts).toBe(1);
     expect(Object.values(testBook.actions).some((a) => a.gear !== undefined)).toBe(true);
-    expect(testBook.chapters[1]!.order).toContain('salvage2');
+    expect(testBook.chapters[1]!.pages[0]!.order).toContain('salvage2');
   });
 });
