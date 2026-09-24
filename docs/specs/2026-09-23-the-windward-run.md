@@ -1,13 +1,14 @@
 # The Windward Run: a playable game
 
 **Date:** 2026-09-23
-**Status:** built on `feature/playable-windward-run` (2026-09-24), awaiting
-the user's play. Designed section by section in a brainstorm on 2026-09-23.
+**Status:** shipped 2026-09-24 as 4602161, live at
+https://mattaltermatt.github.io/continuum/; what the user reports from play is
+filed as issues (#74-#77 so far). Designed section by section in a brainstorm on 2026-09-23.
 User decisions are marked *(user)*; picks the lead made under the user's
 standing instruction for numbers are marked *(pick)*. Reviewed by an agent
 panel with a naysayer before it became code; findings are folded in and
 marked *(panel)* (plan rounds one to five, 2026-09-23). The code panel's
-changes are marked *(code panel)* (round one, 2026-09-24). What is queued from it lives in
+changes are marked *(code panel)* (rounds one to five, 2026-09-24). What is queued from it lives in
 [GitHub Issues](https://github.com/MattAltermatt/continuum/issues).
 
 **Builds on:** [books, chapters, verbs](2026-09-22-books-chapters-verbs.md)

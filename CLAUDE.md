@@ -297,7 +297,11 @@ unsubscribed event) ship without asking.
   `useGame` also runs it after every action and tick while live (`settled`),
   so the committed state, the screen and `window.continuum.state()` are the
   state the next tick will work: a producer that just filled is already gone
-  from the top. Paused, nothing settles.
+  from the top. Paused, nothing settles. **`src/engine/property.test.ts`**
+  (seeded random play at every port, invariants checked after every action
+  and tick) is the guard for this area: five code panel rounds each found a
+  queue defect the previous round's fix had made, and it fails on every one of
+  them. A change to resolve that turns it red has found a real case.
 - **A queue entry is an order, not a row.** Entries carry their own `id`; a
   component that lists the queue keys by it. A row's progress lives on the row
   (`state.work`), so two entries for one row share it and removing one loses

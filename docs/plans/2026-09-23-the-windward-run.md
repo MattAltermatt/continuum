@@ -1,8 +1,9 @@
 # The Windward Run — Implementation Plan
 
-**Status:** built 2026-09-24 on `feature/playable-windward-run`, the branch
-that carries the spec; code panel rounds one to five folded in (below),
-approved to ship by the user 2026-09-24 ("it makes sense to ship this"). The spec went straight from brainstorm to spec to
+**Status:** shipped 2026-09-24, squashed to 4602161 on `main` and published
+to GitHub Pages; code panel rounds one to five folded in (below), approved to
+ship by the user 2026-09-24 ("it makes sense to ship this"). The tracker writes
+of Task 9 were made at merge time. The spec went straight from brainstorm to spec to
 plan, so the plan panel reviewed the spec too. Revised after plan-panel rounds
 one to four (Revisions 1 to 4 below; the task text is already updated and wins
 over any of them); round five converged. **The code panel sections supersede
