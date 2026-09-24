@@ -67,13 +67,34 @@ export const balance = {
   },
 
   /**
+   * The headless play (spec 2026-09-23-headless-play section 6). Agreed with the
+   * user in the brainstorm. Bounds on the measuring bot only; a person playing
+   * is never stopped.
+   */
+  play: {
+    /** UNDERIVED, the user's pick. The bot gives up on a book at this, and a book may not declare more: past it a book cannot be loaded. */
+    maxBookDays: 60,
+    /** UNDERIVED, the user's pick. A book measuring under this is too short and pays no finishing points (when points exist). */
+    minBookHours: 24,
+    /** UNDERIVED, the user's pick. A life longer than this is flagged; the run goes on. */
+    maxLifeMinutes: 60,
+    /** Derived: half the user's 20-minute target for a sane life. A sane policy's life ending in death under this is warned about. */
+    minLifeMinutes: 10,
+    /** UNDERIVED, the user's pick, informed by the panel's measurement that a bot's estimate is good to about 20%. The measured range may sit this far either side of the declared length. */
+    lengthTolerance: 0.25,
+    /** UNDERIVED, the user's pick. Game time is shown in hours up to this, in whole days past it. */
+    hoursShownUpTo: 48,
+  },
+
+  /**
    * Content numbers for the v0.1 slice, the Scrub. UNDERIVED, all of them:
    * they exist so three rows feed each other. The stone cap is deliberately
    * below the cabin's cost so the stall is exercised, and the cabin slows the
    * decay clock so completing it changes the run (its beat is what shows it in
    * v0.1; a rates chunk that shows the number arrives later). The hall is the
    * chapter's big sink (spec section 2), a placeholder no first life can
-   * finish: it keeps stone useful, so time keeps passing and a run can die.
+   * finish (the headless play measures about life 457): it keeps stone useful,
+   * so time keeps passing and a run can die.
    */
   content: {
     scrub: {

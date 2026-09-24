@@ -5,6 +5,11 @@ import type { Book } from './types';
 import { validateBook } from './validate';
 
 describe('the Scrub', () => {
+  it('is version 1, finishes at the hall, and claims five days', () => {
+    expect(saltRoad.version).toBe(1);
+    expect(saltRoad.finish).toBe('hall');
+    expect(saltRoad.length).toEqual({ days: 5 });
+  });
   it('has the four rows in display order, each with a defined action', () => {
     expect(saltRoad.chapters[0]!.order).toEqual(['forage', 'mine', 'cabin', 'hall']);
     for (const id of saltRoad.chapters[0]!.order) expect(saltRoad.actions[id]).toBeDefined();

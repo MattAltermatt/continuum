@@ -40,6 +40,10 @@ describe('balance', () => {
     expect(balance.skills.expCurveExponent).toBe(1.1);
   });
 
+  it('holds the headless play thresholds', () => {
+    expect(balance.play).toEqual({ maxBookDays: 60, minBookHours: 24, maxLifeMinutes: 60, minLifeMinutes: 10, lengthTolerance: 0.25, hoursShownUpTo: 48 });
+  });
+
   it('holds the canonical automation thresholds', () => {
     expect(balance.automation.unlockRepeatable).toBe(200);
     expect(balance.automation.unlockOneTime).toBe(5);

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { balance } from '../balance';
 import type { Book } from './types';
 import { validateBook } from './validate';
 
 /** A minimal valid book to break in one place per test. */
 const good: Book = {
-  id: 'test', name: 'Test',
+  id: 'test', name: 'Test', version: 1, finish: 'hut', length: { hours: 1 },
   roster: [{ id: 'forage', name: 'Forage', icon: 'sprout' }, { id: 'build', name: 'Build', icon: 'house' }],
   chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, order: ['forage', 'hut'] }],
   items: {
@@ -64,7 +65,7 @@ describe('validateBook', () => {
     expect(validateBook(withActions(good.actions, ['toString', 'forage', 'hut']))).toContainEqual(expect.stringMatching(/toString/));
   });
   it('rejects an empty book: no chapters means no first chapter', () => {
-    const b: Book = { id: 'empty', name: 'Empty', roster: [], chapters: [], items: {}, actions: {} };
+    const b: Book = { id: 'empty', name: 'Empty', version: 1, finish: 'none', length: { hours: 1 }, roster: [], chapters: [], items: {}, actions: {} };
     expect(validateBook(b)).toContainEqual(expect.stringMatching(/first chapter/));
   });
   it('rejects a chapter order naming an action the book lacks', () => {
@@ -83,5 +84,35 @@ describe('validateBook', () => {
     const head = good.chapters[0]!.head;
     const b: Book = { ...good, chapters: [{ head, order: ['hut'] }, { head, order: ['forage'] }] };
     expect(validateBook(b)).toContainEqual(expect.stringMatching(/first chapter/));
+  });
+  it('rejects a version that is not a positive integer', () => {
+    for (const version of [0, -1, 1.5, Number.NaN]) {
+      expect(validateBook({ ...good, version })).toContainEqual(expect.stringMatching(/version/));
+    }
+  });
+  it('rejects a finish that is not a row', () => {
+    expect(validateBook({ ...good, finish: 'nothing' })).toContainEqual(expect.stringMatching(/finish "nothing" is not a row/));
+  });
+  it('rejects a finish that is repeatable', () => {
+    expect(validateBook({ ...good, finish: 'forage' })).toContainEqual(expect.stringMatching(/finish "forage".*one-time/));
+  });
+  it('rejects a finish outside the last chapter', () => {
+    const b: Book = { ...good, chapters: [good.chapters[0]!, { head: { numeral: 'II', chapter: 'Two', story: 'Later.' }, order: [] }] };
+    expect(validateBook(b)).toContainEqual(expect.stringMatching(/finish "hut".*last chapter/));
+  });
+  it('rejects a length that is not a positive number', () => {
+    for (const length of [{ hours: 0 }, { days: -2 }, { hours: Number.POSITIVE_INFINITY }, { hours: Number.NaN }, { days: Number.NaN }]) {
+      expect(validateBook({ ...good, length })).toContainEqual(expect.stringMatching(/not a positive number/));
+    }
+  });
+  it('rejects a length that names both hours and days', () => {
+    const length = { hours: 1, days: 9999 } as unknown as Book['length'];   // the type forbids it; a JSON book can still say it
+    expect(validateBook({ ...good, length })).toContainEqual(expect.stringMatching(/both hours and days/));
+  });
+  it('rejects a length past the ceiling, in days or in hours, and accepts one at it', () => {
+    const max = balance.play.maxBookDays;
+    expect(validateBook({ ...good, length: { days: max + 1 } })).toContainEqual(expect.stringMatching(/cannot be loaded/));
+    expect(validateBook({ ...good, length: { hours: (max + 1) * 24 } })).toContainEqual(expect.stringMatching(/cannot be loaded/));
+    expect(validateBook({ ...good, length: { days: max } })).toEqual([]);
   });
 });

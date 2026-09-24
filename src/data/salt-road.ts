@@ -1,7 +1,7 @@
 /**
  * Book one, as much of it as v0.2 needs: one chapter, three rows that feed
  * each other, and the hall, a big sink no first life finishes (spec 2026-09-22
- * section 2). Every tuning number comes from balance.content.scrub; a yield of
+ * section 2); the headless play measures it finishing on about life 457. Every tuning number comes from balance.content.scrub; a yield of
  * one per completion and a cap of one on a structure are counts, not tuning.
  * The text is placeholder content; the chapter brainstorm replaces it.
  *
@@ -18,6 +18,10 @@ const n = balance.content.scrub;
 export const saltRoad: Book = {
   id: 'salt-road',
   name: 'The Salt Road',
+  version: 1,
+  finish: 'hall',
+  /** The author's claim, not tuning (headless-play spec section 3); measured at about 120 h. */
+  length: { days: 5 },
   roster: [
     { id: 'forage', name: 'Forage', icon: 'sprout' },
     { id: 'mine', name: 'Mine', icon: 'pickaxe' },

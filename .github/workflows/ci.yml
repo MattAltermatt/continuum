@@ -27,6 +27,9 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # The headless play is a synchronous loop; a broken bound would hang the
+    # suite past vitest's per-test timeout, and GitHub's default is 6 hours.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       # Pinned from .nvmrc, which tracks the version actually developed against

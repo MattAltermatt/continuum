@@ -70,6 +70,8 @@ which leaves a trail; editing a heading in a file does not.
 ```text
 src/
   engine/     pure simulation — no React, no DOM, no imports from ui/
+              — play.ts plays a book headless and measures its length
+              (spec 2026-09-23-headless-play)
   data/       content definitions (actions, items, skills) — data, not logic
               — a book is a value of the Book type in types.ts;
               src/data/validate.ts is the only check on it, and

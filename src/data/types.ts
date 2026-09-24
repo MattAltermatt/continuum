@@ -72,9 +72,17 @@ export interface Chapter {
   readonly order: readonly ActionId[];
 }
 
+/** The author's claim, in game time (spec 2026-09-23-headless-play section 3). Never a measurement. */
+export type BookLength = { readonly hours: number; readonly days?: never } | { readonly days: number; readonly hours?: never };
+
 /** A book: content plus what the shelf and the chapter panel need. The format a generator emits. */
 export interface Book extends Content {
   readonly id: string;
   readonly name: string;
+  /** 1, 2, ... A shared book is "The Salt Road v1" (headless-play spec section 3). */
+  readonly version: number;
+  /** The big event whose completion finishes the book: a one-time row in the last chapter. */
+  readonly finish: ActionId;
+  readonly length: BookLength;
   readonly chapters: readonly Chapter[];
 }

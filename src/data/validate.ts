@@ -8,7 +8,9 @@
  * shape; a JSON book needs a shape check ahead of this (filed with the
  * generator).
  */
+import { balance } from '../balance';
 import { ICON_NAMES } from './icons';
+import { HOURS_PER_DAY, lengthInHours } from './length';
 import type { ActionId, Book } from './types';
 
 const icons: ReadonlySet<string> = new Set(ICON_NAMES);
@@ -56,5 +58,16 @@ export function validateBook(book: Book): readonly string[] {
   const first = book.chapters[0];
   const opens = first !== undefined && first.order.some((id) => has(book.actions, id) && book.actions[id]!.itemCosts.length === 0);
   if (!opens) problems.push('the first chapter has no row that needs nothing in hand');
+
+  if (!Number.isInteger(book.version) || book.version < 1) problems.push(`version ${book.version} is not a positive integer`);
+  const last = book.chapters[book.chapters.length - 1];
+  if (!has(book.actions, book.finish)) problems.push(`finish "${book.finish}" is not a row`);
+  else if (!book.actions[book.finish]!.isOneTime) problems.push(`finish "${book.finish}" is repeatable; it must be one-time`);
+  else if (last === undefined || !last.order.includes(book.finish)) problems.push(`finish "${book.finish}" is not in the last chapter`);
+  const both = Object.hasOwn(book.length, 'hours') && Object.hasOwn(book.length, 'days');
+  const amount = book.length.hours !== undefined ? book.length.hours : book.length.days;
+  if (both) problems.push('length names both hours and days; a claim must read one way');
+  else if (!Number.isFinite(amount) || amount <= 0) problems.push(`length ${amount} is not a positive number`);
+  else if (lengthInHours(book.length) > balance.play.maxBookDays * HOURS_PER_DAY) problems.push(`length is past ${balance.play.maxBookDays} days: a book that long cannot be loaded`);
   return problems;
 }

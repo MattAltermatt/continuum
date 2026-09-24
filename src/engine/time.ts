@@ -41,6 +41,14 @@ export function msToTicks(ms: number): number {
  */
 const MS_PER_SECOND = 1000;
 
+/** A unit conversion for game time shown to a person, not tuning (see MS_PER_SECOND). */
+const MINUTES_PER_HOUR = 60;
+
+/** Ticks in one hour of game time. */
+export function ticksPerHour(): number {
+  return balance.time.ticksPerMinute * MINUTES_PER_HOUR;
+}
+
 /** Real seconds that a whole number of ticks occupies. */
 export function ticksToSeconds(ticks: number): number {
   return ticksToMs(ticks) / MS_PER_SECOND;

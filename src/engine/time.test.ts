@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { balance } from '../balance';
-import { msToTicks, ticksPerSecond, ticksToMinutes, ticksToMs, ticksToSeconds } from './time';
+import { msToTicks, ticksPerHour, ticksPerSecond, ticksToMinutes, ticksToMs, ticksToSeconds } from './time';
 
 describe('tick conversions', () => {
+  it('an hour of game time is sixty minutes of ticks', () => {
+    expect(ticksPerHour()).toBe(balance.time.ticksPerMinute * 60);
+  });
   it('converts ticks to milliseconds through balance, not a literal', () => {
     expect(ticksToMs(1)).toBe(balance.time.tickIntervalMs);
     expect(ticksToMs(0)).toBe(0);
