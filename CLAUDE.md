@@ -264,6 +264,15 @@ unsubscribed event) ship without asking.
 - **`step()` returns the same object when nothing happened.** React skips
   the render on an idle tick, and `useGame` only logs a state that is new. A
   change that spreads the state on every tick breaks both silently.
+- **The dev handle takes only real `GameAction` types.** `window.continuum.dispatch`
+  with an unknown `type` (`'enqueue'` instead of `'queue'`) makes the reducer
+  return `undefined` and blanks the page with an uncaught error in `<App>`. Read
+  the union in `src/state/useGame.ts` before driving it.
+- **The headless play is a synchronous loop.** A broken bound in
+  `src/engine/play.ts` hangs vitest rather than failing it (a per-test timeout
+  cannot interrupt synchronous code); CI's `timeout-minutes: 15` is the backstop.
+  When mutation-testing it, run `timeout 90 npm test`. The play and measure
+  suites allow 30 s each, since a slower runner took 5.02 s on one case.
 - **`realClick` needs real timers.** It awaits a real `setTimeout`; a suite
   under `vi.useFakeTimers()` hangs on it. Wrap the await in `act`. It passes no
   `view` to `MouseEvent`: under vitest the global `window` is not jsdom's.
