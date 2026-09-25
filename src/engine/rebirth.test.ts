@@ -38,8 +38,15 @@ function deadLife(): GameState {
     life: 2,
     rebirthBonus: 1,
     lifeStartCore: { ...fresh.lifeStartCore, forage: 1, mine: 1 },
+    lastVerb: 'forage',
   };
 }
+
+describe('lastVerb', () => {
+  it('keeps the last verb across death, so the idle cell shows the skill the life that ended was using', () => {
+    expect(rebirth(deadLife()).lastVerb).toBe('forage');
+  });
+});
 
 describe('rebirthGain', () => {
   it('is growthRate ^ minutes - 1, pinned at the spec table', () => {
@@ -139,7 +146,7 @@ describe('rebirth: guard and accrual', () => {
  */
 describe('rebirth: every field is classified', () => {
   const RESETS = ['runTicks', 'paused', 'dead', 'finished', 'inventory', 'acquired', 'foodCooldowns', 'queue', 'nextEntryId', 'work', 'provisioned', 'idleFed', 'chapter', 'completedOneTime', 'decayMultiplier', 'events'];
-  const PERSISTS = ['completionCounts', 'automation', 'skillStats'];
+  const PERSISTS = ['completionCounts', 'automation', 'skillStats', 'lastVerb'];
   const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'finishes', 'rebirthBonus', 'lifeStartCore'];
   it('the three lists cover newState(roster) exactly, with no overlap', () => {
     const all = [...RESETS, ...PERSISTS, ...DERIVED];

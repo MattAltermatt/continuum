@@ -119,6 +119,8 @@ export interface GameState {
   readonly rebirthBonus: number;
   /** Core levels as this life began, so the card can show what moved. */
   readonly lifeStartCore: Readonly<Record<SkillId, number>>;
+  /** The verb of the last row that did work this run, so an idle screen can keep showing it (spec 2026-09-25-the-watched-screen 4.2); null on a fresh run. Kept across death. */
+  readonly lastVerb: SkillId | null;
   /** This tick's events. Replaced every tick; never accumulates. */
   readonly events: readonly GameEvent[];
 }

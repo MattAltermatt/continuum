@@ -48,6 +48,14 @@ describe('the save', () => {
     const kept = loadSave(saveText({ ...m, state: { ...m.state, idleFed: true } }, book), book);
     expect(kept.kind === 'loaded' && kept.model.state.idleFed).toBe(true);
   });
+  it('loads a save from before lastVerb, which has none, as null; a saved verb the roster has is kept', () => {
+    const m = midRun();
+    const { lastVerb: _, ...old } = m.state;
+    const loaded = loadSave(JSON.stringify({ format: SAVE_FORMAT, bookId: book.id, bookVersion: book.version, model: { ...m, state: old } }), book);
+    expect(loaded.kind === 'loaded' && loaded.model.state.lastVerb).toBeNull();
+    const kept = loadSave(saveText({ ...m, state: { ...m.state, lastVerb: 'forage' } }, book), book);
+    expect(kept.kind === 'loaded' && kept.model.state.lastVerb).toBe('forage');
+  });
   it('none for no text', () => {
     expect(loadSave(null, book)).toEqual({ kind: 'none' });
   });
@@ -160,6 +168,11 @@ describe('the save', () => {
 });
 
 describe('reconcile', () => {
+  it('lastVerb: a verb the roster lacks reads null; one it has is kept', () => {
+    const m = midRun();
+    expect(reconcile({ ...m.state, lastVerb: 'nosuch' }, book).lastVerb).toBeNull();
+    expect(reconcile({ ...m.state, lastVerb: 'forage' }, book).lastVerb).toBe('forage');
+  });
   it('drops rows and items the book no longer has, adds new roster skills, clamps the chapter', () => {
     const m = midRun();
     const smaller: Book = {

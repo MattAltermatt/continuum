@@ -32,6 +32,15 @@ Death is the loop, not the failure.
 > on top of the earlier specs in [`docs/specs/`](./docs/specs/), with mockups in
 > [`docs/mockups/`](./docs/mockups/) and plans in [`docs/plans/`](./docs/plans/).
 
+**The screen is what you watch; the sheets are what you operate.** The
+running skill, the food on hand, the queue and the log are the screen; the
+skills, the actions and the pack open as sheets from the bottom bar. One
+layout serves a phone (one column), the 696-wide window the game is mostly
+played in (the width in pairs) and a desktop (three columns, the sheets
+docked); the boxes never move, the page never scrolls, and every bar reads the
+same way (spec
+[`docs/specs/2026-09-25-the-watched-screen.md`](./docs/specs/2026-09-25-the-watched-screen.md)).
+
 ## Run it
 
 ```sh

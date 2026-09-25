@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Desktop O: the phone's order with the sheets docked</title>
+<style>
+:root { color-scheme: dark;
+  --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --item: oklch(22% 0.012 260); --cell-on: oklch(30% 0.02 260);
+  --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --track: oklch(17% 0.012 260); --track-edge: oklch(55% 0.012 260);
+  --ink: oklch(90% 0.01 80); --ink-2: oklch(80% 0.01 80); --ink-3: oklch(62% 0.01 80); --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45);
+  --hurt: oklch(66% 0.18 25); --hurt-text: oklch(70% 0.18 25); --warn: oklch(80% 0.15 85); --auto: oklch(72% 0.10 235); --good: oklch(78% 0.12 150);
+  --mono: ui-monospace, Menlo, monospace; --serif: Georgia, "Times New Roman", serif; --control: 34px; }
+* { box-sizing: border-box; }
+body { margin: 0; background: oklch(12% 0.01 260); color: var(--ink); font-family: var(--mono); font-size: 12px; padding: 24px; }
+h1 { font-size: 13px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 6px; }
+p.note { max-width: 70ch; color: var(--ink-2); font-size: 12px; line-height: 1.5; margin: 0 0 18px; }
+.frames { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+.frame { width: 390px; }
+.frame > h2 { font-size: 12px; font-weight: 700; margin: 0 0 6px; }
+.frame > h2 small { display: block; font-weight: 400; color: var(--ink-2); margin-top: 3px; line-height: 1.4; }
+.phone { width: 390px; height: 800px; background: var(--bg); border: 1px solid var(--edge); border-radius: 18px; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; position: relative; }
+.phone__body { overflow-y: auto; padding: 8px 10px; display: grid; gap: 8px; align-content: start; scrollbar-width: thin; }
+.top { padding: 12px 10px 6px; background: var(--bg); border-bottom: 1px solid var(--edge); display: grid; gap: 6px; }
+.bottom { padding: 6px 10px 10px; background: var(--bg); border-top: 1px solid var(--edge); display: grid; grid-template-columns: var(--control) 1fr auto var(--control); align-items: center; gap: 8px; }
+.clock { text-align: center; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.clock small { font-weight: 400; color: var(--ink-2); margin-left: 6px; }
+
+.bar { height: 8px; border: 1px solid var(--track-edge); border-radius: 3px; background: var(--track); position: relative; overflow: hidden; }
+.bar--hp { height: 16px; }
+.bar--thin { height: 5px; }
+.bar__fill { position: absolute; inset: 0 auto 0 0; background: var(--core); }
+.bar__fill--run { background: var(--run); }
+.bar__fill--hp { background: var(--hurt); }
+.bar__value { font-size: 10px; text-align: center; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
+
+.health { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 10px; }
+.health .bar { grid-column: 1 / -1; }
+.health__value { font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 3px; }
+.health__value small { font-weight: 400; color: var(--ink-2); }
+.health__rate { font-size: 11px; color: var(--hurt-text); text-align: right; margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* The watch face: the running row's strip, in the sticky top. */
+.now { border: 1px solid var(--run); border-radius: 4px; background: var(--item); padding: 5px 8px; display: grid; grid-template-columns: 1.4em 1fr auto; gap: 2px 6px; align-items: center; position: relative; overflow: hidden; }
+.now svg { width: 15px; height: 15px; }
+.now__name b { font-weight: 700; }
+.now__left { text-align: right; font-variant-numeric: tabular-nums; }
+.now__left small { color: var(--ink-2); margin-left: 4px; }
+.now .bar { grid-column: 2 / -1; }
+.now__next { grid-column: 2 / -1; font-size: 10px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now__next b { color: var(--ink-2); font-weight: 400; }
+@keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.now::after, .row--running::after, .entry--running::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--run) 12%, transparent), transparent); animation: sheen 6s linear infinite; }
+
+.region { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; display: grid; gap: 5px; align-content: start; }
+.region__head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.region__head--book { color: var(--ink); letter-spacing: .14em; }
+.region--chapter { padding: 8px 0; }
+.region--chapter > .region__head, .region--chapter > .story { padding-inline: 10px; }
+.story { margin: 0 0 2px; padding-bottom: 6px; border-bottom: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
+.item { border: 1px solid var(--edge); background: var(--item); border-radius: 4px; }
+.region--chapter .item { border-inline: 0; border-radius: 0; }
+
+/* The narrow row: two lines. Name and time on the first; what it takes and gives, and the controls, on the second. */
+.row { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 3px 8px; align-items: center; padding: 7px 10px; position: relative; overflow: hidden; }
+.row svg { width: 15px; height: 15px; }
+.row__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row__name b { font-weight: 700; }
+.row__tx { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row__tx small { color: var(--ink-2); margin-left: 5px; font-size: 10px; }
+.row__mid { grid-column: 2; font-size: 11px; line-height: 1.3; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
+.row__mid .arr { color: var(--edge-on); }
+.row__mid .out { color: var(--ink); }
+.row__short { color: var(--warn); }
+.row__short small { color: var(--ink-2); font-size: 10px; margin-left: 4px; }
+.row__after { color: var(--warn); }
+.row__ctl { grid-column: 3; display: flex; gap: 6px; justify-content: flex-end; }
+.row--running { border-color: var(--run); box-shadow: inset 1px 0 0 var(--run), inset -1px 0 0 var(--run); }
+.row .bar { grid-column: 2 / -1; }
+/* The receded row: chipped and automated, one thin line. */
+.row--auto { padding: 4px 10px; grid-template-columns: 1.6em 1fr auto auto; color: var(--ink-2); background: transparent; }
+.row--auto .row__name { font-size: 11px; }
+.row--auto .row__name b { font-weight: 400; }
+.row--auto .row__done { font-size: 10px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.row--auto .auto { height: 22px; width: auto; padding: 0 6px; }
+.group { grid-column: 1 / -1; padding: 5px 10px 2px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); display: flex; justify-content: space-between; }
+
+.btn { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 5px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; display: inline-grid; place-items: center; }
+.btn--play { color: var(--run); }
+.btn--stop { background: var(--run); color: var(--bg); }
+.btn svg { width: 16px; height: 16px; }
+.auto { width: calc(7ch + 12px); height: var(--control); border: 1px solid var(--edge); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 10px; position: relative; overflow: hidden; }
+.auto i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--auto); }
+.auto--btn { border-color: var(--edge-on); font-size: 11px; }
+.auto--lit { border-color: var(--auto); color: var(--auto); font-weight: 700; }
+
+/* Queue entries, narrow. */
+.entry { display: grid; grid-template-columns: 1.4em 1fr auto; gap: 3px 6px; align-items: center; padding: 6px 8px; position: relative; overflow: hidden; }
+.entry svg { width: 15px; height: 15px; }
+.entry__name b { font-weight: 700; }
+.entry .bar { grid-column: 1 / -1; }
+.entry__tags { grid-column: 1 / 3; display: flex; gap: 4px; align-items: center; font-size: 10px; color: var(--ink-2); }
+.entry__tags .tag { border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; }
+.entry__tags .tag--lit { border-color: var(--auto); color: var(--auto); }
+.entry__time { text-align: right; font-variant-numeric: tabular-nums; }
+.entry__need { grid-column: 1 / -1; font-size: 11px; color: var(--warn); }
+.entry--running { border-color: var(--run); }
+.x { width: 26px; height: 26px; border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; display: inline-grid; place-items: center; }
+
+/* Skills, two to a row on a phone. */
+.skills { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.skill { display: grid; grid-template-columns: 1.4em 1fr auto; gap: 1px 6px; align-items: center; padding: 5px 7px; }
+.skill svg { width: 14px; height: 14px; }
+.skill__name b { font-weight: 700; }
+.skill__mult { color: var(--ink-2); font-size: 10px; margin-left: 4px; }
+.skill__lv { font-size: 10px; color: var(--ink-2); text-align: right; white-space: nowrap; }
+.skill .bar { grid-column: 1 / 3; }
+.skill--on { background: var(--cell-on); }
+.skills--strip { grid-template-columns: repeat(4, 1fr); }
+.skills--strip .skill { grid-template-columns: 1fr; gap: 2px; padding: 4px 5px; text-align: center; }
+.skills--strip .skill svg { display: none; }
+.skills--strip .skill__lv, .skills--strip .bar { grid-column: 1; }
+
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-variant-numeric: tabular-nums; }
+.kv .hurt { color: var(--hurt-text); }
+.kv .dim { color: var(--ink-3); }
+.pack__item { display: grid; grid-template-columns: 1fr 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+.log__line { display: grid; grid-template-columns: 3.4em 1fr; gap: 0 8px; padding: 2px 0; border-bottom: 1px solid var(--edge); font-size: 11px; }
+.log__line span:first-child { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--edge); }
+.tab { padding: 8px 4px; text-align: center; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); border-bottom: 2px solid transparent; }
+.tab--on { color: var(--ink); border-bottom-color: var(--run); }
+.tab b { color: var(--ink); font-weight: 400; }
+
+.qbtn { height: var(--control); border: 1px solid var(--edge-on); border-radius: 5px; background: transparent; color: var(--ink); font: inherit; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; }
+.qbtn small { color: var(--ink-2); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; background: var(--cell); border-top: 1px solid var(--edge-on); border-radius: 12px 12px 0 0; padding: 6px 10px 10px; display: grid; grid-template-rows: auto auto 1fr; gap: 6px; box-shadow: 0 -12px 30px oklch(0% 0 0 / .5); }
+.sheet__grip { width: 36px; height: 4px; border-radius: 2px; background: var(--edge-on); margin: 0 auto; }
+.sheet__list { overflow-y: auto; display: grid; gap: 5px; align-content: start; scrollbar-width: thin; }
+.scrim { position: absolute; inset: 0; background: oklch(0% 0 0 / .35); }
+.acc { display: flex; justify-content: space-between; align-items: center; }
+.acc::after { content: "\25BE"; color: var(--ink-3); }
+.acc--closed::after { content: "\25B8"; }
+
+.kv--line { grid-template-columns: repeat(4, auto); justify-content: space-between; font-size: 11px; color: var(--ink-2); }
+.kv--line b { font-weight: 400; color: var(--ink); }
+.kv--line b.hurt { color: var(--hurt-text); }
+.kv--line b.dim { color: var(--ink-3); }
+.up { color: var(--ink); font-weight: 400; }
+.sheet--tall { height: 74%; grid-template-rows: auto 1fr; }
+.sheet .region--chapter { border: 0; background: transparent; padding-top: 0; }
+
+.skill--now { grid-template-columns: 1.6em 1fr auto; padding: 7px 9px; }
+.skill--now svg { width: 16px; height: 16px; }
+.skill--now .skill__name b { font-size: 13px; }
+.skill--now .skill__lv { font-size: 11px; }
+.btns { display: flex; gap: 6px; justify-content: flex-end; }
+.btns .qbtn { padding: 0 8px; }
+
+/* E, rigid: the body is a fixed grid. Skill cell fixed; the doing box a fixed height that scrolls inside; the log takes the rest and never moves. */
+.phone__body { grid-template-rows: auto auto minmax(0, 2fr) minmax(0, 1fr); gap: 8px; overflow: hidden; }
+.region--doing { grid-template-rows: auto 1fr; overflow: hidden; padding-bottom: 6px; }
+.region--doing .list { overflow-y: auto; display: grid; grid-auto-rows: max-content; gap: 5px; align-content: start; scrollbar-width: thin; padding-bottom: 2px; }
+.region--doing .list::after { content: ""; height: 1px; }
+.region--log { grid-template-rows: auto 1fr; overflow: hidden; }
+.region--log .list { overflow-y: auto; scrollbar-width: thin; }
+.region--doing { position: relative; }
+.region--doing:has(.fade)::after { content: ""; position: absolute; left: 1px; right: 12px; bottom: 6px; height: 22px; background: linear-gradient(transparent, var(--cell)); pointer-events: none; }
+.skill--idle { background: var(--item); color: var(--ink-2); }
+.skill--idle .skill__name b { color: var(--ink-2); }
+.skill--idle .bar__fill { opacity: .6; }
+.empty { color: var(--ink-3); font-size: 11px; padding: 10px 6px; }
+.top__note { font-size: 11px; color: var(--ink-3); text-align: right; }
+.qbtn--waits { border-color: var(--warn); color: var(--warn); }
+
+.phone--short { height: 667px; width: 375px; }
+.frame--short { width: 375px; }
+.head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+.head span:last-child { color: var(--ink-2); }
+.head--turn { color: var(--warn); }
+.pack { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 1px; }
+.chip { flex: 0 0 auto; border: 1px solid var(--edge); background: var(--item); border-radius: 4px; padding: 4px 7px; display: grid; gap: 2px; min-width: 96px; font-variant-numeric: tabular-nums; }
+.chip__name { white-space: nowrap; font-size: 11px; }
+.chip__name b { color: var(--good); font-weight: 400; margin-left: 4px; }
+.chip__n { font-size: 10px; color: var(--ink-2); text-align: center; }
+.chip--empty { color: var(--ink-3); }
+.chip--full .chip__n { color: var(--warn); }
+.region--pack { padding: 6px 8px; }
+.region--pack .region__head { margin-bottom: 4px; }
+.entry--waits { border: 1px dashed var(--warn); }
+.entry__why { grid-column: 1 / -1; font-size: 11px; color: var(--warn); line-height: 1.3; }
+.entry__why small { color: var(--ink-2); display: block; }
+.top--waits .health__rate { color: var(--warn); }
+.skill--waits .skill__lv b.up { color: var(--warn); }
+.heading-waits { color: var(--warn); }
+
+/* Condensed queue: one line per entry unless it is running. */
+.entry--line { grid-template-columns: 1.4em 1fr auto auto auto; gap: 0 8px; padding: 5px 8px; align-items: center; }
+.entry--line .entry__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry--line .entry__name b { font-weight: 400; }
+.entry--line .tag { font-size: 10px; color: var(--ink-2); border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; }
+.entry--line .entry__len { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 3.5ch; text-align: right; }
+.entry--line .x { width: 22px; height: 22px; font-size: 11px; }
+.entry--line .tag--lit { border-color: var(--auto); color: var(--auto); }
+.entry--line .tag--warn { border-color: var(--warn); color: var(--warn); }
+/* Food, its own fixed section. */
+.food__row { display: grid; grid-template-columns: 1fr auto 96px; gap: 0 10px; align-items: center; padding: 4px 8px; font-variant-numeric: tabular-nums; }
+.food__row b { color: var(--good); font-weight: 400; margin-left: 4px; }
+.food__row .n { font-size: 10px; color: var(--ink-2); text-align: center; }
+.food__row .n.ready { color: var(--ink); }
+.food__row .none { color: var(--ink-3); }
+.bottom { grid-template-columns: var(--control) auto 1fr var(--control); }
+.btns { justify-content: flex-end; gap: 5px; }
+.btns .qbtn { padding: 0 7px; font-size: 11px; }
+.sheet--pack { height: 46%; grid-template-rows: auto auto 1fr; }
+.pack__item { padding: 6px 8px; }
+
+.entry--run { grid-template-columns: 1.4em 1fr auto; }
+.entry--run .bar { grid-column: 1 / -1; }
+.entry--run .entry__foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 10px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.entry--run .entry__foot .tag { border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; }
+.entry--run .entry__foot .tag--lit { border-color: var(--auto); color: var(--auto); }
+.entry--run .entry__foot .need { color: var(--warn); }
+.entry--run .entry__foot .v { color: var(--ink); font-size: 12px; }
+.entry--run .entry__foot .v small { color: var(--ink-2); font-size: 10px; margin-right: 6px; }
+
+/* The gauge, the skill cell's shape for every bar: the bar on the left, and on the right the label with its timer over the value. */
+.gauge { display: grid; grid-template-columns: minmax(0, 1fr) var(--g-right, 11ch); grid-template-rows: auto auto; gap: 0 10px; align-items: center; font-variant-numeric: tabular-nums; }
+.gauge .bar { grid-row: 1 / 3; align-self: center; }
+.gauge__label { font-size: 11px; color: var(--ink-2); text-align: right; white-space: nowrap; }
+.gauge__label b { color: var(--ink); font-weight: 400; }
+.gauge__label.warn { color: var(--warn); }
+.gauge__label.dim { color: var(--ink-3); }
+.gauge__value { font-size: 11px; color: var(--ink-2); text-align: right; white-space: nowrap; }
+.gauge--hp .bar { height: 16px; }
+.gauge--hp .gauge__value { font-size: 13px; font-weight: 700; color: var(--ink); }
+.gauge--hp .gauge__value small { font-weight: 400; color: var(--ink-2); }
+.gauge--hp { --g-right: 13ch; }
+.skill--g { display: grid; grid-template-columns: 1.6em 1fr; gap: 3px 8px; padding: 7px 9px; }
+.skill--g .skill__title { display: flex; justify-content: space-between; align-items: baseline; }
+.skill--g .skill__title b { font-size: 13px; font-weight: 700; }
+.skill--g .skill__title .to { font-size: 10px; color: var(--ink-2); }
+.skill--g .gauge { grid-column: 2; --g-right: 15ch; }
+.food--g { padding: 5px 8px; display: grid; grid-template-columns: 1fr; gap: 2px; }
+.food--g .food__name { font-size: 12px; }
+.food--g .food__name b { color: var(--good); font-weight: 400; margin-left: 4px; }
+.food--g .gauge { --g-right: 7ch; }
+.entry--g { grid-template-columns: 1.4em 1fr auto; gap: 3px 6px; }
+.entry--g .entry__tags { grid-column: 2; }
+.entry--g .gauge { grid-column: 1 / -1; --g-right: 9ch; }
+.entry--g .gauge .bar { grid-column: 1; }
+.entry--g .gauge__label b { font-size: 12px; }
+
+/* The narrow row, in the actions sheet. Line one: icon, the name at its 24ch budget, time and xp. Line two: what it takes and gives
+   (two lines reserved, so an instruction replacing it moves nothing), and the three controls. */
+.nrow { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 2px 8px; align-items: start; padding: 7px 10px; position: relative; overflow: hidden; }
+.nrow svg { width: 15px; height: 15px; margin-top: 2px; }
+.nrow__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrow__name b { font-weight: 700; }
+.nrow__tx { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.2; }
+.nrow__tx small { display: block; color: var(--ink-2); font-size: 10px; }
+.nrow__mid { grid-column: 2; font-size: 11px; line-height: 1.3; color: var(--ink-2); min-height: calc(3 * 1.3 * 11px); display: flex; flex-wrap: wrap; gap: 0 6px; align-content: start; }
+.nrow__mid .arr { color: var(--edge-on); }
+.nrow__mid .out { color: var(--ink); }
+.nrow__mid .short { color: var(--warn); }
+.nrow__mid .short small { color: var(--ink-2); font-size: 10px; margin-left: 4px; }
+.nrow__mid .after { color: var(--warn); }
+.nrow__say { grid-column: 2; font-size: 11px; line-height: 1.3; color: var(--warn); min-height: calc(3 * 1.3 * 11px); }
+.nrow__ctl { grid-column: 3; display: flex; gap: 6px; justify-content: flex-end; align-self: end; }
+.nrow--running { border-color: var(--run); box-shadow: inset 1px 0 0 var(--run), inset -1px 0 0 var(--run); }
+.nrow--refused { animation: none; box-shadow: inset 0 0 0 1px var(--hurt); }
+.nrow .auto { width: calc(7ch + 12px); }
+.sheet--actions { height: 78%; bottom: 57px; grid-template-rows: auto auto 1fr; }
+.scrim { bottom: 57px; }
+.sheet--actions .region--chapter { border: 0; background: transparent; padding-top: 0; }
+.sheet--actions .region--chapter .nrow { border-inline: 0; border-radius: 0; }
+.sheet--actions .story { margin: 0; }
+.sheet--skills { height: 78%; bottom: 57px; grid-template-rows: auto auto 1fr; }
+.sheet--skills .skill--g { margin: 0; }
+.sheet--skills .skill--g.dim { opacity: .75; }
+
+/* The list row: the middle is a list, never prose. Header lines ("needs:", "gives:", "still required:") and bullets under them. */
+.lrow { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; gap: 2px 8px; align-items: start; padding: 7px 10px; position: relative; overflow: hidden; }
+.lrow svg { width: 15px; height: 15px; margin-top: 2px; }
+.lrow__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lrow__name b { font-weight: 700; }
+.lrow__tx { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.2; }
+.lrow__tx small { display: block; color: var(--ink-2); font-size: 10px; }
+.lrow__list { grid-column: 2; font-size: 11px; line-height: 1.35; color: var(--ink); display: grid; gap: 0; }
+.lrow__list .h { color: var(--run); margin-top: 2px; }
+.lrow__list .li { padding-left: 1.2em; text-indent: -1.2em; }
+.lrow__list .li::before { content: "\00b7  "; color: var(--edge-on); }
+.lrow__list .warn { color: var(--warn); }
+.lrow__list .warn small { color: var(--ink-2); font-size: 10px; display: block; text-indent: 0; }
+.lrow__list .fix { color: var(--ink-2); }
+.lrow__list .fix::before { content: "\2192  "; color: var(--edge-on); }
+.lrow__ctl { grid-column: 3; display: flex; gap: 6px; justify-content: flex-end; }
+.lrow--a .lrow__ctl { grid-row: 2; align-self: center; gap: 4px; --control: 32px; }
+.lrow--a { padding: 7px 8px; }
+.lrow--b .lrow__list { grid-column: 2 / -1; }
+.lrow--b .lrow__ctl { grid-column: 2 / -1; grid-row: 3; margin-top: 4px; }
+.lrow--running { border-color: var(--run); box-shadow: inset 1px 0 0 var(--run), inset -1px 0 0 var(--run); }
+.lrow--refused { box-shadow: inset 0 0 0 1px var(--hurt); }
+.lrow--refused .warn { color: var(--hurt-text); }
+.lrow .auto { width: calc(7ch + 12px); }
+.sheet--actions .region--chapter .lrow { border-inline: 0; border-radius: 0; }
+
+/* The cost gauge: a bar the row's total wide, ember for units spent, bone for units on hand, empty for the shortfall;
+   the gauge grammar on the right, the actionable number over the parts. */
+.cost { display: grid; grid-template-columns: 6ch minmax(0, 1fr) var(--g-right, 21ch); grid-template-rows: auto auto; gap: 0 8px; align-items: center; font-variant-numeric: tabular-nums; margin: 2px 0; }
+.cost__name { grid-row: 1 / 3; font-size: 11px; color: var(--ink); }
+.cost .bar { grid-row: 1 / 3; height: 8px; display: flex; }
+.cost .seg { height: 100%; }
+.cost .seg--spent { background: var(--run); }
+.cost .seg--have { background: var(--core); }
+.cost .seg--have + .seg--spent, .cost .seg--spent + .seg--have { border-left: 1px solid var(--track); }
+.cost__label { font-size: 11px; text-align: right; white-space: nowrap; color: var(--ink); }
+.cost__label.warn { color: var(--warn); }
+.cost__label.dim { color: var(--ink-3); }
+.cost__value { font-size: 10px; color: var(--ink-2); text-align: right; white-space: nowrap; }
+.lrow--refused .cost__label.warn { color: var(--hurt-text); }
+.lrow--refused .cost .bar { border-color: var(--hurt); }
+.lrow__list .fix { margin-left: calc(6ch + 8px); }
+
+/* C: the controls on the title line, the list full width under it. */
+.lrow--c { grid-template-columns: 1.6em minmax(0, 1fr) auto auto; padding: 7px 8px; }
+.lrow--c .lrow__tx { font-size: 11px; }
+.lrow--c .lrow__ctl { grid-column: 4; grid-row: 1; gap: 4px; --control: 30px; align-self: start; }
+.lrow--c .lrow__list { grid-column: 2 / -1; }
+.lrow--c .auto { width: calc(7ch + 10px); font-size: 10px; }
+.sheet--actions .sheet__list { margin: 0 -10px; padding: 0 0 0 0; }
+.sheet--actions .region--chapter { padding-inline: 0; }
+.sheet--actions .region--chapter .group { padding-inline: 8px; }
+
+/* M: the cost as a fraction, paid of total. */
+.li--cost { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding-left: 0; text-indent: 0; }
+.li--cost::before { display: none; }
+.li--cost .frac { font-variant-numeric: tabular-nums; color: var(--ink); }
+.li--cost.flash { color: var(--hurt-text); }
+.li--cost.flash .frac { color: var(--hurt-text); }
+.cost--m { grid-template-columns: 6ch minmax(0, 1fr) 6ch; --g-right: 6ch; }
+.cost--m .cost__label { font-size: 11px; color: var(--ink); }
+.cost--m.flash .cost__name, .cost--m.flash .cost__label { color: var(--hurt-text); }
+.cost--m.flash .bar { border-color: var(--hurt); }
+
+/* The cards on a phone: one overlay, centred in the body above the bottom bar, the screen behind dimmed and inert. */
+.veil { position: absolute; left: 0; right: 0; top: 0; bottom: 57px; background: oklch(0% 0 0 / .55); display: grid; place-items: center; padding: 16px; }
+.pcard { width: 100%; max-width: 358px; border: 1px solid var(--edge-on); background: var(--cell-on); border-radius: 6px; padding: 14px 16px; box-shadow: 0 8px 28px oklch(0% 0 0 / .5); }
+.pcard__title { font-family: var(--serif); font-style: italic; font-size: 17px; text-align: center; }
+.pcard__sub, .pcard__quiet { color: var(--ink-2); text-align: center; }
+.pcard__sub { margin-bottom: 10px; }
+.pcard__facts { text-align: center; margin: -4px 0 10px; line-height: 1.5; }
+.pcard__facts .hurt { color: var(--hurt-text); }
+.pcard__gains { display: grid; grid-template-columns: 1.4em 6em 1fr auto; gap: 4px 8px; align-items: center; }
+.pcard__gains svg { width: 14px; height: 14px; }
+.pcard__lv { text-align: right; white-space: nowrap; font-size: 11px; }
+.pcard__new { color: var(--good); }
+.pcard__rule { border-top: 1px solid var(--edge); margin: 10px 0; }
+.pcard__hp { display: flex; justify-content: space-between; align-items: baseline; }
+.pcard__why { color: var(--ink-2); font-size: 10px; margin-top: 2px; }
+.pcard__begin { display: block; width: 100%; margin: 14px auto 0; padding: 10px 18px; border: 1px solid var(--run); background: var(--run); color: var(--bg); border-radius: 5px; font: inherit; font-weight: 700; font-size: 13px; }
+.pcard__quiet { font-size: 10px; margin-top: 8px; }
+.pcard__line { font-family: var(--serif); font-style: italic; font-size: 13px; line-height: 1.45; color: var(--ink-2); text-align: center; margin: 8px auto; }
+.pcard__count { text-align: center; }
+.pcard__count b { font-size: 13px; }
+.top--dead .gauge--hp .bar__fill { width: 0 !important; }
+
+body { padding: 24px; }
+.frames { flex-direction: column; gap: 36px; }
+.frame--desk { width: auto; }
+.desk { background: var(--bg); border: 1px solid var(--edge); border-radius: 10px; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; }
+.desk--1280 { width: 1280px; height: 820px; }
+.desk--1600 { width: 1600px; height: 900px; }
+.desk__top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 24px; align-items: center; padding: 10px 14px 8px; border-bottom: 1px solid var(--edge); }
+.desk__top .head { gap: 12px; }
+.desk__top .gauge--hp { --g-right: 13ch; }
+.desk__top .kv--line { gap: 0 18px; }
+.desk__cols { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr) minmax(460px, 1.15fr); gap: 10px; padding: 10px 14px; overflow: hidden; min-height: 0; }
+.col { display: grid; gap: 10px; align-content: start; min-height: 0; overflow: hidden; }
+.col--watch { grid-template-rows: auto minmax(0, 2fr) minmax(0, 1fr); }
+.col--skills { grid-template-rows: minmax(0, 1fr) auto; }
+.col--act { grid-template-rows: minmax(0, 1fr); }
+.col .region--doing, .col .region--log { height: auto; }
+.region--skills { display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+.region--skills .list { overflow-y: auto; display: grid; gap: 5px; align-content: start; scrollbar-width: thin; }
+.region--skills .skill--g { padding: 6px 9px; }
+.region--skills .skill--g.dim { opacity: .75; }
+.region--act { display: grid; grid-template-rows: auto auto 1fr; overflow: hidden; padding: 8px 0; }
+.region--act > .region__head, .region--act > .story { padding-inline: 10px; }
+.region--act .list { overflow-y: auto; scrollbar-width: thin; }
+.region--act .lrow { border-inline: 0; border-radius: 0; }
+.region--pack .pack__item { padding: 4px 8px; }
+.desk__bottom { display: grid; grid-template-columns: var(--control) 1fr var(--control); align-items: center; gap: 8px; padding: 6px 14px 8px; border-top: 1px solid var(--edge); }
+.desk--1600 .desk__cols { grid-template-columns: minmax(380px, 1fr) minmax(380px, 1fr) minmax(520px, 1.1fr); }
+</style></head>
+<body>
+<h1>Desktop · O, the phone's order with the sheets docked</h1>
+<p class="note">The same hierarchy as the phone, laid out where there is room. One top strip: running head, health gauge, rates. Three columns, watched to operated left to right: <b>food · doing · log</b>, the phone's order with the skill cell gone to its own column; <b>skills · pack</b> (all seven cells in roster order, the running one lit, the pack under them); <b>actions</b>, the chapter with its story and the list rows exactly as the phone's sheet has them. Nothing is a sheet, so the bottom bar is gear, clock and pause again. Every column holds its height; the doing list, skills and actions scroll inside their boxes; nothing moves as the queue or the page changes. Under 1000 the skills column folds back into a bottom-bar sheet; under 732 it is the phone.</p>
+<div class="frames">
+  <div class="frame frame--desk"><h2>O1 · 1280 × 820<small>Three columns at 360 / 360 / 460 and change.</small></h2><div class="desk desk--1280" id="o1"></div></div>
+  <div class="frame frame--desk"><h2>O2 · 1600 × 900<small>The cap. Columns grow, the actions column to about 560; nothing new appears, nothing wraps differently.</small></h2><div class="desk desk--1600" id="o2"></div></div>
+</div>
+<script>
+const I = {
+  fish: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h1"/><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"/><circle cx="18" cy="18" r="2"/></svg>',
+  salvage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>',
+  tinker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></svg>',
+  rig: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v15"/><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"/><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"/></svg>',
+  fight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>',
+  talk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+};
+const play = '<button class="btn btn--play">▶</button>', plus = '<button class="btn">+</button>', stop = '<button class="btn btn--stop">■</button>';
+const chip = (t, lit) => `<span class="auto ${lit ? 'auto--lit' : t ? '' : 'auto--btn'}">${lit ? 'auto' : t || ''}${t && !lit ? `<i style="width:${t.split('/')[0] / t.split('/')[1] * 100}%"></i>` : ''}</span>`;
+
+const bar = (pct, cls = '', v = '', thin = false) => `<div class="bar${thin ? ' bar--thin' : ''}"><div class="bar__fill ${cls}" style="width:${pct}%"></div></div>${v ? `<div class="bar__value">${v}</div>` : ''}`;
+
+const rowFull = (r) => `<div class="item row ${r.running ? 'row--running' : ''}">${I[r.skill]}<div class="row__name"><b>${r.verb}</b> ${r.noun}</div><div class="row__tx">${r.time}<small>+${r.xp} xp</small></div>
+  <div class="row__mid">${r.mid}</div><div class="row__ctl">${r.running ? stop : play}${plus}${chip(r.chip, r.lit)}</div>${r.running ? bar(r.pct, 'bar__fill--run') : ''}</div>`;
+const rowAuto = (r) => `<div class="item row row--auto">${I[r.skill]}<div class="row__name"><b>${r.verb}</b> ${r.noun}</div><span class="row__done">×${r.done}</span>${chip('', true)}</div>`;
+
+const ROWS = [
+  { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', time: '4.0s', xp: '4.0', mid: '<span class="arr">→</span><span class="out">+1 cloud-fish</span>', lit: true, done: 12 },
+  { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', time: '4.5s', xp: '5.0', mid: '<span class="arr">→</span><span class="out">+1 scrap</span>', lit: true, done: 31 },
+  { skill: 'rig', verb: 'Rig', noun: 'the hull', time: '1:00', xp: '60.0', mid: '<span class="row__short">⚠ 15 of 16 scrap<small>have 4</small></span><span class="arr">→</span><span class="out">decay ×0.80</span>', running: true, pct: 1, chip: '' },
+  { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', time: '40s', xp: '40.0', mid: '<span class="row__short">⚠ 12 scrap<small>have 4</small></span><span class="arr">→</span><span class="out">Fish ×1.25</span>', chip: '' },
+  { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', time: '50s', xp: '50.0', mid: '<span class="row__short">⚠ 20 scrap<small>have 4</small></span><span class="arr">→</span><span class="out">stack +5</span>', chip: '' },
+  { skill: 'rig', verb: 'Rig', noun: 'the sails', time: '20s', xp: '20.0', mid: '<span class="row__after">after: the hull, a trawl net, a canvas satchel</span>', chip: '' },
+];
+// In the baseline, the chipped rows keep their seat; Salvage's chip is not yet earned there, as in the screenshot.
+const ROWS_A = ROWS.map((r, i) => i === 0 ? { ...r, lit: true } : i === 1 ? { ...r, lit: false, chip: '5/200' } : r);
+
+const chapterHead = `<div class="region__head region__head--book"><span>The Windward Run</span><span>I · Port Cinder</span></div><p class="story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p>`;
+const chapterA = `<section class="region region--chapter">${chapterHead}${ROWS_A.map(rowFull).join('')}</section>`;
+const live = ROWS.filter(r => !r.lit), auto = ROWS.filter(r => r.lit);
+const chapterC = `<section class="region region--chapter">${chapterHead}${live.map(rowFull).join('')}<div class="group"><span>automated · ${auto.length}</span><span>page · fitting out</span></div>${auto.map(rowAuto).join('')}</section>`;
+
+const QUEUE = [
+  { skill: 'rig', verb: 'Rig', noun: 'the hull', pct: 1, v: '0.5/60.0', tags: '<span class="tag">once</span><span class="tag tag--lit">auto</span>', time: '18s', need: 'scrap 1/16', running: true },
+  { skill: 'rig', verb: 'Rig', noun: 'the sails', pct: 0, v: '0.0/20.0', tags: '<span class="tag">once</span>', time: '' },
+  { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', pct: 0, v: '0.0/5.0', tags: '<span class="tag">repeat</span>', time: '' },
+  { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', pct: 0, v: '0.0/4.0', tags: '<span class="tag">repeat</span>', time: '' },
+];
+const entry = (q) => `<div class="item entry ${q.running ? 'entry--running' : ''}">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><button class="x">×</button>${bar(q.pct, 'bar__fill--run', q.v)}<div class="entry__tags">${q.tags}</div><div class="entry__time">${q.time}</div>${q.need ? `<div class="entry__need">${q.need}</div>` : ''}</div>`;
+const queueRegion = `<section class="region"><div class="region__head"><span>queue · 4</span></div>${QUEUE.map(entry).join('')}</section>`;
+
+const SKILLS = [
+  ['fish', 'Fish', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0], ['salvage', 'Salvage', '1.11', 2, '4.3/12.1', 36, 1, '0.3/27.5', 1],
+  ['tinker', 'Tinker', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0], ['rig', 'Rig', '1.00', 0, '0.5/10.0', 5, 0, '0.5/25.0', 2, true],
+  ['fight', 'Fight', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0], ['search', 'Search', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0], ['talk', 'Talk', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0],
+];
+const skill = ([id, name, mult, cl, cv, cp, rl, rv, rp, on]) => `<div class="item skill ${on ? 'skill--on' : ''}">${I[id]}<div class="skill__name"><b>${name}</b><span class="skill__mult">×${mult}</span></div><div class="skill__lv">Lv ${cl} · ${rl}</div>${bar(cp, '', '', true)}<div class="skill__lv">${cv}</div>${bar(rp, 'bar__fill--run', '', true)}<div class="skill__lv">${rv}</div></div>`;
+const skillStrip = ([id, name, mult, cl, cv, cp, rl, rv, rp, on]) => `<div class="item skill ${on ? 'skill--on' : ''}"><div class="skill__name"><b>${name}</b></div><div class="skill__lv">Lv ${cl} · ${rl}</div>${bar(cp, '', '', true)}${bar(rp, 'bar__fill--run', '', true)}</div>`;
+const skillsRegion = `<section class="region"><div class="region__head"><span>skills</span></div><div class="skills">${SKILLS.map(skill).join('')}</div></section>`;
+const skillsStrip = `<section class="region"><div class="region__head acc"><span>skills</span></div><div class="skills skills--strip">${SKILLS.map(skillStrip).join('')}</div></section>`;
+
+const rates = `<section class="region"><div class="region__head"><span>rates</span></div><div class="kv"><span>decay</span><span class="hurt">−0.11 hp/s ▲</span><span>food ceiling</span><span class="dim">0.00 hp/s</span><span>rig</span><span class="dim">0.00 hp/s</span></div></section>`;
+const food = `<section class="region"><div class="region__head"><span>food</span><span>nothing to eat</span></div><div class="item pack__item"><span>cloud-fish <span class="dim" style="color:var(--good)">+4 hp</span></span><div>${bar(0, 'bar__fill--run')}<div class="bar__value">none</div></div></div></section>`;
+const pack = `<section class="region"><div class="region__head"><span>pack</span></div><div class="item pack__item"><span>scrap</span><div>${bar(20)}<div class="bar__value">4/20</div></div></div></section>`;
+const LOG = [['0:24', 'Rig the hull: 15 of 16 scrap, have 4 — Salvage drifting scrap first'], ['0:19', 'Salvage → run Lv 1'], ['0:13', 'Salvage → core Lv 2'], ['0:00', 'Life 3 begins at Port Cinder']];
+const log = `<section class="region"><div class="region__head"><span>log</span></div>${LOG.map(([t, s]) => `<div class="log__line"><span>${t}</span><span>${s}</span></div>`).join('')}</section>`;
+const logAcc = log.replace('class="region__head"', 'class="region__head acc"');
+const moreAcc = `<section class="region"><div class="region__head acc acc--closed"><span>food · pack · rates</span><span>nothing to eat</span></div></section>`;
+
+const healthPlain = `<div class="health">${bar(97, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<div class="health__value">97 <small>/ 100</small></div><div class="health__rate">−0.11 hp/s</div></div>`;
+const now = `<div class="now">${I.rig}<div class="now__name"><b>Rig</b> the hull</div><div class="now__left">18s<small>scrap 1/16</small></div>${bar(1, 'bar__fill--run')}<div class="now__next">next <b>Rig the sails</b> · then 2 more</div></div>`;
+const bottom = (mid) => `<div class="bottom"><button class="btn">${I.gear}</button><div class="clock">00:24</div>${mid || '<span></span>'}<button class="btn">${I.pause}</button></div>`;
+const tabs = (on) => `<div class="tabs">${['chapter', 'queue <b>· 4</b>', 'skills', 'more'].map((t, i) => `<div class="tab ${i === on ? 'tab--on' : ''}">${t}</div>`).join('')}</div>`;
+
+const ratesLine = `<div class="kv kv--line"><span>decay <b class="hurt">−0.11</b></span><span>food <b class="dim">0.00</b></span><span>rig <b class="dim">0.00</b></span><span>net <b class="hurt">−0.11 hp/s</b></span></div>`;
+const healthRates = `<div class="health">${bar(97, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<div class="health__value">97 <small>/ 100</small></div><div class="health__rate">≈ 14:42 left</div></div>${ratesLine}`;
+const skillWatch = ([id, name, mult, cl, cv, cp, rl, rv, rp, on]) => `<div class="item skill ${on ? 'skill--on' : ''}">${I[id]}<div class="skill__name"><b>${name}</b><span class="skill__mult">×${mult}</span></div><div class="skill__lv">Lv ${cl}${on ? ' <b class="up">↑ 10s</b>' : ''}</div>${bar(cp, '', '', true)}<div class="skill__lv">${cv}</div><div class="skill__lv" style="grid-column:3">Lv ${rl}${on ? ' <b class="up">↑ 25s</b>' : ''}</div>${bar(rp, 'bar__fill--run', '', true)}<div class="skill__lv">${rv}</div></div>`;
+const skillsWatch = `<section class="region"><div class="region__head"><span>skills</span><span>rig ×1.00 → ×1.05 at Lv 1</span></div><div class="skills">${SKILLS.map(skillWatch).join('')}</div></section>`;
+const skillNow = `<section class="region region--now"><div class="region__head"><span>skill</span><span>rig ×1.00 → ×1.05 at Lv 1</span></div>
+  <div class="item skill skill--on skill--now">${I.rig}<div class="skill__name"><b>Rig</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">core Lv 0 <b class="up">↑ 10s</b></div>${bar(5, '', '', false)}<div class="skill__lv">0.5/10.0</div><div class="skill__lv" style="grid-column:3">run Lv 0 <b class="up">↑ 25s</b></div>${bar(2, 'bar__fill--run', '', false)}<div class="skill__lv">0.5/25.0</div></div></section>`;
+
+const doingBox = (entries, note) => `<section class="region region--doing"><div class="region__head"><span>doing · ${entries.length}</span><span>${note}</span></div><div class="list ${entries.length > 3 ? 'fade' : ''}">${entries.length ? entries.map(entry).join('') : '<div class="empty">nothing queued — pick an action</div>'}</div></section>`;
+const logBox = (lines) => `<section class="region region--log"><div class="region__head"><span>log</span></div><div class="list">${lines.map(([t, s]) => `<div class="log__line"><span>${t}</span><span>${s}</span></div>`).join('')}</div></section>`;
+const LOG9 = [['1:02', 'Fish the cloud shallows ×12'], ['0:58', 'Rig → core Lv 1: rig ×1.05'], ['0:51', 'Rig the hull done — decay ×0.80'], ['0:24', 'Rig the hull: 15 of 16 scrap, have 4 — Salvage drifting scrap first'], ['0:19', 'Salvage → run Lv 1'], ['0:13', 'Salvage → core Lv 2'], ['0:00', 'Life 3 begins at Port Cinder']];
+const QUEUE9 = [...QUEUE, { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', pct: 0, v: '0.0/40.0', tags: '<span class="tag">once</span>', time: '' }, { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', pct: 0, v: '0.0/5.0', tags: '<span class="tag">repeat</span>', time: '' }, { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', pct: 0, v: '0.0/50.0', tags: '<span class="tag">once</span>', time: '' }, { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', pct: 0, v: '0.0/4.0', tags: '<span class="tag">repeat</span>', time: '' }, { skill: 'rig', verb: 'Rig', noun: 'the sails', pct: 0, v: '0.0/20.0', tags: '<span class="tag">once</span>', time: '' }];
+const skillIdle = `<section class="region region--now"><div class="region__head"><span>skill</span><span>last used</span></div>
+  <div class="item skill skill--now skill--idle">${I.rig}<div class="skill__name"><b>Rig</b><span class="skill__mult">×1.05</span></div><div class="skill__lv">core Lv 1</div>${bar(15, '', '', false)}<div class="skill__lv">1.7/11.0</div><div class="skill__lv" style="grid-column:3">run Lv 0</div>${bar(30, 'bar__fill--run', '', false)}<div class="skill__lv">7.5/25.0</div></div></section>`;
+const healthIdle = `<div class="health">${bar(91, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<div class="health__value">91 <small>/ 100</small></div><div class="health__rate" style="color:var(--ink-3)">idle</div></div><div class="kv kv--line"><span>decay <b class="dim">−0.00</b></span><span>food <b class="dim">0.00</b></span><span>rig <b class="dim">0.00</b></span><span>net <b class="dim">0.00 hp/s</b></span></div>`;
+const eBar = (n, waits) => bottom(`<span class="btns"><button class="qbtn">skills ▴</button><button class="qbtn ${waits ? 'qbtn--waits' : ''}">actions <small>· ${n}</small> ▴</button></span>`);
+
+const runningHead = (turn) => `<div class="head ${turn ? 'head--turn' : ''}"><span>The Windward Run</span><span>I · Port Cinder · ${turn ? 'Casting off' : 'Fitting out'}</span></div>`;
+const chipFood = (name, hp, n, cap, pct, note) => `<div class="chip ${n === 0 ? 'chip--empty' : ''}"><div class="chip__name">${name}<b>+${hp} hp</b></div>${bar(pct, 'bar__fill--run', '', true)}<div class="chip__n">${n}/${cap} · ${note}</div></div>`;
+const chipItem = (name, n, cap) => `<div class="chip ${n >= cap ? 'chip--full' : ''}"><div class="chip__name">${name}</div>${bar(n / cap * 100, '', '', true)}<div class="chip__n">${n}/${cap}${n >= cap ? ' full' : ''}</div></div>`;
+const packStrip = (foodNote) => `<section class="region region--pack"><div class="region__head"><span>pack</span><span>${foodNote}</span></div><div class="pack">${chipFood('cloud-fish', 4, 1, 5, 100, 'ready')}${chipItem('scrap', 4, 20)}${chipItem('rope', 2, 2)}${chipItem('sailcloth', 0, 3)}</div></section>`;
+const fight = { skill: 'fight', verb: 'Fight', noun: 'the harbor pirates', pct: 0, v: '0.0/30.0', tags: '<span class="tag">once</span>', time: '' };
+const entryWaits = (q, why, how) => `<div class="item entry entry--waits">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><button class="x">×</button>${bar(q.pct, 'bar__fill--wait', q.v)}<div class="entry__tags">${q.tags}</div><div class="entry__time heading-waits">waits</div><div class="entry__why">${why}<small>${how}</small></div></div>`;
+const QUEUE_W = [fight, QUEUE[1], QUEUE[2]];
+const doingWaits = `<section class="region region--doing"><div class="region__head"><span>doing · 3</span><span class="heading-waits">waiting</span></div><div class="list">${entryWaits(fight, '⚠ would kill you at 31 hp', 'eat, or queue a heal in front')}${QUEUE_W.slice(1).map(entry).join('')}</div></section>`;
+const healthWaits = `<div class="health">${bar(31, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<div class="health__value">31 <small>/ 100</small></div><div class="health__rate heading-waits">waiting</div></div><div class="kv kv--line"><span>decay <b class="dim">−0.00</b></span><span>food <b class="dim">0.00</b></span><span>fight <b class="dim">0.00</b></span><span>net <b class="dim">0.00 hp/s</b></span></div>`;
+const skillWaits = `<section class="region region--now"><div class="region__head"><span>skill</span><span>fight ×1.00 → ×1.05 at Lv 1</span></div>
+  <div class="item skill skill--now skill--idle skill--waits">${I.fight}<div class="skill__name"><b>Fight</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">core Lv 0 <b class="up">waits</b></div>${bar(0, '', '', false)}<div class="skill__lv">0.0/10.0</div><div class="skill__lv" style="grid-column:3">run Lv 0 <b class="up">waits</b></div>${bar(0, 'bar__fill--run', '', false)}<div class="skill__lv">0.0/25.0</div></div></section>`;
+const body = (skill, doing, log) => `<div class="phone__body">${skill}${packStrip('1 to eat')}${doing}${log}</div>`;
+
+const entryRun = (q) => `<div class="item entry entry--running entry--run">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><button class="x">\u00d7</button>${bar(q.pct, 'bar__fill--run')}<div class="entry__foot"><span><span class="tag">once</span> <span class="tag tag--lit">auto</span> <span class="need">\u00b7 scrap 1/16</span></span><span class="v"><small>0.5/60.0</small>18s</span></div></div>`;
+const entryLine = (q) => `<div class="item entry entry--line">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><span class="tag ${q.auto ? 'tag--lit' : ''}">${q.mode}</span><span class="entry__len">${q.len}</span><button class="x">×</button></div>`;
+const Q = [
+  { ...QUEUE[0] },
+  { skill: 'rig', verb: 'Rig', noun: 'the sails', mode: 'once', len: '20s' },
+  { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', mode: 'repeat', len: '4.5s' },
+  { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', mode: 'repeat', len: '4.0s' },
+];
+const Q9 = [...Q, { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', mode: 'once', len: '40s' }, { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', mode: 'auto', auto: true, len: '4.5s' }, { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', mode: 'once', len: '50s' }, { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', mode: 'auto', auto: true, len: '4.0s' }, { skill: 'rig', verb: 'Rig', noun: 'the sails', mode: 'once', len: '20s' }];
+const doingC = (qs, note) => `<section class="region region--doing"><div class="region__head"><span>doing · ${qs.length}</span><span>${note}</span></div><div class="list ${qs.length > 6 ? 'fade' : ''}">${entryRun(qs[0])}${qs.slice(1).map(entryLine).join('')}</div></section>`;
+const foodSection = `<section class="region region--pack"><div class="region__head"><span>food</span><span>1 to eat</span></div>
+  <div class="item food__row"><span>cloud-fish<b>+4 hp</b></span><span class="n ready">1/5</span><div>${bar(100, 'bar__fill--run', '', false)}<div class="n ready">ready</div></div></div>
+  <div class="item food__row"><span>salt biscuit<b>+2 hp</b></span><span class="n none">0/3</span><div>${bar(0, 'bar__fill--run', '', false)}<div class="n none">none</div></div></div></section>`;
+const gBar = (n, which) => bottom(`<span class="btns"><button class="qbtn">skills</button><button class="qbtn">actions <small>· ${n}</small></button><button class="qbtn ${which === 'pack' ? '' : ''}">pack${which === 'pack' ? ' ▾' : ''}</button></span>`);
+const gBody = (doing, log) => `<div class="phone__body">${skillNow}${foodSection}${doing}${log}</div>`;
+const packSheet = `<div class="scrim"></div><div class="sheet sheet--pack"><div class="sheet__grip"></div><div class="region__head"><span>pack · 4 of 6</span><span>stack +5 at the satchel</span></div><div class="sheet__list">
+  <div class="item pack__item"><span>cloud-fish <b style="color:var(--good);font-weight:400">+4 hp</b></span><div>${bar(20)}<div class="bar__value">1/5</div></div></div>
+  <div class="item pack__item"><span>salt biscuit <b style="color:var(--good);font-weight:400">+2 hp</b></span><div>${bar(0)}<div class="bar__value">0/3</div></div></div>
+  <div class="item pack__item"><span>scrap</span><div>${bar(20)}<div class="bar__value">4/20</div></div></div>
+  <div class="item pack__item"><span>rope</span><div>${bar(100, 'bar__fill--warn')}<div class="bar__value" style="color:var(--warn)">2/2 full</div></div></div>
+  <div class="item pack__item"><span>sailcloth</span><div>${bar(0)}<div class="bar__value">0/3</div></div></div>
+  <div class="item pack__item"><span>tar</span><div>${bar(50)}<div class="bar__value">1/2</div></div></div></div></div>`;
+
+const gauge = ({ label, value, pct, cls = '', labelCls = '', kind = '' }) => `<div class="gauge ${kind}">${bar(pct, cls)}<span class="gauge__label ${labelCls}">${label}</span><span class="gauge__value">${value}</span></div>`;
+const healthG = (hp, label, labelCls, style) => `<div class="gauge gauge--hp">${bar(hp, 'bar__fill--hp')}<span class="gauge__label ${labelCls}" ${style || ''}>${label}</span><span class="gauge__value">${hp} <small>/ 100</small></span></div>`;
+const topG = (head) => `<div class="top">${head}${healthG(97, '\u2248 14:42 left', '', 'style="color:var(--hurt-text)"')}${ratesLine}</div>`;
+const skillG = `<section class="region region--now"><div class="region__head"><span>skill</span></div>
+  <div class="item skill--g skill--on">${I.rig}<div class="skill__title"><span><b>Rig</b> <span class="skill__mult">\u00d71.00</span></span><span class="to">\u2192 \u00d71.05 at Lv 1</span></div>
+  ${gauge({ label: 'core Lv 0 \u2191 <b>10s</b>', value: '0.5/10.0', pct: 5 })}${gauge({ label: 'run Lv 0 \u2191 <b>25s</b>', value: '0.5/25.0', pct: 2, cls: 'bar__fill--run' })}</div></section>`;
+const foodG = `<section class="region region--pack"><div class="region__head"><span>food</span><span>1 to eat</span></div>
+  <div class="item food--g"><div class="food__name">cloud-fish<b>+4 hp</b></div>${gauge({ label: '<b>ready</b>', value: '1/5', pct: 100, cls: 'bar__fill--run' })}</div>
+  <div class="item food--g"><div class="food__name">salt biscuit<b>+2 hp</b></div>${gauge({ label: 'none', value: '0/3', pct: 0, cls: 'bar__fill--run', labelCls: 'dim' })}</div></section>`;
+const entryG = (q) => `<div class="item entry entry--running entry--g">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><button class="x">\u00d7</button><div class="entry__tags"><span class="tag">once</span><span class="tag tag--lit">auto</span><span style="color:var(--warn)">\u00b7 scrap 1/16</span></div><span></span>${gauge({ label: '<b>18s</b>', value: '0.5/60.0', pct: 1, cls: 'bar__fill--run' })}</div>`;
+const doingG = (qs, note) => `<section class="region region--doing"><div class="region__head"><span>doing \u00b7 ${qs.length}</span><span>${note}</span></div><div class="list ${qs.length > 6 ? 'fade' : ''}">${entryG(qs[0])}${qs.slice(1).map(entryLine).join('')}</div></section>`;
+const iBody = (doing, log) => `<div class="phone__body">${skillG}${foodG}${doing}${log}</div>`;
+
+const nrow = (r, say) => `<div class="item nrow ${r.running ? 'nrow--running' : ''} ${say ? 'nrow--refused' : ''}">${I[r.skill]}<div class="nrow__name"><b>${r.verb}</b> ${r.noun}</div><div class="nrow__tx">${r.time}<small>+${r.xp} xp</small></div>
+  ${say ? `<div class="nrow__say">${say}</div>` : `<div class="nrow__mid">${r.mid.replaceAll('row__short', 'short').replaceAll('row__after', 'after')}</div>`}<div class="nrow__ctl">${r.running ? stop : play}${plus}${chip(r.chip, r.lit)}</div></div>`;
+const nrowAuto = (r) => `<div class="item row row--auto">${I[r.skill]}<div class="row__name"><b>${r.verb}</b> ${r.noun}</div><span class="row__done">\u00d7${r.done}</span>${chip('', true)}</div>`;
+const LIVE = ROWS.filter(r => !r.lit).map((r, i) => i === 1 ? { ...r, chip: '5/200' } : r);
+const AUTO = ROWS.filter(r => r.lit);
+const chapterSheet = (sayOn) => `<div class="scrim"></div><div class="sheet sheet--actions"><div class="sheet__grip"></div><div><div class="region__head region__head--book"><span>The Windward Run</span><span>I \u00b7 Port Cinder \u00b7 Fitting out</span></div><p class="story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p></div>
+  <div class="sheet__list"><section class="region region--chapter">${LIVE.map((r, i) => nrow(r, sayOn && i === 1 ? '\u26A0 12 scrap, have 4 \u2014 Salvage drifting scrap first' : null)).join('')}<div class="group"><span>automated \u00b7 ${AUTO.length}</span><span>page \u00b7 fitting out</span></div>${AUTO.map(nrowAuto).join('')}</section></div></div>`;
+const skillCell = ([id, name, mult, cl, cv, cp, rl, rv, rp, on]) => `<div class="item skill--g ${on ? 'skill--on' : 'dim'}">${I[id]}<div class="skill__title"><span><b>${name}</b> <span class="skill__mult">\u00d7${mult}</span></span><span class="to">${on ? '\u2192 \u00d71.05 at Lv 1' : ''}</span></div>
+  ${gauge({ label: `core Lv ${cl}${on ? ' \u2191 <b>10s</b>' : ''}`, value: cv, pct: cp })}${gauge({ label: `run Lv ${rl}${on ? ' \u2191 <b>25s</b>' : ''}`, value: rv, pct: rp, cls: 'bar__fill--run' })}</div>`;
+const skillsSheet = `<div class="scrim"></div><div class="sheet sheet--skills"><div class="sheet__grip"></div><div class="region__head"><span>skills \u00b7 7</span><span>rig is running</span></div><div class="sheet__list">${SKILLS.map(skillCell).join('')}</div></div>`;
+const jBar = (which) => bottom(`<span class="btns"><button class="qbtn">skills${which === 'skills' ? ' \u25BE' : ''}</button><button class="qbtn">actions <small>\u00b7 4</small>${which === 'actions' ? ' \u25BE' : ''}</button><button class="qbtn">pack</button></span>`);
+const screen = `${topG(runningHead(false))}${iBody(doingG(Q, '1:29 queued'), logBox(LOG))}`;
+
+const LR = [
+  { skill: 'rig', verb: 'Rig', noun: 'the hull', time: '1:00', xp: '60', running: true, chip: '', list: '<div class="h">needs:</div><div class="li warn">\u26A0 11 more scrap <small>have 4 \u00b7 15 of 16 to pay</small></div><div class="h">gives:</div><div class="li">decay \u00d70.80</div>' },
+  { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', time: '40s', xp: '40', chip: '5/200', list: '<div class="h">needs:</div><div class="li warn">\u26A0 8 more scrap <small>have 4 of 12</small></div><div class="li fix">Salvage drifting scrap</div><div class="h">gives:</div><div class="li">Fish \u00d71.25</div>' },
+  { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', time: '50s', xp: '50', chip: '', list: '<div class="h">needs:</div><div class="li warn">\u26A0 16 more scrap <small>have 4 of 20</small></div><div class="li fix">Salvage drifting scrap</div><div class="h">gives:</div><div class="li">stack +5</div>' },
+  { skill: 'rig', verb: 'Rig', noun: 'the sails', time: '20s', xp: '20', chip: '', list: '<div class="h">still required:</div><div class="li">Rig the hull</div><div class="li">Tinker a trawl net</div><div class="li">Tinker a canvas satchel</div>' },
+];
+const lrowOld = (r, v, refused) => `<div class="item lrow lrow--${v} ${r.running ? 'lrow--running' : ''} ${refused ? 'lrow--refused' : ''}">${I[r.skill]}<div class="lrow__name"><b>${r.verb}</b> ${r.noun}</div><div class="lrow__tx">${r.time}<small>+${r.xp} xp</small></div><div class="lrow__list">${r.list}</div><div class="lrow__ctl">${r.running ? stop : play}${plus}${chip(r.chip, r.lit)}</div></div>`;
+const listSheet = (v, refusedIdx) => `<div class="scrim"></div><div class="sheet sheet--actions"><div class="sheet__grip"></div><div><div class="region__head region__head--book"><span>The Windward Run</span><span>I \u00b7 Port Cinder \u00b7 Fitting out</span></div><p class="story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p></div>
+  <div class="sheet__list"><section class="region region--chapter">${LR.map((r, i) => lrow(r, v, i === refusedIdx)).join('')}<div class="group"><span>automated \u00b7 ${AUTO.length}</span><span>page \u00b7 fitting out</span></div>${AUTO.map(nrowAuto).join('')}</section></div></div>`;
+
+const cost = (name, total, spent, have, fix) => {
+  const short = Math.max(0, total - spent - have), haveShown = Math.min(have, total - spent);
+  const pct = (n) => `${n / total * 100}%`;
+  const label = short > 0 ? `\u26A0 ${short} short` : spent > 0 ? `${total - spent} to spend` : 'ready';
+  const parts = [spent > 0 ? `${spent} spent` : null, `${have} have`, `${total}`].filter(Boolean).join(' \u00b7 ');
+  return `<div class="cost"><span class="cost__name">${name}</span><div class="bar">${spent ? `<span class="seg seg--spent" style="width:${pct(spent)}"></span>` : ''}${haveShown ? `<span class="seg seg--have" style="width:${pct(haveShown)}"></span>` : ''}</div><span class="cost__label ${short > 0 ? 'warn' : ''}">${label}</span><span class="cost__value">${parts}</span></div>${short > 0 && fix ? `<div class="li fix">${fix}</div>` : ''}`;
+};
+const LR2 = (scrap, hullSpent) => [
+  { skill: 'rig', verb: 'Rig', noun: 'the hull', time: '1:00', xp: '60', running: true, chip: '', list: `<div class="h">needs:</div>${cost('scrap', 16, hullSpent, scrap, 'Salvage drifting scrap')}<div class="h">gives:</div><div class="li">decay \u00d70.80</div>` },
+  { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', time: '40s', xp: '40', chip: '5/200', list: `<div class="h">needs:</div>${cost('scrap', 12, 0, scrap, 'Salvage drifting scrap')}<div class="h">gives:</div><div class="li">Fish \u00d71.25</div>` },
+  { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', time: '50s', xp: '50', chip: '', list: `<div class="h">needs:</div>${cost('scrap', 20, 0, scrap, 'Salvage drifting scrap')}${cost('rope', 2, 0, 2, null)}<div class="h">gives:</div><div class="li">stack +5</div>` },
+  { skill: 'rig', verb: 'Rig', noun: 'the sails', time: '20s', xp: '20', chip: '', list: '<div class="h">still required:</div><div class="li">Rig the hull</div><div class="li">Tinker a trawl net</div><div class="li">Tinker a canvas satchel</div>' },
+];
+const lrow = (r, v, refused) => `<div class="item lrow lrow--${v} ${r.running ? 'lrow--running' : ''} ${refused ? 'lrow--refused' : ''}">${I[r.skill]}<div class="lrow__name"><b>${r.verb}</b> ${r.noun}</div><div class="lrow__tx">${r.time}</div><div class="lrow__ctl">${r.running ? stop : play}${plus}${chip(r.chip, r.lit)}</div><div class="lrow__list">${r.list.replace('<div class="h">gives:</div>', `<div class="h">gives:</div><div class="li">+${r.xp} xp</div>`)}</div></div>`;
+const gaugeSheet = (rows) => `<div class="scrim"></div><div class="sheet sheet--actions"><div class="sheet__grip"></div><div><div class="region__head region__head--book"><span>The Windward Run</span><span>I \u00b7 Port Cinder \u00b7 Fitting out</span></div><p class="story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p></div>
+  <div class="sheet__list"><section class="region region--chapter">${rows.map((r) => lrow(r, 'c', false)).join('')}<div class="group"><span>automated \u00b7 ${AUTO.length}</span><span>page \u00b7 fitting out</span></div>${AUTO.map(nrowAuto).join('')}</section></div></div>`;
+
+const costWords = (name, total, spent, flash) => `<div class="li li--cost ${flash ? 'flash' : ''}"><span><span style="color:var(--edge-on)">\u00b7</span> ${name}</span><span class="frac">${spent}/${total}</span></div>`;
+const costBar = (name, total, spent, have, flash) => { const haveShown = Math.min(have, total - spent); const pct = (n) => `${n / total * 100}%`;
+  return `<div class="cost cost--m ${flash ? 'flash' : ''}"><span class="cost__name">${name}</span><div class="bar">${spent ? `<span class="seg seg--spent" style="width:${pct(spent)}"></span>` : ''}${haveShown ? `<span class="seg seg--have" style="width:${pct(haveShown)}"></span>` : ''}</div><span class="cost__label">${spent}/${total}</span><span class="cost__value"></span></div>`; };
+const LM = (form, scrap, flashIdx) => {
+  const c = (name, total, spent, have, i) => form === 'words' ? costWords(name, total, spent, i === flashIdx) : costBar(name, total, spent, have, i === flashIdx);
+  return [
+    { skill: 'rig', verb: 'Rig', noun: 'the hull', time: '1:00', xp: '60', running: true, chip: '', list: `<div class="h">needs:</div>${c('scrap', 16, 1, scrap, 0)}<div class="h">gives:</div><div class="li">decay \u00d70.80</div>` },
+    { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', time: '40s', xp: '40', chip: '5/200', list: `<div class="h">needs:</div>${c('scrap', 12, 0, scrap, 1)}<div class="h">gives:</div><div class="li">Fish \u00d71.25</div>` },
+    { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', time: '50s', xp: '50', chip: '', list: `<div class="h">needs:</div>${c('scrap', 20, 0, scrap, 2)}${c('rope', 2, 0, 2, 99)}<div class="h">gives:</div><div class="li">stack +5</div>` },
+    { skill: 'rig', verb: 'Rig', noun: 'the sails', time: '20s', xp: '20', chip: '', list: '<div class="h">still required:</div><div class="li">Rig the hull</div><div class="li">Tinker a trawl net</div><div class="li">Tinker a canvas satchel</div>' },
+  ];
+};
+const mSheet = (rows, refusedIdx) => `<div class="scrim"></div><div class="sheet sheet--actions"><div class="sheet__grip"></div><div><div class="region__head region__head--book"><span>The Windward Run</span><span>I \u00b7 Port Cinder \u00b7 Fitting out</span></div><p class="story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p></div>
+  <div class="sheet__list"><section class="region region--chapter">${rows.map((r, i) => lrow(r, 'c', i === refusedIdx)).join('')}<div class="group"><span>automated \u00b7 ${AUTO.length}</span><span>page \u00b7 fitting out</span></div>${AUTO.map(nrowAuto).join('')}</section></div></div>`;
+
+const nextLifeTop = `<div class="top">${runningHead(false)}<div class="gauge gauge--hp">${bar(100, 'bar__fill--hp')}<span class="gauge__label dim">life 4</span><span class="gauge__value">100 <small>/ 100</small></span></div><div class="kv kv--line"><span>decay <b class="dim">\u22120.00</b></span><span>food <b class="dim">0.00</b></span><span>rig <b class="dim">0.00</b></span><span>net <b class="dim">0.00 hp/s</b></span></div></div>`;
+const idleBody = `<div class="phone__body">${skillIdle}${foodG}${doingBox([], 'idle')}${logBox([['0:00', 'Life 4 begins at Port Cinder'], ['12:04', 'Life 3 ends: fell during Fight the harbor pirates'], ...LOG9])}</div>`;
+const gains = `<div class="pcard__gains">${I.salvage}<b>Salvage</b>${bar(36)}<span class="pcard__lv">core 1 \u2192 <b>2</b></span>${I.rig}<b>Rig</b>${bar(15)}<span class="pcard__lv">core 0 \u2192 <b>1</b></span></div>`;
+const hp = `<div class="pcard__hp"><span>max health</span><b>100.00 \u2192 <span class="pcard__new">103.41</span></b></div><div class="pcard__why">+3.41 from 12:04 alive \u00b7 1.0028^12.07 \u2212 1</div>`;
+const deathCard = `<div class="veil"><div class="pcard" role="dialog"><div class="pcard__title">Life 3 ends</div><div class="pcard__sub">12:04 on the clock</div><div class="pcard__facts"><div>reached I \u00b7 Port Cinder</div><div class="hurt">fell during Fight the harbor pirates</div></div>${gains}<div class="pcard__rule"></div>${hp}<button class="pcard__begin">Begin life 4</button></div></div>`;
+const finishCard = `<div class="veil"><div class="pcard" role="dialog"><div class="pcard__title">The Windward Run</div><p class="pcard__line">The sails fill. Port Cinder falls away below, and the ruin waits somewhere in the haze ahead.</p><div class="pcard__sub">41:12 on the clock</div>${gains}<div class="pcard__rule"></div>${hp}<div class="pcard__rule"></div><div class="pcard__count">finished <b>1\u00d7</b></div><button class="pcard__begin">Read again</button><div class="pcard__quiet">the shelf is #87; for now the book opens at chapter I</div></div></div>`;
+const tabCard = `<div class="veil"><div class="pcard" role="dialog"><div class="pcard__title">The game is open in another tab</div><div class="pcard__sub">Only one tab plays, so the save is never written from two places.</div><button class="pcard__begin">Play here</button></div></div>`;
+const restTop = `<div class="top">${runningHead(false)}<div class="gauge gauge--hp">${bar(97, 'bar__fill--hp')}<span class="gauge__label dim">elsewhere</span><span class="gauge__value">97 <small>/ 100</small></span></div>${ratesLine}</div>`;
+
+const deskTop = `<div class="desk__top">${runningHead(false)}<div class="gauge gauge--hp">${bar(97, 'bar__fill--hp')}<span class="gauge__label" style="color:var(--hurt-text)">\u2248 14:42 left</span><span class="gauge__value">97 <small>/ 100</small></span></div>${ratesLine}</div>`;
+const deskSkills = `<section class="region region--skills"><div class="region__head"><span>skills \u00b7 7</span><span>rig \u00d71.00 \u2192 \u00d71.05 at Lv 1</span></div><div class="list">${SKILLS.map(skillCell).join('')}</div></section>`;
+const deskPack = `<section class="region region--pack"><div class="region__head"><span>pack \u00b7 4 of 6</span><span>stack +5 at the satchel</span></div>
+  <div class="item pack__item"><span>cloud-fish <b style="color:var(--good);font-weight:400">+4 hp</b></span><div>${bar(20)}<div class="bar__value">1/5</div></div></div>
+  <div class="item pack__item"><span>salt biscuit <b style="color:var(--good);font-weight:400">+2 hp</b></span><div>${bar(0)}<div class="bar__value">0/3</div></div></div>
+  <div class="item pack__item"><span>scrap</span><div>${bar(20)}<div class="bar__value">4/20</div></div></div>
+  <div class="item pack__item"><span>rope</span><div>${bar(100, 'bar__fill--warn')}<div class="bar__value" style="color:var(--warn)">2/2 full</div></div></div></section>`;
+const deskActions = `<section class="region region--chapter region--act"><div class="region__head region__head--book"><span>The Windward Run</span><span>I \u00b7 Port Cinder \u00b7 Fitting out</span></div><p class="story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p>
+  <div class="list">${LM('words', 4, -1).map((r) => lrow(r, 'c', false)).join('')}<div class="group"><span>automated \u00b7 ${AUTO.length}</span><span>page \u00b7 fitting out</span></div>${AUTO.map(nrowAuto).join('')}</section>`;
+const deskBottom = `<div class="desk__bottom"><button class="btn">${I.gear}</button><div class="clock">00:24</div><button class="btn">${I.pause}</button></div>`;
+const desk = `${deskTop}<div class="desk__cols"><div class="col col--watch">${foodG}${doingG(Q9, '4:08 queued')}${logBox(LOG9)}</div><div class="col col--skills">${deskSkills}${deskPack}</div><div class="col col--act">${deskActions}</div></div>${deskBottom}`;
+document.getElementById('o1').innerHTML = desk;
+document.getElementById('o2').innerHTML = desk;
+</script>
+</body></html>

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { Content } from '../data/types';
 import { newState } from './queue';
-import { applyDecay, applyRowHealth, covers, damagePerTick, decayPerSecond, eat, feeding, foodCeilingPerSecond, foodsByHeal, rowHealthPerSecond } from './health';
+import { applyDecay, applyRowHealth, damagePerTick, decayPerSecond, eat, feeding, foodCeilingPerSecond, foodsByHeal, rowHealthPerSecond } from './health';
 import { ticksPerSecond, ticksToSeconds } from './time';
 import type { GameState } from './types';
 
@@ -145,15 +145,11 @@ describe('rates, true this second (spec 2026-09-23 section 4.1)', () => {
     expect(feeding({ ...newState(content.roster), foodCooldowns: { berries: 1 } }, 'berries')).toBe(true);
     expect(feeding(newState(content.roster), 'berries')).toBe(false);
   });
-  it('covers: the larder covers decay at the start with a berry, and not with none', () => {
-    expect(covers({ ...newState(content.roster), inventory: { berries: 1 } }, content)).toBe(true);
-    expect(covers(newState(content.roster), content)).toBe(false);
-  });
-  it('covers stops once decay passes the ceiling, late in a run', () => {
+  it('decay passes a berry-a-bite ceiling late in a run: the rates line reads it red by then', () => {
     // Decay reaches perBite (0.8 hp/s) a little before minute 10 at the placeholder curve.
     const late = { ...newState(content.roster), runTicks: balance.time.ticksPerMinute * 12, inventory: { berries: 5 } };
     expect(decayPerSecond(late)).toBeGreaterThan(perBite);
-    expect(covers(late, content)).toBe(false);
+    expect(decayPerSecond(newState(content.roster))).toBeLessThan(perBite);
   });
 });
 

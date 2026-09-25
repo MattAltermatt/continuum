@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Phone H: one meter grammar for every bar</title>
+<style>
+:root { color-scheme: dark;
+  --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --item: oklch(22% 0.012 260); --cell-on: oklch(30% 0.02 260);
+  --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --track: oklch(17% 0.012 260); --track-edge: oklch(55% 0.012 260);
+  --ink: oklch(90% 0.01 80); --ink-2: oklch(80% 0.01 80); --ink-3: oklch(62% 0.01 80); --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45);
+  --hurt: oklch(66% 0.18 25); --hurt-text: oklch(70% 0.18 25); --warn: oklch(80% 0.15 85); --auto: oklch(72% 0.10 235); --good: oklch(78% 0.12 150);
+  --mono: ui-monospace, Menlo, monospace; --serif: Georgia, "Times New Roman", serif; --control: 34px; }
+* { box-sizing: border-box; }
+body { margin: 0; background: oklch(12% 0.01 260); color: var(--ink); font-family: var(--mono); font-size: 12px; padding: 24px; }
+h1 { font-size: 13px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 6px; }
+p.note { max-width: 70ch; color: var(--ink-2); font-size: 12px; line-height: 1.5; margin: 0 0 18px; }
+.frames { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+.frame { width: 390px; }
+.frame > h2 { font-size: 12px; font-weight: 700; margin: 0 0 6px; }
+.frame > h2 small { display: block; font-weight: 400; color: var(--ink-2); margin-top: 3px; line-height: 1.4; }
+.phone { width: 390px; height: 800px; background: var(--bg); border: 1px solid var(--edge); border-radius: 18px; overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; position: relative; }
+.phone__body { overflow-y: auto; padding: 8px 10px; display: grid; gap: 8px; align-content: start; scrollbar-width: thin; }
+.top { padding: 12px 10px 6px; background: var(--bg); border-bottom: 1px solid var(--edge); display: grid; gap: 6px; }
+.bottom { padding: 6px 10px 10px; background: var(--bg); border-top: 1px solid var(--edge); display: grid; grid-template-columns: var(--control) 1fr auto var(--control); align-items: center; gap: 8px; }
+.clock { text-align: center; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.clock small { font-weight: 400; color: var(--ink-2); margin-left: 6px; }
+
+.bar { height: 8px; border: 1px solid var(--track-edge); border-radius: 3px; background: var(--track); position: relative; overflow: hidden; }
+.bar--hp { height: 16px; }
+.bar--thin { height: 5px; }
+.bar__fill { position: absolute; inset: 0 auto 0 0; background: var(--core); }
+.bar__fill--run { background: var(--run); }
+.bar__fill--hp { background: var(--hurt); }
+.bar__value { font-size: 10px; text-align: center; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
+
+.health { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 10px; }
+.health .bar { grid-column: 1 / -1; }
+.health__value { font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 3px; }
+.health__value small { font-weight: 400; color: var(--ink-2); }
+.health__rate { font-size: 11px; color: var(--hurt-text); text-align: right; margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+/* The watch face: the running row's strip, in the sticky top. */
+.now { border: 1px solid var(--run); border-radius: 4px; background: var(--item); padding: 5px 8px; display: grid; grid-template-columns: 1.4em 1fr auto; gap: 2px 6px; align-items: center; position: relative; overflow: hidden; }
+.now svg { width: 15px; height: 15px; }
+.now__name b { font-weight: 700; }
+.now__left { text-align: right; font-variant-numeric: tabular-nums; }
+.now__left small { color: var(--ink-2); margin-left: 4px; }
+.now .bar { grid-column: 2 / -1; }
+.now__next { grid-column: 2 / -1; font-size: 10px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now__next b { color: var(--ink-2); font-weight: 400; }
+@keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.now::after, .row--running::after, .entry--running::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--run) 12%, transparent), transparent); animation: sheen 6s linear infinite; }
+
+.region { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; display: grid; gap: 5px; align-content: start; }
+.region__head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.region__head--book { color: var(--ink); letter-spacing: .14em; }
+.region--chapter { padding: 8px 0; }
+.region--chapter > .region__head, .region--chapter > .story { padding-inline: 10px; }
+.story { margin: 0 0 2px; padding-bottom: 6px; border-bottom: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
+.item { border: 1px solid var(--edge); background: var(--item); border-radius: 4px; }
+.region--chapter .item { border-inline: 0; border-radius: 0; }
+
+/* The narrow row: two lines. Name and time on the first; what it takes and gives, and the controls, on the second. */
+.row { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 3px 8px; align-items: center; padding: 7px 10px; position: relative; overflow: hidden; }
+.row svg { width: 15px; height: 15px; }
+.row__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row__name b { font-weight: 700; }
+.row__tx { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row__tx small { color: var(--ink-2); margin-left: 5px; font-size: 10px; }
+.row__mid { grid-column: 2; font-size: 11px; line-height: 1.3; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
+.row__mid .arr { color: var(--edge-on); }
+.row__mid .out { color: var(--ink); }
+.row__short { color: var(--warn); }
+.row__short small { color: var(--ink-2); font-size: 10px; margin-left: 4px; }
+.row__after { color: var(--warn); }
+.row__ctl { grid-column: 3; display: flex; gap: 6px; justify-content: flex-end; }
+.row--running { border-color: var(--run); box-shadow: inset 1px 0 0 var(--run), inset -1px 0 0 var(--run); }
+.row .bar { grid-column: 2 / -1; }
+/* The receded row: chipped and automated, one thin line. */
+.row--auto { padding: 4px 10px; grid-template-columns: 1.6em 1fr auto auto; color: var(--ink-2); background: transparent; }
+.row--auto .row__name { font-size: 11px; }
+.row--auto .row__name b { font-weight: 400; }
+.row--auto .row__done { font-size: 10px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.row--auto .auto { height: 22px; width: auto; padding: 0 6px; }
+.group { grid-column: 1 / -1; padding: 5px 10px 2px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); display: flex; justify-content: space-between; }
+
+.btn { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 5px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; display: inline-grid; place-items: center; }
+.btn--play { color: var(--run); }
+.btn--stop { background: var(--run); color: var(--bg); }
+.btn svg { width: 16px; height: 16px; }
+.auto { width: calc(7ch + 12px); height: var(--control); border: 1px solid var(--edge); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 10px; position: relative; overflow: hidden; }
+.auto i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--auto); }
+.auto--btn { border-color: var(--edge-on); font-size: 11px; }
+.auto--lit { border-color: var(--auto); color: var(--auto); font-weight: 700; }
+
+/* Queue entries, narrow. */
+.entry { display: grid; grid-template-columns: 1.4em 1fr auto; gap: 3px 6px; align-items: center; padding: 6px 8px; position: relative; overflow: hidden; }
+.entry svg { width: 15px; height: 15px; }
+.entry__name b { font-weight: 700; }
+.entry .bar { grid-column: 1 / -1; }
+.entry__tags { grid-column: 1 / 3; display: flex; gap: 4px; align-items: center; font-size: 10px; color: var(--ink-2); }
+.entry__tags .tag { border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; }
+.entry__tags .tag--lit { border-color: var(--auto); color: var(--auto); }
+.entry__time { text-align: right; font-variant-numeric: tabular-nums; }
+.entry__need { grid-column: 1 / -1; font-size: 11px; color: var(--warn); }
+.entry--running { border-color: var(--run); }
+.x { width: 26px; height: 26px; border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; display: inline-grid; place-items: center; }
+
+/* Skills, two to a row on a phone. */
+.skills { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.skill { display: grid; grid-template-columns: 1.4em 1fr auto; gap: 1px 6px; align-items: center; padding: 5px 7px; }
+.skill svg { width: 14px; height: 14px; }
+.skill__name b { font-weight: 700; }
+.skill__mult { color: var(--ink-2); font-size: 10px; margin-left: 4px; }
+.skill__lv { font-size: 10px; color: var(--ink-2); text-align: right; white-space: nowrap; }
+.skill .bar { grid-column: 1 / 3; }
+.skill--on { background: var(--cell-on); }
+.skills--strip { grid-template-columns: repeat(4, 1fr); }
+.skills--strip .skill { grid-template-columns: 1fr; gap: 2px; padding: 4px 5px; text-align: center; }
+.skills--strip .skill svg { display: none; }
+.skills--strip .skill__lv, .skills--strip .bar { grid-column: 1; }
+
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-variant-numeric: tabular-nums; }
+.kv .hurt { color: var(--hurt-text); }
+.kv .dim { color: var(--ink-3); }
+.pack__item { display: grid; grid-template-columns: 1fr 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+.log__line { display: grid; grid-template-columns: 3.4em 1fr; gap: 0 8px; padding: 2px 0; border-bottom: 1px solid var(--edge); font-size: 11px; }
+.log__line span:first-child { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--edge); }
+.tab { padding: 8px 4px; text-align: center; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); border-bottom: 2px solid transparent; }
+.tab--on { color: var(--ink); border-bottom-color: var(--run); }
+.tab b { color: var(--ink); font-weight: 400; }
+
+.qbtn { height: var(--control); border: 1px solid var(--edge-on); border-radius: 5px; background: transparent; color: var(--ink); font: inherit; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; }
+.qbtn small { color: var(--ink-2); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; background: var(--cell); border-top: 1px solid var(--edge-on); border-radius: 12px 12px 0 0; padding: 6px 10px 10px; display: grid; grid-template-rows: auto auto 1fr; gap: 6px; box-shadow: 0 -12px 30px oklch(0% 0 0 / .5); }
+.sheet__grip { width: 36px; height: 4px; border-radius: 2px; background: var(--edge-on); margin: 0 auto; }
+.sheet__list { overflow-y: auto; display: grid; gap: 5px; align-content: start; scrollbar-width: thin; }
+.scrim { position: absolute; inset: 0; background: oklch(0% 0 0 / .35); }
+.acc { display: flex; justify-content: space-between; align-items: center; }
+.acc::after { content: "\25BE"; color: var(--ink-3); }
+.acc--closed::after { content: "\25B8"; }
+
+.kv--line { grid-template-columns: repeat(4, auto); justify-content: space-between; font-size: 11px; color: var(--ink-2); }
+.kv--line b { font-weight: 400; color: var(--ink); }
+.kv--line b.hurt { color: var(--hurt-text); }
+.kv--line b.dim { color: var(--ink-3); }
+.up { color: var(--ink); font-weight: 400; }
+.sheet--tall { height: 74%; grid-template-rows: auto 1fr; }
+.sheet .region--chapter { border: 0; background: transparent; padding-top: 0; }
+
+.skill--now { grid-template-columns: 1.6em 1fr auto; padding: 7px 9px; }
+.skill--now svg { width: 16px; height: 16px; }
+.skill--now .skill__name b { font-size: 13px; }
+.skill--now .skill__lv { font-size: 11px; }
+.btns { display: flex; gap: 6px; justify-content: flex-end; }
+.btns .qbtn { padding: 0 8px; }
+
+/* E, rigid: the body is a fixed grid. Skill cell fixed; the doing box a fixed height that scrolls inside; the log takes the rest and never moves. */
+.phone__body { grid-template-rows: auto auto minmax(0, 2fr) minmax(0, 1fr); gap: 8px; overflow: hidden; }
+.region--doing { grid-template-rows: auto 1fr; overflow: hidden; padding-bottom: 6px; }
+.region--doing .list { overflow-y: auto; display: grid; grid-auto-rows: max-content; gap: 5px; align-content: start; scrollbar-width: thin; padding-bottom: 2px; }
+.region--doing .list::after { content: ""; height: 1px; }
+.region--log { grid-template-rows: auto 1fr; overflow: hidden; }
+.region--log .list { overflow-y: auto; scrollbar-width: thin; }
+.region--doing { position: relative; }
+.region--doing:has(.fade)::after { content: ""; position: absolute; left: 1px; right: 12px; bottom: 6px; height: 22px; background: linear-gradient(transparent, var(--cell)); pointer-events: none; }
+.skill--idle { background: var(--item); color: var(--ink-2); }
+.skill--idle .skill__name b { color: var(--ink-2); }
+.skill--idle .bar__fill { opacity: .6; }
+.empty { color: var(--ink-3); font-size: 11px; padding: 10px 6px; }
+.top__note { font-size: 11px; color: var(--ink-3); text-align: right; }
+.qbtn--waits { border-color: var(--warn); color: var(--warn); }
+
+.phone--short { height: 667px; width: 375px; }
+.frame--short { width: 375px; }
+.head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+.head span:last-child { color: var(--ink-2); }
+.head--turn { color: var(--warn); }
+.pack { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 1px; }
+.chip { flex: 0 0 auto; border: 1px solid var(--edge); background: var(--item); border-radius: 4px; padding: 4px 7px; display: grid; gap: 2px; min-width: 96px; font-variant-numeric: tabular-nums; }
+.chip__name { white-space: nowrap; font-size: 11px; }
+.chip__name b { color: var(--good); font-weight: 400; margin-left: 4px; }
+.chip__n { font-size: 10px; color: var(--ink-2); text-align: center; }
+.chip--empty { color: var(--ink-3); }
+.chip--full .chip__n { color: var(--warn); }
+.region--pack { padding: 6px 8px; }
+.region--pack .region__head { margin-bottom: 4px; }
+.entry--waits { border: 1px dashed var(--warn); }
+.entry__why { grid-column: 1 / -1; font-size: 11px; color: var(--warn); line-height: 1.3; }
+.entry__why small { color: var(--ink-2); display: block; }
+.top--waits .health__rate { color: var(--warn); }
+.skill--waits .skill__lv b.up { color: var(--warn); }
+.heading-waits { color: var(--warn); }
+
+/* Condensed queue: one line per entry unless it is running. */
+.entry--line { grid-template-columns: 1.4em 1fr auto auto auto; gap: 0 8px; padding: 5px 8px; align-items: center; }
+.entry--line .entry__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry--line .entry__name b { font-weight: 400; }
+.entry--line .tag { font-size: 10px; color: var(--ink-2); border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; }
+.entry--line .entry__len { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 3.5ch; text-align: right; }
+.entry--line .x { width: 22px; height: 22px; font-size: 11px; }
+.entry--line .tag--lit { border-color: var(--auto); color: var(--auto); }
+.entry--line .tag--warn { border-color: var(--warn); color: var(--warn); }
+/* Food, its own fixed section. */
+.food__row { display: grid; grid-template-columns: 1fr auto 96px; gap: 0 10px; align-items: center; padding: 4px 8px; font-variant-numeric: tabular-nums; }
+.food__row b { color: var(--good); font-weight: 400; margin-left: 4px; }
+.food__row .n { font-size: 10px; color: var(--ink-2); text-align: center; }
+.food__row .n.ready { color: var(--ink); }
+.food__row .none { color: var(--ink-3); }
+.bottom { grid-template-columns: var(--control) auto 1fr var(--control); }
+.btns { justify-content: flex-end; gap: 5px; }
+.btns .qbtn { padding: 0 7px; font-size: 11px; }
+.sheet--pack { height: 46%; grid-template-rows: auto auto 1fr; }
+.pack__item { padding: 6px 8px; }
+
+.entry--run { grid-template-columns: 1.4em 1fr auto; }
+.entry--run .bar { grid-column: 1 / -1; }
+.entry--run .entry__foot { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 10px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.entry--run .entry__foot .tag { border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; }
+.entry--run .entry__foot .tag--lit { border-color: var(--auto); color: var(--auto); }
+.entry--run .entry__foot .need { color: var(--warn); }
+.entry--run .entry__foot .v { color: var(--ink); font-size: 12px; }
+.entry--run .entry__foot .v small { color: var(--ink-2); font-size: 10px; margin-right: 6px; }
+
+/* The meter: one grammar for every bar. Label and value on the left in fixed columns, the bar filling the middle, the time or state on the right. */
+.meter { display: grid; grid-template-columns: var(--m-label, 0) 8ch minmax(0, 1fr) var(--m-right, 6ch); gap: 0 8px; align-items: center; font-variant-numeric: tabular-nums; }
+.meter__label { font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+.meter__value { font-size: 11px; color: var(--ink); text-align: right; white-space: nowrap; }
+.meter__right { font-size: 11px; color: var(--ink-2); text-align: right; white-space: nowrap; }
+.meter__right b { color: var(--ink); font-weight: 400; }
+.meter__right.warn { color: var(--warn); }
+.meter__right.dim { color: var(--ink-3); }
+.meter .bar { height: 8px; }
+.meter--hp .bar { height: 14px; }
+.meter--hp .meter__value { font-size: 13px; font-weight: 700; }
+.meter--hp .meter__value small { font-weight: 400; color: var(--ink-2); }
+.meter--hp { --m-right: 11ch; }
+.skill--m { display: grid; grid-template-columns: 1.6em 1fr; gap: 3px 8px; padding: 7px 9px; }
+.skill--m .skill__title { display: flex; justify-content: space-between; align-items: baseline; }
+.skill--m .skill__title b { font-size: 13px; font-weight: 700; }
+.skill--m .skill__title .to { font-size: 10px; color: var(--ink-2); }
+.skill--m .meter { grid-column: 2; --m-label: 9ch; --m-right: 5ch; }
+.food--m { display: grid; grid-template-columns: 1fr; padding: 5px 8px; }
+.food--m .meter { --m-label: 15ch; --m-right: 5ch; }
+.food--m .meter__label { color: var(--ink); }
+.food--m .meter__label b { color: var(--good); font-weight: 400; margin-left: 4px; }
+.entry--m { grid-template-columns: 1.4em 1fr auto; gap: 3px 6px; }
+.entry--m .entry__tags { grid-column: 2; }
+.entry--m .meter { grid-column: 1 / -1; --m-right: 4ch; }
+.entry--m .meter .bar { grid-column: auto; }
+.top .meter--hp { margin-top: 2px; }
+</style></head>
+<body>
+<h1>Phone · H, one meter grammar</h1>
+<p class="note">G with every bar on one grammar, the <b>meter</b>: label and value on the left in fixed columns, the bar filling the middle, the time or state on the right. The skill cell is two meters, <span style="color:var(--ink)">core Lv 0 · 0.5/10.0 · bar · ↑ 10s</span>. Each food is one, <span style="color:var(--ink)">cloud-fish +4 hp · 1/5 · ember bar · ready</span>. The running entry is one, <span style="color:var(--ink)">0.5/60.0 · bar · 18s</span>, with its tags on the name line. Health is one too, so the top loses a line. Waiting entries stay a line with no bar.</p>
+<div class="frames">
+  <div class="frame"><h2>H1 · 390 × 800<small>Four queued. Same regions as G, every bar now reads the same way.</small></h2><div class="phone" id="h1"></div></div>
+  <div class="frame frame--short"><h2>H2 · 375 × 667, nine queued<small>The short phone gains a queue line from the condensed top and skill.</small></h2><div class="phone phone--short" id="h2"></div></div>
+  <div class="frame"><h2>the meter, its four uses<small>Isolated, at phone width.</small></h2><div id="legend" style="width:390px;display:grid;gap:10px;padding:10px;background:var(--bg);border:1px solid var(--edge);border-radius:8px"></div></div>
+</div>
+<script>
+const I = {
+  fish: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h1"/><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"/><circle cx="18" cy="18" r="2"/></svg>',
+  salvage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>',
+  tinker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"/></svg>',
+  rig: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v15"/><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"/><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"/></svg>',
+  fight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>',
+  talk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+};
+const play = '<button class="btn btn--play">▶</button>', plus = '<button class="btn">+</button>', stop = '<button class="btn btn--stop">■</button>';
+const chip = (t, lit) => `<span class="auto ${lit ? 'auto--lit' : t ? '' : 'auto--btn'}">${lit ? 'auto' : t || ''}${t && !lit ? `<i style="width:${t.split('/')[0] / t.split('/')[1] * 100}%"></i>` : ''}</span>`;
+
+const bar = (pct, cls = '', v = '', thin = false) => `<div class="bar${thin ? ' bar--thin' : ''}"><div class="bar__fill ${cls}" style="width:${pct}%"></div></div>${v ? `<div class="bar__value">${v}</div>` : ''}`;
+
+const rowFull = (r) => `<div class="item row ${r.running ? 'row--running' : ''}">${I[r.skill]}<div class="row__name"><b>${r.verb}</b> ${r.noun}</div><div class="row__tx">${r.time}<small>+${r.xp} xp</small></div>
+  <div class="row__mid">${r.mid}</div><div class="row__ctl">${r.running ? stop : play}${plus}${chip(r.chip, r.lit)}</div>${r.running ? bar(r.pct, 'bar__fill--run') : ''}</div>`;
+const rowAuto = (r) => `<div class="item row row--auto">${I[r.skill]}<div class="row__name"><b>${r.verb}</b> ${r.noun}</div><span class="row__done">×${r.done}</span>${chip('', true)}</div>`;
+
+const ROWS = [
+  { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', time: '4.0s', xp: '4.0', mid: '<span class="arr">→</span><span class="out">+1 cloud-fish</span>', lit: true, done: 12 },
+  { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', time: '4.5s', xp: '5.0', mid: '<span class="arr">→</span><span class="out">+1 scrap</span>', lit: true, done: 31 },
+  { skill: 'rig', verb: 'Rig', noun: 'the hull', time: '1:00', xp: '60.0', mid: '<span class="row__short">⚠ 15 of 16 scrap<small>have 4</small></span><span class="arr">→</span><span class="out">decay ×0.80</span>', running: true, pct: 1, chip: '' },
+  { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', time: '40s', xp: '40.0', mid: '<span class="row__short">⚠ 12 scrap<small>have 4</small></span><span class="arr">→</span><span class="out">Fish ×1.25</span>', chip: '' },
+  { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', time: '50s', xp: '50.0', mid: '<span class="row__short">⚠ 20 scrap<small>have 4</small></span><span class="arr">→</span><span class="out">stack +5</span>', chip: '' },
+  { skill: 'rig', verb: 'Rig', noun: 'the sails', time: '20s', xp: '20.0', mid: '<span class="row__after">after: the hull, a trawl net, a canvas satchel</span>', chip: '' },
+];
+// In the baseline, the chipped rows keep their seat; Salvage's chip is not yet earned there, as in the screenshot.
+const ROWS_A = ROWS.map((r, i) => i === 0 ? { ...r, lit: true } : i === 1 ? { ...r, lit: false, chip: '5/200' } : r);
+
+const chapterHead = `<div class="region__head region__head--book"><span>The Windward Run</span><span>I · Port Cinder</span></div><p class="story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p>`;
+const chapterA = `<section class="region region--chapter">${chapterHead}${ROWS_A.map(rowFull).join('')}</section>`;
+const live = ROWS.filter(r => !r.lit), auto = ROWS.filter(r => r.lit);
+const chapterC = `<section class="region region--chapter">${chapterHead}${live.map(rowFull).join('')}<div class="group"><span>automated · ${auto.length}</span><span>page · fitting out</span></div>${auto.map(rowAuto).join('')}</section>`;
+
+const QUEUE = [
+  { skill: 'rig', verb: 'Rig', noun: 'the hull', pct: 1, v: '0.5/60.0', tags: '<span class="tag">once</span><span class="tag tag--lit">auto</span>', time: '18s', need: 'scrap 1/16', running: true },
+  { skill: 'rig', verb: 'Rig', noun: 'the sails', pct: 0, v: '0.0/20.0', tags: '<span class="tag">once</span>', time: '' },
+  { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', pct: 0, v: '0.0/5.0', tags: '<span class="tag">repeat</span>', time: '' },
+  { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', pct: 0, v: '0.0/4.0', tags: '<span class="tag">repeat</span>', time: '' },
+];
+const entry = (q) => `<div class="item entry ${q.running ? 'entry--running' : ''}">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><button class="x">×</button>${bar(q.pct, 'bar__fill--run', q.v)}<div class="entry__tags">${q.tags}</div><div class="entry__time">${q.time}</div>${q.need ? `<div class="entry__need">${q.need}</div>` : ''}</div>`;
+const queueRegion = `<section class="region"><div class="region__head"><span>queue · 4</span></div>${QUEUE.map(entry).join('')}</section>`;
+
+const SKILLS = [
+  ['fish', 'Fish', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0], ['salvage', 'Salvage', '1.11', 2, '4.3/12.1', 36, 1, '0.3/27.5', 1],
+  ['tinker', 'Tinker', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0], ['rig', 'Rig', '1.00', 0, '0.5/10.0', 5, 0, '0.5/25.0', 2, true],
+  ['fight', 'Fight', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0], ['search', 'Search', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0], ['talk', 'Talk', '1.00', 0, '0.0/10.0', 0, 0, '0.0/25.0', 0],
+];
+const skill = ([id, name, mult, cl, cv, cp, rl, rv, rp, on]) => `<div class="item skill ${on ? 'skill--on' : ''}">${I[id]}<div class="skill__name"><b>${name}</b><span class="skill__mult">×${mult}</span></div><div class="skill__lv">Lv ${cl} · ${rl}</div>${bar(cp, '', '', true)}<div class="skill__lv">${cv}</div>${bar(rp, 'bar__fill--run', '', true)}<div class="skill__lv">${rv}</div></div>`;
+const skillStrip = ([id, name, mult, cl, cv, cp, rl, rv, rp, on]) => `<div class="item skill ${on ? 'skill--on' : ''}"><div class="skill__name"><b>${name}</b></div><div class="skill__lv">Lv ${cl} · ${rl}</div>${bar(cp, '', '', true)}${bar(rp, 'bar__fill--run', '', true)}</div>`;
+const skillsRegion = `<section class="region"><div class="region__head"><span>skills</span></div><div class="skills">${SKILLS.map(skill).join('')}</div></section>`;
+const skillsStrip = `<section class="region"><div class="region__head acc"><span>skills</span></div><div class="skills skills--strip">${SKILLS.map(skillStrip).join('')}</div></section>`;
+
+const rates = `<section class="region"><div class="region__head"><span>rates</span></div><div class="kv"><span>decay</span><span class="hurt">−0.11 hp/s ▲</span><span>food ceiling</span><span class="dim">0.00 hp/s</span><span>rig</span><span class="dim">0.00 hp/s</span></div></section>`;
+const food = `<section class="region"><div class="region__head"><span>food</span><span>nothing to eat</span></div><div class="item pack__item"><span>cloud-fish <span class="dim" style="color:var(--good)">+4 hp</span></span><div>${bar(0, 'bar__fill--run')}<div class="bar__value">none</div></div></div></section>`;
+const pack = `<section class="region"><div class="region__head"><span>pack</span></div><div class="item pack__item"><span>scrap</span><div>${bar(20)}<div class="bar__value">4/20</div></div></div></section>`;
+const LOG = [['0:24', 'Rig the hull: 15 of 16 scrap, have 4 — Salvage drifting scrap first'], ['0:19', 'Salvage → run Lv 1'], ['0:13', 'Salvage → core Lv 2'], ['0:00', 'Life 3 begins at Port Cinder']];
+const log = `<section class="region"><div class="region__head"><span>log</span></div>${LOG.map(([t, s]) => `<div class="log__line"><span>${t}</span><span>${s}</span></div>`).join('')}</section>`;
+const logAcc = log.replace('class="region__head"', 'class="region__head acc"');
+const moreAcc = `<section class="region"><div class="region__head acc acc--closed"><span>food · pack · rates</span><span>nothing to eat</span></div></section>`;
+
+const healthPlain = `<div class="health">${bar(97, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<div class="health__value">97 <small>/ 100</small></div><div class="health__rate">−0.11 hp/s</div></div>`;
+const now = `<div class="now">${I.rig}<div class="now__name"><b>Rig</b> the hull</div><div class="now__left">18s<small>scrap 1/16</small></div>${bar(1, 'bar__fill--run')}<div class="now__next">next <b>Rig the sails</b> · then 2 more</div></div>`;
+const bottom = (mid) => `<div class="bottom"><button class="btn">${I.gear}</button><div class="clock">00:24</div>${mid || '<span></span>'}<button class="btn">${I.pause}</button></div>`;
+const tabs = (on) => `<div class="tabs">${['chapter', 'queue <b>· 4</b>', 'skills', 'more'].map((t, i) => `<div class="tab ${i === on ? 'tab--on' : ''}">${t}</div>`).join('')}</div>`;
+
+const ratesLine = `<div class="kv kv--line"><span>decay <b class="hurt">−0.11</b></span><span>food <b class="dim">0.00</b></span><span>rig <b class="dim">0.00</b></span><span>net <b class="hurt">−0.11 hp/s</b></span></div>`;
+const healthRates = `<div class="health">${bar(97, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<div class="health__value">97 <small>/ 100</small></div><div class="health__rate">≈ 14:42 left</div></div>${ratesLine}`;
+const skillWatch = ([id, name, mult, cl, cv, cp, rl, rv, rp, on]) => `<div class="item skill ${on ? 'skill--on' : ''}">${I[id]}<div class="skill__name"><b>${name}</b><span class="skill__mult">×${mult}</span></div><div class="skill__lv">Lv ${cl}${on ? ' <b class="up">↑ 10s</b>' : ''}</div>${bar(cp, '', '', true)}<div class="skill__lv">${cv}</div><div class="skill__lv" style="grid-column:3">Lv ${rl}${on ? ' <b class="up">↑ 25s</b>' : ''}</div>${bar(rp, 'bar__fill--run', '', true)}<div class="skill__lv">${rv}</div></div>`;
+const skillsWatch = `<section class="region"><div class="region__head"><span>skills</span><span>rig ×1.00 → ×1.05 at Lv 1</span></div><div class="skills">${SKILLS.map(skillWatch).join('')}</div></section>`;
+const skillNow = `<section class="region region--now"><div class="region__head"><span>skill</span><span>rig ×1.00 → ×1.05 at Lv 1</span></div>
+  <div class="item skill skill--on skill--now">${I.rig}<div class="skill__name"><b>Rig</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">core Lv 0 <b class="up">↑ 10s</b></div>${bar(5, '', '', false)}<div class="skill__lv">0.5/10.0</div><div class="skill__lv" style="grid-column:3">run Lv 0 <b class="up">↑ 25s</b></div>${bar(2, 'bar__fill--run', '', false)}<div class="skill__lv">0.5/25.0</div></div></section>`;
+
+const doingBox = (entries, note) => `<section class="region region--doing"><div class="region__head"><span>doing · ${entries.length}</span><span>${note}</span></div><div class="list ${entries.length > 3 ? 'fade' : ''}">${entries.length ? entries.map(entry).join('') : '<div class="empty">nothing queued — pick an action</div>'}</div></section>`;
+const logBox = (lines) => `<section class="region region--log"><div class="region__head"><span>log</span></div><div class="list">${lines.map(([t, s]) => `<div class="log__line"><span>${t}</span><span>${s}</span></div>`).join('')}</div></section>`;
+const LOG9 = [['1:02', 'Fish the cloud shallows ×12'], ['0:58', 'Rig → core Lv 1: rig ×1.05'], ['0:51', 'Rig the hull done — decay ×0.80'], ['0:24', 'Rig the hull: 15 of 16 scrap, have 4 — Salvage drifting scrap first'], ['0:19', 'Salvage → run Lv 1'], ['0:13', 'Salvage → core Lv 2'], ['0:00', 'Life 3 begins at Port Cinder']];
+const QUEUE9 = [...QUEUE, { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', pct: 0, v: '0.0/40.0', tags: '<span class="tag">once</span>', time: '' }, { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', pct: 0, v: '0.0/5.0', tags: '<span class="tag">repeat</span>', time: '' }, { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', pct: 0, v: '0.0/50.0', tags: '<span class="tag">once</span>', time: '' }, { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', pct: 0, v: '0.0/4.0', tags: '<span class="tag">repeat</span>', time: '' }, { skill: 'rig', verb: 'Rig', noun: 'the sails', pct: 0, v: '0.0/20.0', tags: '<span class="tag">once</span>', time: '' }];
+const skillIdle = `<section class="region region--now"><div class="region__head"><span>skill</span><span>last used</span></div>
+  <div class="item skill skill--now skill--idle">${I.rig}<div class="skill__name"><b>Rig</b><span class="skill__mult">×1.05</span></div><div class="skill__lv">core Lv 1</div>${bar(15, '', '', false)}<div class="skill__lv">1.7/11.0</div><div class="skill__lv" style="grid-column:3">run Lv 0</div>${bar(30, 'bar__fill--run', '', false)}<div class="skill__lv">7.5/25.0</div></div></section>`;
+const healthIdle = `<div class="health">${bar(91, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<div class="health__value">91 <small>/ 100</small></div><div class="health__rate" style="color:var(--ink-3)">idle</div></div><div class="kv kv--line"><span>decay <b class="dim">−0.00</b></span><span>food <b class="dim">0.00</b></span><span>rig <b class="dim">0.00</b></span><span>net <b class="dim">0.00 hp/s</b></span></div>`;
+const eBar = (n, waits) => bottom(`<span class="btns"><button class="qbtn">skills ▴</button><button class="qbtn ${waits ? 'qbtn--waits' : ''}">actions <small>· ${n}</small> ▴</button></span>`);
+
+const runningHead = (turn) => `<div class="head ${turn ? 'head--turn' : ''}"><span>The Windward Run</span><span>I · Port Cinder · ${turn ? 'Casting off' : 'Fitting out'}</span></div>`;
+const chipFood = (name, hp, n, cap, pct, note) => `<div class="chip ${n === 0 ? 'chip--empty' : ''}"><div class="chip__name">${name}<b>+${hp} hp</b></div>${bar(pct, 'bar__fill--run', '', true)}<div class="chip__n">${n}/${cap} · ${note}</div></div>`;
+const chipItem = (name, n, cap) => `<div class="chip ${n >= cap ? 'chip--full' : ''}"><div class="chip__name">${name}</div>${bar(n / cap * 100, '', '', true)}<div class="chip__n">${n}/${cap}${n >= cap ? ' full' : ''}</div></div>`;
+const packStrip = (foodNote) => `<section class="region region--pack"><div class="region__head"><span>pack</span><span>${foodNote}</span></div><div class="pack">${chipFood('cloud-fish', 4, 1, 5, 100, 'ready')}${chipItem('scrap', 4, 20)}${chipItem('rope', 2, 2)}${chipItem('sailcloth', 0, 3)}</div></section>`;
+const fight = { skill: 'fight', verb: 'Fight', noun: 'the harbor pirates', pct: 0, v: '0.0/30.0', tags: '<span class="tag">once</span>', time: '' };
+const entryWaits = (q, why, how) => `<div class="item entry entry--waits">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><button class="x">×</button>${bar(q.pct, 'bar__fill--wait', q.v)}<div class="entry__tags">${q.tags}</div><div class="entry__time heading-waits">waits</div><div class="entry__why">${why}<small>${how}</small></div></div>`;
+const QUEUE_W = [fight, QUEUE[1], QUEUE[2]];
+const doingWaits = `<section class="region region--doing"><div class="region__head"><span>doing · 3</span><span class="heading-waits">waiting</span></div><div class="list">${entryWaits(fight, '⚠ would kill you at 31 hp', 'eat, or queue a heal in front')}${QUEUE_W.slice(1).map(entry).join('')}</div></section>`;
+const healthWaits = `<div class="health">${bar(31, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<div class="health__value">31 <small>/ 100</small></div><div class="health__rate heading-waits">waiting</div></div><div class="kv kv--line"><span>decay <b class="dim">−0.00</b></span><span>food <b class="dim">0.00</b></span><span>fight <b class="dim">0.00</b></span><span>net <b class="dim">0.00 hp/s</b></span></div>`;
+const skillWaits = `<section class="region region--now"><div class="region__head"><span>skill</span><span>fight ×1.00 → ×1.05 at Lv 1</span></div>
+  <div class="item skill skill--now skill--idle skill--waits">${I.fight}<div class="skill__name"><b>Fight</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">core Lv 0 <b class="up">waits</b></div>${bar(0, '', '', false)}<div class="skill__lv">0.0/10.0</div><div class="skill__lv" style="grid-column:3">run Lv 0 <b class="up">waits</b></div>${bar(0, 'bar__fill--run', '', false)}<div class="skill__lv">0.0/25.0</div></div></section>`;
+const body = (skill, doing, log) => `<div class="phone__body">${skill}${packStrip('1 to eat')}${doing}${log}</div>`;
+
+const entryRun = (q) => `<div class="item entry entry--running entry--run">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><button class="x">\u00d7</button>${bar(q.pct, 'bar__fill--run')}<div class="entry__foot"><span><span class="tag">once</span> <span class="tag tag--lit">auto</span> <span class="need">\u00b7 scrap 1/16</span></span><span class="v"><small>0.5/60.0</small>18s</span></div></div>`;
+const entryLine = (q) => `<div class="item entry entry--line">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><span class="tag ${q.auto ? 'tag--lit' : ''}">${q.mode}</span><span class="entry__len">${q.len}</span><button class="x">×</button></div>`;
+const Q = [
+  { ...QUEUE[0] },
+  { skill: 'rig', verb: 'Rig', noun: 'the sails', mode: 'once', len: '20s' },
+  { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', mode: 'repeat', len: '4.5s' },
+  { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', mode: 'repeat', len: '4.0s' },
+];
+const Q9 = [...Q, { skill: 'tinker', verb: 'Tinker', noun: 'a trawl net', mode: 'once', len: '40s' }, { skill: 'salvage', verb: 'Salvage', noun: 'drifting scrap', mode: 'auto', auto: true, len: '4.5s' }, { skill: 'tinker', verb: 'Tinker', noun: 'a canvas satchel', mode: 'once', len: '50s' }, { skill: 'fish', verb: 'Fish', noun: 'the cloud shallows', mode: 'auto', auto: true, len: '4.0s' }, { skill: 'rig', verb: 'Rig', noun: 'the sails', mode: 'once', len: '20s' }];
+const doingC = (qs, note) => `<section class="region region--doing"><div class="region__head"><span>doing · ${qs.length}</span><span>${note}</span></div><div class="list ${qs.length > 6 ? 'fade' : ''}">${entryRun(qs[0])}${qs.slice(1).map(entryLine).join('')}</div></section>`;
+const foodSection = `<section class="region region--pack"><div class="region__head"><span>food</span><span>1 to eat</span></div>
+  <div class="item food__row"><span>cloud-fish<b>+4 hp</b></span><span class="n ready">1/5</span><div>${bar(100, 'bar__fill--run', '', false)}<div class="n ready">ready</div></div></div>
+  <div class="item food__row"><span>salt biscuit<b>+2 hp</b></span><span class="n none">0/3</span><div>${bar(0, 'bar__fill--run', '', false)}<div class="n none">none</div></div></div></section>`;
+const gBar = (n, which) => bottom(`<span class="btns"><button class="qbtn">skills</button><button class="qbtn">actions <small>· ${n}</small></button><button class="qbtn ${which === 'pack' ? '' : ''}">pack${which === 'pack' ? ' ▾' : ''}</button></span>`);
+const gBody = (doing, log) => `<div class="phone__body">${skillNow}${foodSection}${doing}${log}</div>`;
+const packSheet = `<div class="scrim"></div><div class="sheet sheet--pack"><div class="sheet__grip"></div><div class="region__head"><span>pack · 4 of 6</span><span>stack +5 at the satchel</span></div><div class="sheet__list">
+  <div class="item pack__item"><span>cloud-fish <b style="color:var(--good);font-weight:400">+4 hp</b></span><div>${bar(20)}<div class="bar__value">1/5</div></div></div>
+  <div class="item pack__item"><span>salt biscuit <b style="color:var(--good);font-weight:400">+2 hp</b></span><div>${bar(0)}<div class="bar__value">0/3</div></div></div>
+  <div class="item pack__item"><span>scrap</span><div>${bar(20)}<div class="bar__value">4/20</div></div></div>
+  <div class="item pack__item"><span>rope</span><div>${bar(100, 'bar__fill--warn')}<div class="bar__value" style="color:var(--warn)">2/2 full</div></div></div>
+  <div class="item pack__item"><span>sailcloth</span><div>${bar(0)}<div class="bar__value">0/3</div></div></div>
+  <div class="item pack__item"><span>tar</span><div>${bar(50)}<div class="bar__value">1/2</div></div></div></div></div>`;
+
+const meter = ({ label = '', value, pct, cls = '', right = '', rightCls = '', kind = '' }) => `<div class="meter ${kind}"><span class="meter__label">${label || ''}</span><span class="meter__value">${value}</span>${bar(pct, cls)}<span class="meter__right ${rightCls}">${right}</span></div>`;
+const healthM = (hp, right, rightCls) => `<div class="meter meter--hp" style="--m-label:0"><span></span><span class="meter__value">${hp} <small>/ 100</small></span>${bar(hp, 'bar__fill--hp').replace('class="bar"', 'class="bar bar--hp"')}<span class="meter__right ${rightCls}">${right}</span></div>`;
+const topM = (head) => `<div class="top">${head}${healthM(97, '\u2248 14:42 left', 'warn').replace('class="meter__right warn"', 'class="meter__right" style="color:var(--hurt-text)"')}${ratesLine}</div>`;
+const skillM = `<section class="region region--now"><div class="region__head"><span>skill</span></div>
+  <div class="item skill--m skill--on">${I.rig}<div class="skill__title"><span><b>Rig</b> <span class="skill__mult">\u00d71.00</span></span><span class="to">\u2192 \u00d71.05 at Lv 1</span></div>
+  ${meter({ label: 'core Lv 0', value: '0.5/10.0', pct: 5, right: '\u2191 <b>10s</b>' })}${meter({ label: 'run Lv 0', value: '0.5/25.0', pct: 2, cls: 'bar__fill--run', right: '\u2191 <b>25s</b>' })}</div></section>`;
+const foodM = `<section class="region region--pack"><div class="region__head"><span>food</span><span>1 to eat</span></div>
+  <div class="item food--m">${meter({ label: 'cloud-fish<b>+4 hp</b>', value: '1/5', pct: 100, cls: 'bar__fill--run', right: 'ready' })}</div>
+  <div class="item food--m">${meter({ label: 'salt biscuit<b>+2 hp</b>', value: '0/3', pct: 0, cls: 'bar__fill--run', right: 'none', rightCls: 'dim' })}</div></section>`;
+const entryM = (q) => `<div class="item entry entry--running entry--m">${I[q.skill]}<div class="entry__name"><b>${q.verb}</b> ${q.noun}</div><button class="x">\u00d7</button><div class="entry__tags"><span class="tag">once</span><span class="tag tag--lit">auto</span><span style="color:var(--warn)">\u00b7 scrap 1/16</span></div><span></span>${meter({ label: null, value: '0.5/60.0', pct: 1, cls: 'bar__fill--run', right: '<b>18s</b>' })}</div>`;
+const doingM = (qs, note) => `<section class="region region--doing"><div class="region__head"><span>doing \u00b7 ${qs.length}</span><span>${note}</span></div><div class="list ${qs.length > 6 ? 'fade' : ''}">${entryM(qs[0])}${qs.slice(1).map(entryLine).join('')}</div></section>`;
+const hBody = (doing, log) => `<div class="phone__body">${skillM}${foodM}${doing}${log}</div>`;
+document.getElementById('h1').innerHTML = `${topM(runningHead(false))}${hBody(doingM(Q, '1:29 queued'), logBox(LOG))}${gBar(4, '')}`;
+document.getElementById('h2').innerHTML = `${topM(runningHead(false))}${hBody(doingM(Q9, '4:08 queued'), logBox(LOG))}${gBar(4, '')}`;
+document.getElementById('legend').innerHTML = `<div class="head" style="color:var(--ink-3)"><span>health</span></div>${healthM(97, '\u2248 14:42 left', '').replace('class="meter__right "', 'class="meter__right" style="color:var(--hurt-text)"')}
+  <div class="head" style="color:var(--ink-3)"><span>skill, two lines</span></div><div style="--m-label:9ch;--m-right:5ch;display:grid;gap:3px">${meter({ label: 'core Lv 0', value: '0.5/10.0', pct: 5, right: '\u2191 <b>10s</b>' })}${meter({ label: 'run Lv 0', value: '0.5/25.0', pct: 2, cls: 'bar__fill--run', right: '\u2191 <b>25s</b>' })}</div>
+  <div class="head" style="color:var(--ink-3)"><span>food</span></div><div style="--m-label:15ch;--m-right:5ch">${meter({ label: 'cloud-fish<b style="color:var(--good);font-weight:400;margin-left:4px">+4 hp</b>', value: '1/5', pct: 60, cls: 'bar__fill--run', right: '3.2s' })}</div>
+  <div class="head" style="color:var(--ink-3)"><span>running entry</span></div><div style="--m-right:4ch">${meter({ label: null, value: '0.5/60.0', pct: 1, cls: 'bar__fill--run', right: '<b>18s</b>' })}</div>
+  <div class="head" style="color:var(--ink-3)"><span>the rule</span></div><div style="font-size:11px;color:var(--ink-2);line-height:1.5">label \u00b7 <span style="color:var(--ink)">value</span> \u00b7 bar \u00b7 <span style="color:var(--ink)">time or state</span>. Value is 8ch right-aligned so bars start on one column inside a region; the right column is pinned per region so a timer that goes 10s \u2192 9s moves nothing. Bone is XP, ember is time and work, red is health.</div>`;
+</script>
+</body></html>

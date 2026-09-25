@@ -104,3 +104,17 @@ describe('hurts (section 6.1)', () => {
     expect(deathSummary(dead, content).during).toBeNull();
   });
 });
+
+describe('lastVerb', () => {
+  it('is null on a fresh run and becomes the verb of a row that works', () => {
+    const s = live(newState(content.roster));
+    expect(s.lastVerb).toBeNull();
+    const t = step(enqueue(s, content, 'fish'), content);
+    expect(t.lastVerb).toBe('fish');
+  });
+  it('is untouched by an idle step, which still returns the same object', () => {
+    const s = { ...live(newState(content.roster)), lastVerb: 'fish' as const };
+    expect(step(s, content)).toBe(s);
+    expect(step(s, content).lastVerb).toBe('fish');
+  });
+});

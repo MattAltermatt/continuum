@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clock, countdown, duration, floored, fraction, healthPair, tenths } from './format';
+import { clock, countdown, duration, floored, fraction, healthPair, rate, tenths } from './format';
 
 describe('format', () => {
   it('fraction is a/b with one decimal and no spaces', () => {
@@ -20,6 +20,11 @@ describe('format', () => {
   it('clock is mm:ss padded', () => {
     expect(clock(372)).toBe('06:12');
     expect(clock(0)).toBe('00:00');
+  });
+  it('rate is hpRate without its unit, and a bare 0.00 for zero', () => {
+    expect(rate(-0.3)).toBe('\u22120.30');
+    expect(rate(0.3)).toBe('+0.30');
+    expect(rate(0)).toBe('0.00');
   });
 });
 

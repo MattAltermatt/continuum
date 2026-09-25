@@ -90,6 +90,35 @@ that skipped them has not verified anything that matters here.
 - **Nothing may move under the cursor.** Watch a control whose label or number
   changes — a count, a timer, a progress figure — and confirm its neighbours stay
   put. Click A, content widens, A is now where B was, the next click hits B.
+- **Rigidity: the watched boxes never move** (spec 2026-09-25-the-watched-screen
+  section 5). Every state change happens inside a box; the boxes keep their
+  rects. Record them once, play through every state, record again, compare to
+  the pixel. This script does it in one go through the handle (the sheet's `+`
+  buttons are real presses); `equal` must read `true`:
+
+  ```js
+  (async () => {
+    const C = window.continuum, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const rects = () => [...document.querySelectorAll('.top, .region--skill, .region--food, .region--doing, .region--log, .bottom')]
+      .map((e) => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height].map(Math.round); });
+    C.dispatch({ type: 'queue', actionId: 'fish' }); C.step(40); await wait(50);   // running, food landing, net positive
+    const a = rects();
+    document.querySelector('.qbtn--actions').click(); await wait(150);
+    for (const name of ['Salvage drifting scrap', 'Fish the cloud shallows', 'Salvage drifting scrap', 'Fish the cloud shallows']) {
+      document.querySelector(`.sheet--actions [aria-label="add to queue: ${name}"]`).click(); await wait(20);
+    }
+    C.step(20);   // short: a harvest whose stack fills leaves the queue on its own
+    C.dispatch({ type: 'remove', entryId: C.state().queue.at(-1).id });
+    C.dispatch({ type: 'die' }); await wait(50); C.dispatch({ type: 'begin' }); await wait(100);   // the card closes the sheet
+    const b = rects();
+    return { equal: JSON.stringify(a) === JSON.stringify(b), a, b };
+  })()
+  ```
+
+  The things that have broken it: a label that renders `''` in one state (the
+  row collapses; render a no-break space), an empty slot shorter than a filled
+  one (render the filled markup with blank lines), a later CSS rule capping a
+  list the box already sizes.
 - **A pop must not read as an error.** When the top entry runs out of an item
   and no automation supplies it, it leaves the queue and the log says why in
   words (`needs 15 scrap · Salvage drifting scrap automation is not yet earned · earn it by

@@ -16,9 +16,10 @@ body {
   margin: 0;
 }
 
-/* A long queue can grow the page past the window; the gutter is kept either way, so a classic scrollbar appearing never moves the page under the cursor. */
-html {
-  scrollbar-gutter: stable;
+/* The page never scrolls: only the boxes inside it do (spec 2026-09-25-the-watched-screen section 3). No scrollbar gutter either: under
+   overflow: hidden a reserved gutter would make the container query's width and the tier hook's disagree on classic scrollbars. */
+body {
+  overflow: hidden;
 }
 
 
@@ -33,6 +34,7 @@ html {
   --track-edge: oklch(55% 0.012 260);
   --ink: oklch(90% 0.01 80);
   --ink-2: oklch(80% 0.01 80);
+  --ink-3: oklch(62% 0.01 80);
   --core: oklch(84% 0.02 80);
   --run: oklch(70% 0.16 45);
   --hurt: oklch(66% 0.18 25);
@@ -58,7 +60,6 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .bar__fill--run { background: var(--run); }
 .bar__fill--hp { background: var(--hurt); }
 .bar__fill--warn { background: var(--warn); }
-.bar__fill--wait { background: var(--track-edge); }
 .bar__value { font-size: 10px; text-align: center; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
 .bar__value b { color: var(--ink); font-weight: 400; margin-left: 4px; }
 
@@ -81,68 +82,79 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .item { border: 1px solid var(--edge); background: var(--item); border-radius: 4px; }
 
 /* After .item on purpose, and scoped to it: .item's border shorthand would otherwise reset the ember colour. */
-.item.working { position: relative; overflow: hidden; border-color: var(--run); }
+.item.working { position: relative; overflow: clip; border-color: var(--run); }   /* clip, not hidden: hidden makes a scroll container, whose grid minimum is zero, and a docked column crushed the running row to 16px */
 @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .item.working::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--run) 12%, transparent), transparent); animation: sheen 2.2s linear infinite; }
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--run) 12%, transparent), transparent); animation: sheen 6s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .item.working::after { display: none; } .bar__fill { transition: none; } }
 
-.health .bar { height: var(--bar-health); }
-.health__value { text-align: center; font-weight: 700; font-size: 14px; margin-top: 4px; font-variant-numeric: tabular-nums; }
-.health__value small { font-weight: 400; color: var(--ink-2); }
+/* The running head's page word turns in place with one warn-coloured fade (spec 2026-09-25-the-watched-screen 4.1), the same 700ms ease-out as the row's refusal flash. */
+@keyframes turn { from { color: var(--warn); } }
+.head__page { animation: turn 700ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .head__page { animation: none; } }
 
-/* Cells at least 360px that stretch to fill the band and wrap by window width (mockup 2026-09-23-wrapping-band, amended by spec
-   2026-09-24-screen-pass 2.5 for one width): three at 1280, four under the 1600 cap. */
-.skills { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 4px; }
-.skill { display: grid; grid-template-columns: 1.4em 4.5em 3em 1fr; gap: 3px 6px; align-items: center; padding: 5px 7px; }
+/* The gauge (spec 2026-09-25-the-watched-screen section 5): bar left; label over value right, in a column the region pins. */
+.gauge { display: grid; grid-template-columns: minmax(0, 1fr) var(--g-right, 11ch); grid-template-rows: auto auto; gap: 0 10px; align-items: center; font-variant-numeric: tabular-nums; }
+.gauge .bar { grid-row: 1 / 3; }
+.gauge--tall .bar { height: var(--bar-health); }
+.gauge__label, .gauge__value { font-size: 11px; text-align: right; white-space: nowrap; color: var(--ink-2); }
+.gauge__label b { color: var(--ink); font-weight: 400; }
+.gauge__label--warn { color: var(--warn); } .gauge__label--dim { color: var(--ink-3); } .gauge__label--hurt { color: var(--hurt-text); } .gauge__label--good { color: var(--good); }
+.gauge--tall .gauge__value { font-size: 13px; font-weight: 700; color: var(--ink); }
+.gauge--tall .gauge__value small { font-weight: 400; color: var(--ink-2); }
+.health .gauge { --g-right: 13ch; }
+.ink-3 { color: var(--ink-3); }
+
+/* The skill cell (spec 2026-09-25-the-watched-screen 4.2): the icon, a title line, and two gauges. In the sheet one per row; two across in tier P. */
+.skills { display: grid; gap: 4px; }
+.skill { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); gap: 3px 8px; align-items: center; padding: 7px 9px; }
 .skill--on { background: var(--cell-on); }
-.skill__icon, .skill__name { grid-row: span 2; }
-.skill__icon svg { width: 15px; height: 15px; display: block; }
-.skill__name b { display: block; font-weight: 700; }
-.skill__mult { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.skill--idle { opacity: .7; }
+.skill--empty { color: var(--ink-3); }
+.skill__icon { grid-row: span 3; align-self: start; margin-top: 2px; }
+.skill__icon svg { width: 16px; height: 16px; display: block; }
+.skill__title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-height: 1.3em; }
+.skill__name { white-space: nowrap; }
+.skill__name b { font-weight: 700; font-size: 13px; }
+.skill__mult { color: var(--ink-2); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .skill--on .skill__mult { color: var(--ink); font-weight: 700; }
-.skill__lv { text-align: right; white-space: nowrap; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.skill--on .skill__lv { color: var(--ink); }
+.skill__to { color: var(--ink-2); font-size: 10px; white-space: nowrap; }
+.skill .gauge { grid-column: 2; --g-right: 15ch; }
 
 .chapter { display: grid; gap: 5px; align-content: start; }
 .head__story { margin: 0 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
-/* The name column keeps the 24-character budget for skill plus noun (09-22 8.1), "Fight the harbor pirates". */
-.row { display: grid; grid-template-columns: calc(1.6em + 8px + 24ch) minmax(0, 1fr) auto; gap: 0 10px; align-items: center; padding: 6px 8px; }
+/* The row (spec 2026-09-25-the-watched-screen section 7): icon, name, time and controls on the title line's four
+   columns; the list spans the last three under it, so nothing about the row's height depends on its state (section
+   6: rows are as tall as their lists and never change height). */
+.row { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto auto; gap: 2px 8px; align-items: start; padding: 7px 8px; }
 .row--on { background: var(--cell-on); }
-.row__c1 { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); gap: 0 8px; align-items: center; white-space: nowrap; }
-.row__c1 > span { overflow: hidden; text-overflow: ellipsis; }
-.row__c1 svg { width: 15px; height: 15px; }
-/* The space between verb and noun is a real character (a screen reader reads "Fight the harbor pirates"), so no margin: 24 characters are 24ch. */
-.row__c1 b { font-weight: 700; }
-/* The middle chunk stacks (09-22 8.4): needs on their own line above the inputs, one input per line, so every row
-   fits the chapter column, which is 712px at the 732px floor and 714px at 1280 (plan Task 7; mockup
-   2026-09-23-queue-orders frame d): the row is that width less the frame's two border pixels, 710 and 712, since its
-   own side borders are gone. That floor is a chosen width, the one the words in the middle chunk fit at, held by
-   .screen's min-width and the column tiers; the row's own grid would shrink far below it. Every row reserves three
-   lines of the words at their own size, so no row changes height when an instruction or a waiting look comes or goes,
-   and nothing below it moves under the cursor. */
-.row__c2 { display: grid; grid-template-columns: minmax(0, 1fr) 1.2em 14ch; gap: 0 6px; align-items: center; min-height: calc(3 * 1.15 * 11px); }
-.row__in { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
-.row__in > span { white-space: nowrap; }
-.row__needs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 4px; }
-.need { border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; font-size: 11px; color: var(--ink); white-space: nowrap; }
-.need--unmet { border-color: var(--hurt); color: var(--hurt-text); }
-.row__short { color: var(--warn); }
-.row__short small { color: var(--ink-2); margin-left: 6px; font-size: 11px; }
-.row__short--quiet { color: var(--ink-2); }
-.row__short--quiet small { color: var(--ink-2); margin-left: 6px; font-size: 11px; }
-.row__arr { color: var(--edge-on); text-align: center; }
-.row__out { display: flex; flex-direction: column; white-space: nowrap; }
-.row__say { grid-column: 1 / -1; text-align: center; color: var(--warn); font-size: 11px; line-height: 1.15;
-  overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
-.row__say--fading { opacity: 0; transition: opacity var(--fade); }
-.row__c3 { display: grid; grid-template-columns: 5em var(--control) var(--control) auto; gap: 0 8px; align-items: center; justify-items: end; }
-.row__tx { text-align: right; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.row__tx small { display: block; color: var(--ink-2); font-size: 10px; }
+.row svg { width: 15px; height: 15px; }
+.row__name { overflow-wrap: anywhere; }   /* never truncated (spec 7): a long name wraps under itself; the row's height is the book's, not the state's */
+/* The space between verb and noun is a real character (a screen reader reads "Fight the harbor pirates"), so no margin. */
+.row__name b { font-weight: 700; }
+.row__tx { font-size: 11px; font-variant-numeric: tabular-nums; }
+.row__ctl { display: flex; gap: 4px; --control: 30px; }
+.row__list { grid-column: 2 / -1; font-size: 11px; line-height: 1.35; display: grid; }
+.li-h { color: var(--run); margin-top: 2px; }
+.li { padding-left: 1.2em; text-indent: -1.2em; }
+.li::before { content: "\00b7  "; color: var(--edge-on); }
+.li--wait, .li--unmet { color: var(--ink); }
+/* More than a colour: the health line is hurt-red already, so the flash is a wash of background behind the line too. */
+@keyframes refuse-line { from { background: color-mix(in oklch, var(--hurt) 40%, transparent); } }
+.li--flash { color: var(--hurt-text); animation: refuse-line 700ms ease-out; border-radius: 3px; }
+.row--built { opacity: .6; }
+.row--built .row__tx { color: var(--good); }
+/* The chapter's two groups (spec 2026-09-25-the-watched-screen section 7): a chipped row recedes to one line under
+   this group heading, and stays there (with .working, the ember frame) while it runs, so nothing jumps groups. */
+.group { padding: 5px 10px 2px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); display: flex; justify-content: space-between; }
+.row--auto { padding: 4px 8px; grid-template-columns: 1.6em 1fr auto auto; color: var(--ink-2); }
+.row--auto .row__done { font-size: 10px; color: var(--ink-3); }
 .btn { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
 .btn--play { color: var(--run); }
 .btn--stop { background: var(--run); color: var(--bg); cursor: default; }   /* keeps --edge-on: still a focusable control (spec 8.1) */
-/* The refusal (#43, spec 2.5): one red flash on the row and its play button. The class comes off on animationend. */
+/* The refusal (#43, spec 2.5): one red flash on the row and its play button; its short cost line goes with it
+   (spec 2026-09-25-the-watched-screen section 7): .li--flash's own keyframe runs the same 700ms, the class comes and goes
+   with the row's. The class comes off on animationend. */
 @keyframes refuse { from { border-color: var(--hurt); box-shadow: 0 0 0 2px var(--hurt); background: color-mix(in oklch, var(--hurt) 12%, var(--item)); } }
 @keyframes refuse-play { from { background: var(--hurt); color: var(--bg); border-color: var(--hurt); } }
 .row--refused { animation: refuse 700ms ease-out; }
@@ -159,19 +171,25 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .auto--waits { border-style: dashed; }
 .auto--btn[aria-disabled="true"] { opacity: .7; cursor: default; }
 
-/* The floor is the action row, which cannot shrink below 712px, plus the page padding. Below it the page scrolls sideways; a phone layout is #62.
-   One content width, capped (spec 2026-09-24-screen-pass 2.3): at 1920 the chapter no longer stretches to ~1354px. The four rows are the
-   top, the band, the columns and the bottom bar (the inert wrappers are display: contents); min-height reaches the window bottom so the
-   bottom bar sits there on a short page, and the 1fr row takes that slack, or a grid's default align-content would stretch every box. */
-.screen { display: grid; gap: 8px; grid-template-rows: auto auto 1fr auto; padding: 0 10px; min-width: 732px; max-width: 1600px; min-height: 100%; margin: 0 auto; container-type: inline-size; }
-/* The two bars stick (spec 2.1, 2.2). Each bleeds into the page's side padding and carries its own padding in place of the grid's gap,
-   so nothing scrolls past it through a strip either side or through the gap. */
-.top { position: sticky; top: 0; z-index: 4; background: var(--bg); margin: 0 -10px; padding: 10px 10px 4px; }
-.bottom { position: sticky; bottom: 0; z-index: 4; background: var(--bg); margin: 0 -10px; padding: 6px 10px 10px; border-top: 1px solid var(--edge);
-  display: grid; grid-template-columns: var(--control) 1fr var(--control); align-items: center; gap: 8px; }
-.bottom__clock { justify-self: center; min-width: 14ch; text-align: center; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink); }   /* pinned: "00:00 waiting" must not move the controls */
-.bottom__clock--dim { color: var(--ink-2); }
+/* The screen is three rows, top strip, body, bottom bar, and never taller than the window (spec 2026-09-25-the-watched-screen
+   section 3): the body is the one that clips, and the boxes inside it scroll. One content width, capped at 1600 (spec 2026-09-24-screen-pass 2.3).
+   Container queries on .screen measure the content box, the same width the tier hook reads (the window's less the side padding). */
+.screen { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; max-width: 1600px; margin: 0 auto; padding: 0 10px; container-type: inline-size; }
+/* The two bars stick (spec 2.1, 2.2), each with its own padding in place of the grid's gap. */
+.top { position: sticky; top: 0; z-index: 4; background: var(--bg); padding: calc(10px + env(safe-area-inset-top)) 10px 6px; display: grid; gap: 4px; border-bottom: 1px solid var(--edge); }
+.bottom { position: sticky; bottom: 0; z-index: 6; background: var(--bg); padding: 6px 0 calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--edge);
+  display: grid; grid-template-columns: var(--control) auto 1fr var(--control); align-items: center; gap: 6px; }   /* 6, not 8: at 360 the six controls need it */
+.bottom__clock { justify-self: center; min-width: 7ch; text-align: center; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink); }   /* pinned: "00:00" must not move the controls */
 .bottom__clock small { font-size: 10px; }
+/* The bottom bar's three sheet buttons (spec 4.6): between the clock and pause, absent on the desktop tier (Sheet docks there instead). */
+.btns { display: flex; gap: 4px; justify-content: flex-end; }
+.qbtn { height: var(--control); border: 1px solid var(--edge-on); border-radius: 5px; background: transparent; color: var(--ink); font: inherit; padding: 0 7px; }
+.qbtn--open { border-color: var(--run); }
+.qbtn--waits { border-color: var(--warn); color: var(--warn); }
+.qbtn small { color: var(--ink-2); }
+/* Pinned for two digits: at 12px Menlo "actions" plus the middot and "10" in <small> is 98.5px with padding and border, so ten going back to nine moves neither neighbour. */
+.qbtn--actions { min-width: calc(12ch + 16px); }   /* "actions", a middot and a two-digit count, plus the padding: the count never moves pack or pause */
+.qbtn--placeholder { visibility: hidden; }
 .settings { position: relative; }
 .settings__gear { display: grid; place-items: center; padding: 0; }
 .settings__gear svg { width: 14px; height: 14px; }
@@ -201,21 +219,45 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .debug__toggle[aria-expanded="false"]::before { content: "\25B8  " / ""; white-space: pre; }
 .debug__toggle[aria-expanded="true"]::before { content: "\25BE  " / ""; white-space: pre; }
 .debug__line { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px; padding-left: 2ch; }
-.columns { display: grid; grid-template-columns: 1fr 250px 280px; gap: 8px; align-items: start; }
-.middle { display: grid; gap: 8px; }
-.queue { display: grid; gap: 5px; align-content: start; }
-/* Narrower windows fold the columns rather than scroll (2026-09-23). Container queries on .screen measure the content box, so a classic scrollbar cannot push the page a few pixels past a breakpoint. 1258 = chapter floor 712 + 250 + 280 + two 8px gaps; 1000 = 712 + 280 + one gap. Below 1258 the queue sits in the second column above the middle one: the middle grows as the log fills, the queue grows at its own bottom, so the queue's buttons never move under the cursor. Below 1000 the chapter takes the full width and queue and middle sit side by side under it. */
-@container (max-width: 1257px) {
-  .columns { grid-template-columns: 1fr 280px; }
-  .columns__chapter { grid-column: 1; grid-row: 1 / span 2; }
-  .queue { grid-column: 2; grid-row: 1; }
-  .middle { grid-column: 2; grid-row: 2; }
+/* The body and its three tiers (spec 2026-09-25-the-watched-screen section 3). Within a tier the layout is fluid (fr columns);
+   between tiers it snaps. The two widths were measured against the live build (the one-line entry, the list row);
+   src/ui/tiers.ts carries the same numbers and tiers.test.ts keeps the two in step. */
+.body { display: grid; gap: 8px; padding: 8px 0; min-height: 0; overflow: hidden; position: relative; }
+/* The watched column: skill, food, doing, log. */
+/* One running entry (three lines and its gauge, 83px) with the box's head and padding: the doing box never cuts the one thing it must show (spec 4.4). */
+.watch { --doing-min: 118px; }
+.watch { display: grid; gap: 8px; grid-template-rows: auto auto minmax(var(--doing-min), 2fr) minmax(0, 1fr); min-height: 0; }   /* skill, food, doing, log: the two boxes share what is left, doing twice the log, doing never under one entry */
+.region--skill { display: grid; gap: 4px; }
+.region--skill .ledger { max-width: calc(100vw - 40px); }   /* the pop-out on a phone: no wider than the screen */
+.sheet__doing { font-variant-numeric: tabular-nums; }
+.region--doing, .region--log { min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.queue { gap: 5px; align-content: start; overflow-y: auto; scrollbar-width: thin; }
+/* The list scrolls inside the box (spec 4.4); the empty state (below) sits above it, and the box never changes size. */
+.queue__list { overflow-y: auto; display: grid; grid-auto-rows: max-content; gap: 5px; align-content: start; scrollbar-width: thin; }
+.queue__list--more { mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }   /* the fade at the floor when there is more (spec 4.4); Queue measures the overflow; 28 is FADE_PX there */
+.queue__empty { color: var(--ink-3); font-size: 11px; padding: 10px 6px; }
+.queue__empty small { display: block; color: var(--ink-3); margin-top: 4px; }
+/* Tier I: one column; the sheets over the body, hidden unless open. */
+.body--I, .body--P { grid-template-columns: minmax(0, 1fr); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 80%; z-index: 5; display: none; grid-template-rows: auto auto minmax(0, 1fr); gap: 6px; padding: 6px 10px 10px; background: var(--cell); border-top: 1px solid var(--edge-on); border-radius: 12px 12px 0 0; box-shadow: 0 -12px 30px oklch(0% 0 0 / .5); }
+.sheet--open { display: grid; }
+.sheet__grip { width: 36px; height: 4px; border-radius: 2px; background: var(--edge-on); margin: 0 auto; }
+.sheet__list { overflow-y: auto; min-height: 0; }
+.scrim { position: absolute; inset: 0; z-index: 5; background: oklch(0% 0 0 / .35); }
+/* Tier P: the width in pairs, 3:2. */
+@container (min-width: 640px) {   /* TIER_P_MIN */
+  .watch { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); grid-template-rows: auto minmax(var(--doing-min), 1fr); }
+  .sheet--skills .sheet__list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; align-content: start; }
 }
-@container (max-width: 999px) {
-  .columns { grid-template-columns: 1fr 1fr; }
-  .columns__chapter { grid-column: 1 / -1; grid-row: 1; }
-  .middle { grid-column: 1; grid-row: 2; }
-  .queue { grid-column: 2; grid-row: 2; }
+/* Tier O: three columns, the sheets docked. 1200 is 360 + 360 + 460 and the gaps, rounded. */
+@container (min-width: 1200px) {
+  .body--O { grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr) minmax(460px, 1.15fr); grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }   /* fixed shares: the pack scrolls rather than growing into the roster (spec section 6) */
+  .body--O .watch { grid-column: 1; grid-row: 1 / 3; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(var(--doing-min), 2fr) minmax(0, 1fr); }   /* the phone's four rows again (the P rule above pairs them); the skill cell stays, its pop-out is the desktop's too */
+  .dock { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; overflow: hidden; }
+  .dock > .region { min-height: 0; overflow-y: auto; }   /* a long roster or chapter scrolls inside its column; at 1280x820 seven cells do not fit */
+  .dock--skills { grid-row: 1; grid-column: 2; }
+  .dock--pack { grid-row: 2; grid-column: 2; }
+  .dock--actions { grid-column: 3; grid-row: 1 / 3; }
 }
 .entry { display: grid; grid-template-columns: 1.4em 1fr var(--control); gap: 3px 6px; align-items: center; padding: 6px 8px; }
 .entry svg { width: 15px; height: 15px; }
@@ -227,15 +269,14 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .tag { display: inline-block; min-width: calc(6ch + 10px); text-align: center; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; font-size: 10px; color: var(--ink-2); margin-right: 4px; }
 .tag--auto { border-color: var(--auto); color: var(--auto); min-width: 0; }
 .tag--forced { border-color: var(--hurt); color: var(--hurt-text); min-width: 0; }
-.entry__third { justify-content: flex-start; gap: 0 10px; }
-.entry__bar { grid-column: 1 / -1; }
-/* Every entry reserves the working bar's height, so an entry that stops or starts being worked
-   does not shift the entries (and their remove buttons) below it. Padding, not margin: a margin
-   here collapses with .bar__value's and the reservation silently comes up 2px short. */
-.entry__bar { padding-block: calc((var(--bar-working) - var(--bar)) / 2); }
-.entry--on .entry__bar { padding-block: 0; }
 .entry--on .bar { height: var(--bar-working); }
-.entry__sub { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-variant-numeric: tabular-nums; min-height: 18px; white-space: nowrap; overflow: hidden; }
+/* The running entry's tags and costs, on one line under the title row (spec 4.4). */
+.entry__tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: 11px; font-variant-numeric: tabular-nums; }
+/* The running entry's gauge (spec section 5), full width under the tags. */
+.entry--on .gauge { grid-column: 1 / -1; --g-right: 9ch; }
+/* Every other entry: one line, no bar (spec 4.4). */
+.entry--line { grid-template-columns: 1.4em 1fr auto auto auto; gap: 0 8px; padding: 5px 8px; }
+.entry--line .entry__name b { font-weight: 400; }
 .warn { color: var(--warn); } .ink-2 { color: var(--ink-2); }
 .pack { display: grid; gap: 4px; }
 .pack__item { display: grid; grid-template-columns: 1fr 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
@@ -244,26 +285,21 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .hurt-text { color: var(--hurt-text); }
 .heal-text { color: var(--good); }
 .pack__item--full { color: var(--warn); }
-.log__list { list-style: none; margin: 0; padding: 0; max-height: 9em; overflow-y: auto; }
+.log__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; scrollbar-width: thin; }   /* its height is the box's: the log scrolls inside, never the page */
 .log__line { display: grid; grid-template-columns: 3.4em 1fr; gap: 0 8px; padding: 2px 0; border-bottom: 1px solid var(--edge); font-size: 11px; }
 .log__line:last-child { border-bottom: 0; }
 .log__at { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .log__line--story { font-family: var(--serif); font-style: italic; font-size: 12px; }
 .log__line--note { color: var(--ink-2); }
-.row--built .row__built { color: var(--good); grid-column: 1 / -1; }
 /* A control that does nothing right now says so: a built row, a dead run. Not below 70% (spec 8.1). */
 .btn[aria-disabled="true"]:not(.btn--stop) { opacity: .7; cursor: default; color: var(--ink-2); }
 .entry__x[aria-disabled="true"] { opacity: .7; cursor: default; }
 
 /* A wrapper that only carries inert: it adds no box, so the grid it sits in is unchanged. */
 .inert-wrap { display: contents; }
-/* The chapter and its card share one grid cell, so the column is as tall as the taller of the two and the card never overhangs
-   (spec 2026-09-24-screen-pass 2.7). The card's z-index works as a static grid item, and it outranks the sticky bars' 4 only while
-   neither .columns__chapter nor .columns forms a stacking context (no z-index, opacity under 1, transform, filter, contain: paint
-   or isolation on either), or Begin goes under the bottom bar with no error. */
-.columns__chapter { display: grid; }
-.columns__chapter > * { grid-area: 1 / 1; }
-.card { align-self: start; margin: 24px 40px 0; z-index: 6; border: 1px solid var(--edge-on); background: var(--cell-on); border-radius: 6px; padding: 14px 16px; box-shadow: 0 8px 28px oklch(0% 0 0 / .5); font-variant-numeric: tabular-nums; }
+/* The cards' seat (spec 2026-09-25-the-watched-screen section 9): a veil over the body alone, between the two bars, which stay. */
+.veil { position: absolute; inset: 0; z-index: 6; background: oklch(0% 0 0 / .55); display: grid; place-items: center; padding: 16px; }
+.card { width: 100%; max-width: 420px; margin: 0; border: 1px solid var(--edge-on); background: var(--cell-on); border-radius: 6px; padding: 14px 16px; box-shadow: 0 8px 28px oklch(0% 0 0 / .5); font-variant-numeric: tabular-nums; }
 .card__title { font-family: var(--serif); font-style: italic; font-size: 16px; text-align: center; }
 .card__sub, .card__quiet { color: var(--ink-2); text-align: center; }
 .card__sub { margin-bottom: 12px; }
@@ -273,23 +309,23 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .card__rule { border-top: 1px solid var(--edge); margin: 10px 0; }
 .card__hp { display: flex; justify-content: space-between; align-items: baseline; }
 .card__why { color: var(--ink-2); font-size: 10px; margin-top: 2px; }
-.card__begin { display: block; margin: 14px auto 0; padding: 6px 18px; border: 1px solid var(--run); background: var(--run); color: var(--bg); border-radius: 4px; font: inherit; font-weight: 700; }
+.card__begin { display: block; width: 100%; margin: 14px auto 0; padding: 10px 18px; border: 1px solid var(--run); background: var(--run); color: var(--bg); border-radius: 5px; font: inherit; font-size: 13px; font-weight: 700; }
 .card__quiet { font-size: 10px; margin-top: 8px; }
 /* The finish card's last line, in the running head's serif (mockup 2026-09-23-finish-card). */
 .card__line { font-family: var(--serif); font-style: italic; font-size: 13px; line-height: 1.45; color: var(--ink-2); text-align: center; max-width: 42ch; margin: 8px auto; }
 .card__facts { text-align: center; margin: -6px 0 12px; line-height: 1.5; }
 .card__count { text-align: center; }
 .card__count b { font-size: 13px; }
-.rates { font-variant-numeric: tabular-nums; }
-.rates--stopped { opacity: .55; }
-.rates__kv { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; }
-.rates__v { text-align: right; min-width: 13ch; display: inline-block; }
-.rates__food--covers { color: var(--good); }
-.rates__food--short { color: var(--hurt-text); }
-/* The hurts line's box is always there, blank until a hurting row runs, so the chunks below never jump when a fight starts. */
-.rates__blank { visibility: hidden; }
+/* The top strip's rates line (spec 2026-09-25-the-watched-screen 4.1): four equal cells, so the third's word
+   changing (fish -> dash -> salvage) moves nothing. */
+.rates { display: grid; grid-template-columns: repeat(4, 1fr); font-size: 11px; font-variant-numeric: tabular-nums; }
+.rates__cell { white-space: nowrap; }   /* at 390 the net cell's hp/s would wrap; nowrap widens that column, and 1fr keeps the rest equal */
+.rates__cell b { font-weight: 400; }
+/* Food (spec 2026-09-25 4.3): three slots, each a row's height, filled from the pack in eating order or left blank. */
 .food { display: grid; gap: 4px; }
-.food__item { display: grid; grid-template-columns: 1fr auto 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
-.food__item > span { white-space: nowrap; }   /* "cloud-fish" broke at its hyphen, and "+4 hp" at its space */
-.food__item--none { color: var(--ink-2); }
+.food__slot--blank { border: 1px dashed var(--edge); border-radius: 4px; opacity: .4; }   /* a filled row's markup with blank lines: its height by construction */
+.food__row { display: grid; gap: 2px; padding: 5px 8px; }
+.food__name { font-size: 12px; white-space: nowrap; }   /* "cloud-fish" broke at its hyphen, and "+4 hp" at its space */
+.food__name b { color: var(--good); font-weight: 400; margin-left: 4px; }
+.food .gauge { --g-right: 7ch; }
 .btn--placeholder { visibility: hidden; }

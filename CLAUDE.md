@@ -275,24 +275,26 @@ unsubscribed event) ship without asking.
   under `src/engine/`.
 - **Ten additions of `0.1` are `0.9999…`.** A test that counts ticks to a
   completion uses `floor(expCost / baseTickExp) + 1`, not `ceil`.
-- **The layout folds rather than scrolls, down to 732px.** One content
-  width, capped at 1600px and centred (spec 2026-09-24-screen-pass); every
-  region is a box with its heading inside (`src/ui/Region.tsx`, mockup
-  2026-09-24-regions treatment A), health alone on top and the clock, gear
-  and pause in a bottom bar, both sticky. The skills band's cells are at
-  least 360px and stretch to fill the band, wrapping by window width (three
-  at 1280, four under the cap). Below 1280 the queue moves into the second
-  column *above* the middle one (the middle grows as the log fills; above it,
-  the queue's buttons stay put); below 1020 the chapter takes the full width
-  with middle and queue side by side under it (`src/styles.css`, two
-  `@container` queries on `.screen`, which measure the content box so a
-  classic scrollbar cannot tip a breakpoint; mockup 2026-09-23-fold). The
-  floor is the action row, which cannot shrink below 712px: the chapter's
-  rows sit flush in their frame with no side borders of their own, so the
-  frame's two border pixels are part of that 712 and the tiers keep their
-  numbers; under 732 (747 where scrollbars are classic 15px ones, whose gutter
-  `scrollbar-gutter: stable` keeps reserved so a long queue growing the page
-  never shifts it) the page scrolls sideways. A phone layout is #62.
+- **The screen is watched; the sheets are operated** (spec 2026-09-25-the-watched-screen).
+  Three tiers by content width, `src/ui/tiers.ts`: I under 640 (one column: top,
+  skill, food, doing, log; the skills, actions and pack regions are sheets from
+  the bottom bar), P from 640 (skill beside food, doing beside log, 3:2; sheets
+  still), O from 1200 (three columns, the sheets docked, no buttons). `useTier`
+  reads two `matchMedia` queries on the window's width less the screen's 20px of
+  side padding; `styles.css` repeats the numbers in two `@container` queries on
+  `.screen`, and `src/ui/tiers.test.ts` keeps the two in step and keeps
+  `scrollbar-gutter` out (`body` never scrolls: the doing and log boxes scroll
+  inside). **The boxes never move** (spec section 5): `.watch` has fixed rows,
+  every text line that can be empty holds a no-break space (the empty skill cell,
+  a blank food slot, the health label's `steady`), and the chrome-verify skill's
+  rigidity script compares the six boxes' rects across every state. `Sheet.tsx`
+  is one region over the body (`${name} sheet`, `hidden` when closed, Escape
+  unless another dialog is open, a scrim) or a docked column whose region scrolls.
+  `Gauge.tsx` is the one bar grammar (bar left, label over value right, `--g-right`
+  pinned per region); a row's middle is a list (`needs:` with `scrap 1/16` paid of
+  total, `still required:`, `gives:`), a refused play flashes the row and the
+  line it names; `lastVerb` on the state keeps the screen's cell on the last
+  skill that ran; the sheen takes 6s.
 - **`step()` returns the same object when nothing happened.** React skips
   the render on an idle tick, and `useGame` only logs a state that is new. A
   change that spreads the state on every tick breaks both silently.
@@ -302,7 +304,9 @@ unsubscribed event) ship without asking.
   `src/state/useGame.ts` (`queue` with `front`/`once`, `remove` with `entryId`,
   `automate`, `tick` with `n`, `reset`, `load`, and the dev-only `setHealth`,
   `setSkill`, `setItem`, `earnChips` and `die`). The handle also has
-  `step(n)`, `speed(n)`, `save()`, `load()` and `erase()`. **The backtick
+  `step(n)`, `speed(n)`, `save()`, `load()` and `erase()`. The sheets are React
+  state, not the handle's: open one with a click on its bottom-bar button
+  (`.qbtn--actions`), and read the game through `state()` either way. **The backtick
   opens the debug overlay** (`src/ui/Debug.tsx`, dev builds only, a portal on
   `document.body`) with the same actions as buttons and inputs; `setHealth`
   to 0 is not a death (death is the tick's decay), `die` is.

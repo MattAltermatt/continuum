@@ -75,3 +75,8 @@ export function hpRate(n: number): string {
 export function hpClass(n: number): 'hurt-text' | 'heal-text' {
   return n < 0 ? 'hurt-text' : 'heal-text';
 }
+
+/** A rate without its unit, for the rates line's first three cells: the sign as hpRate writes it, and a bare 0.00 for zero. */
+export function rate(n: number): string {
+  return n === 0 ? n.toFixed(2) : hpRate(n).replace(' hp/s', '');
+}

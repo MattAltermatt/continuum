@@ -1,16 +1,19 @@
 /* The skill pop-out (spec 2026-09-23-the-windward-run section 8, mockup 2026-09-23-skills-ledger-gear). Tokens come from src/styles.css. */
 
 /* The slot takes the band's grid cell and positions the pop-out; the cell itself clips (its sheen needs overflow: hidden), so the pop-out is its sibling. */
-.skill-slot { position: relative; }
-.skill-slot > .skill { height: 100%; }
+/* The slot is the cell and, held inline, its ledger under it: the cell takes the slot's height less the ledger's, so the band's
+   cells stay equal and an inline ledger never stretches its cell (a pop-out is out of flow and takes nothing). */
+.skill-slot { position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
 .skill[aria-expanded="true"] { box-shadow: 0 0 0 1px var(--edge-on); }
 
-/* z-index 1: over every row below the band, and under the death card, which is also 1 and later in the page. */
+/* z-index 1: over every row below its cell; the sheets and scrim (5), the veil and the bottom bar (6) sit above it. */
 .ledger { position: absolute; left: 0; top: calc(100% + 4px); z-index: 1; width: 470px; background: oklch(26% 0.014 260); border: 1px solid var(--edge-on); border-radius: 6px; padding: 10px 12px; box-shadow: 0 8px 24px oklch(0% 0 0 / .55); font-variant-numeric: tabular-nums; text-align: left; }
 .ledger:focus { outline: none; }
 /* Opened by hover alone, the pointer passes through it to the cells beneath, which open their own. */
 .ledger--hover { pointer-events: none; }
 .ledger--right { left: auto; right: 0; }
+/* In the skills sheet the ledger sits in flow under its cell, as wide as the cell, so nothing 470px wide opens on a phone. */
+.ledger--inline { position: static; width: auto; margin-top: 4px; }
 
 .ledger__title { margin: 0 0 8px; font-size: 13px; display: flex; gap: 8px; align-items: center; }
 .ledger__title svg { width: 15px; height: 15px; display: block; }

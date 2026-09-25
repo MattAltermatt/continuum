@@ -42,6 +42,47 @@ function renderCell(state: GameState = geared, running = false) {
 const ledger = () => screen.queryByRole('dialog', { name: 'Fish ledger' });
 
 describe('SkillCell', () => {
+  it('is two gauges: core and run, label over value, with the next multiplier on the title line', () => {
+    render(<SkillCell skill={fishDef} content={book} state={newState(book.roster)} running={false} row={null} />);
+    const gauges = document.querySelectorAll('.gauge');
+    expect(gauges).toHaveLength(2);
+    expect(gauges[0]).toHaveTextContent(/core Lv 0/);
+    expect(gauges[1]).toHaveTextContent(/run Lv 0/);
+    expect(screen.getByText(/\u2192 \u00d71\.\d\d at Lv 1/)).toBeInTheDocument();
+  });
+  it('the next multiplier is the one the next core level gives, gear included, and not the current one', () => {
+    renderCell();
+    const next = multiplier({ ...fish, core: { ...fish.core, level: fish.core.level + 1 } }, net).toFixed(2);
+    expect(next).not.toBe(multiplier(fish, net).toFixed(2));
+    expect(screen.getByText(`\u2192 \u00d7${next} at Lv ${fish.core.level + 1}`)).toBeInTheDocument();
+  });
+  it('idle: dimmed, no timers even while marked running, and its pop-out still opens on a click', async () => {
+    render(<SkillCell skill={fishDef} content={book} state={newState(book.roster)} running row={null} idle />);
+    const cell = screen.getByRole('button', { name: /Fish/ });
+    expect(cell).toHaveClass('skill--idle');
+    expect(screen.queryByText(/\u2191/)).toBeNull();
+    await act(() => realClick(cell));
+    expect(screen.getByRole('dialog', { name: 'Fish ledger' })).not.toHaveClass('ledger--inline');
+  });
+  it('ledger inline: held opens the ledger under the cell, in flow, and hover does nothing', async () => {
+    render(<SkillCell skill={fishDef} content={book} state={newState(book.roster)} running={false} row={null} ledger="inline" />);
+    const cell = screen.getByRole('button', { name: /Fish/ });
+    fireEvent.mouseEnter(cell.parentElement!);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await act(() => realClick(cell));
+    expect(screen.getByRole('dialog')).toHaveClass('ledger--inline');
+  });
+  it('empty: the same box with two blank gauges and no name, so a fresh run is the cell\'s height', () => {
+    render(<SkillCell skill={fishDef} content={book} state={newState(book.roster)} running={false} row={null} empty />);
+    expect(document.querySelector('.skill--empty')).not.toBeNull();
+    expect(document.querySelectorAll('.gauge')).toHaveLength(2);
+    // Every line holds a no-break space, so the box is a filled cell's height (spec 2026-09-25 section 5); '' would collapse it.
+    const lines = document.querySelectorAll('.skill--empty .skill__title span, .skill--empty .gauge__label, .skill--empty .gauge__value');
+    expect(lines).toHaveLength(5);
+    for (const el of lines) expect(el.textContent).toBe('\u00a0');
+    expect(screen.queryByText('Fish')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
   it('shows the name, Lv on each line, and a multiplier that includes the gear', () => {
     renderCell();
     const withGear = `×${multiplier(fish, net).toFixed(2)}`;
@@ -50,8 +91,8 @@ describe('SkillCell', () => {
     expect(screen.getByText('Fish')).toBeInTheDocument();
     expect(screen.getByText(withGear)).toBeInTheDocument();
     expect(screen.queryByText(without)).toBeNull();
-    expect(screen.getByText('Lv 12')).toBeInTheDocument();
-    expect(screen.getByText('Lv 5')).toBeInTheDocument();
+    expect(screen.getByText(/core Lv 12/)).toBeInTheDocument();
+    expect(screen.getByText(/run Lv 5/)).toBeInTheDocument();
   });
   it('without gear the multiplier is the two ledgers alone', () => {
     renderCell(game());

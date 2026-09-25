@@ -76,15 +76,6 @@ export function foodCeilingPerSecond(state: GameState, content: Content): number
   return total;
 }
 
-/**
- * Whether the larder covers decay this second: the rates chunk's one judgement
- * (spec 2026-09-23 section 4.1). There is no net line; every form of it either
- * lied or repeated decay (plan Revisions 1 and 2).
- */
-export function covers(state: GameState, content: Content): boolean {
-  return foodCeilingPerSecond(state, content) >= decayPerSecond(state);
-}
-
 /** The top row's health rate this second, signed (spec 2026-09-24-proving-ground section 1). 0 when the top has none. */
 export function rowHealthPerSecond(state: GameState, content: Content): number {
   const top = state.queue[0];

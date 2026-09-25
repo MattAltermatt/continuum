@@ -7,6 +7,7 @@ export default defineConfig({
   base: './',
   server: { port: 5173 },
   test: {
+    css: true,
     globals: true,
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],

@@ -77,7 +77,7 @@ export function rebirth(dead: GameState): GameState {
   const lifeStartCore: Record<SkillId, number> = Object.fromEntries(ids.map((id) => [id, skills[id]!.core.level]));
   return {
     ...blankRun(skills, lifeStartCore), paused: 'system', life: dead.life + 1, rebirthBonus, maxHealth, health: maxHealth,
-    completionCounts: dead.completionCounts, automation: dead.automation, skillStats: dead.skillStats,
+    completionCounts: dead.completionCounts, automation: dead.automation, skillStats: dead.skillStats, lastVerb: dead.lastVerb,
     finishes: dead.finishes + (dead.finished ? 1 : 0),
   };
 }

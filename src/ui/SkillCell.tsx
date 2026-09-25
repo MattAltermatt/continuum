@@ -7,29 +7,9 @@ import { expToNextLevel, tickExp } from '../engine/skills';
 import { ticksPerSecond } from '../engine/time';
 import type { GameState, Ledger } from '../engine/types';
 import { countdown, fraction } from './format';
+import { Gauge } from './Gauge';
 import { ICONS } from './icons';
-import { multiplierText, SkillLedger } from './SkillLedger';
-
-function Line({ ledger, baseExp, running, perSecond, runFill, resetKey }: {
-  ledger: Ledger; baseExp: number; running: boolean; perSecond: number; runFill: boolean;
-  /** Changes exactly when the ledger resets, so the fill remounts and jumps rather than sliding back (spec 2026-09-24-screen-pass 4). */
-  resetKey: string | number;
-}) {
-  const cost = expToNextLevel(baseExp, ledger.level);
-  const pct = Math.min(100, (ledger.exp / cost) * 100);
-  return (
-    <>
-      <div className="skill__lv">Lv {ledger.level}</div>
-      <div>
-        <div className="bar" aria-hidden="true"><div key={resetKey} className={`bar__fill${runFill ? ' bar__fill--run' : ''}`} style={{ width: `${pct}%` }} /></div>
-        <div className="bar__value">
-          {fraction(ledger.exp, cost)}
-          {running && <b>↑ {countdown((cost - ledger.exp) / perSecond)}</b>}
-        </div>
-      </div>
-    </>
-  );
-}
+import { multiplierText, nextMultiplierText, SkillLedger } from './SkillLedger';
 
 /**
  * How the ledger is open: by hover alone, which mouse leave closes; or held,
@@ -39,19 +19,37 @@ function Line({ ledger, baseExp, running, perSecond, runFill, resetKey }: {
 type Open = 'hover' | 'held' | null;
 
 /**
- * One skill in the band: its multiplier and two ledgers, and the pop-out that
- * explains the multiplier. The multiplier and the level-up countdown include
- * the skill's gear, so the cell, the ledger's total and the engine agree.
+ * Where the ledger goes (spec 2026-09-25-the-watched-screen 4.2): `popout` is
+ * the pop-out, hover or held (the screen's one cell on every tier, and the
+ * desktop's roster column); `inline` renders it in flow under the cell when
+ * held, no hover (the skills sheet, where a pop-out would be wider than the
+ * screen).
  */
-export function SkillCell({ skill, content, state, running, row }: {
+export type LedgerMode = 'popout' | 'inline';
+
+const pctOf = (l: Ledger, cost: number) => (l.exp / cost) * 100;
+
+/**
+ * One skill: its multiplier, the multiplier the next core level gives, and two
+ * gauges, core and run (spec 2026-09-25 4.2 and 5). The multiplier and the
+ * level-up countdown include the skill's gear, so the cell, the ledger's
+ * total and the engine agree. `idle` keeps the last skill dimmed with no
+ * timers; `empty` is the same box with nothing in it, so a fresh run's cell
+ * is the cell's height from the first paint.
+ */
+export function SkillCell({ skill, content, state, running, row, idle = false, empty = false, ledger = 'popout' }: {
   skill: SkillDefinition; content: Content; state: GameState; running: boolean;
   /** The row the skill is working, when it is running. */
   row: ActionDefinition | null;
+  idle?: boolean; empty?: boolean; ledger?: LedgerMode;
 }) {
   const Icon = ICONS[skill.icon];
   const s = state.skills[skill.id]!;
   const gear = gearMultiplier(state, content, skill.id);
   const perSecond = tickExp(s, gear) * ticksPerSecond();
+  const coreCost = expToNextLevel(balance.skills.coreMastery.baseExp, s.core.level);
+  const runCost = expToNextLevel(balance.skills.runMastery.baseExp, s.run.level);
+  const timers = running && !idle;
 
   const [open, setOpen] = useState<Open>(null);
   const slot = useRef<HTMLDivElement>(null);
@@ -91,29 +89,47 @@ export function SkillCell({ skill, content, state, running, row }: {
     pressing.current = false;
     if (!slot.current?.contains(e.relatedTarget as Node | null)) setOpen(null);
   };
+  // Hover opens the pop-out only: an inline ledger is held or nothing.
+  const hover = ledger === 'popout'
+    ? { onMouseEnter: () => setOpen((o) => o ?? 'hover'), onMouseLeave: () => setOpen((o) => (o === 'hover' ? null : o)) }
+    : {};
+
+  if (empty) {
+    // Every text line holds a no-break space, so the box is the filled cell's height to the pixel and the first press moves nothing.
+    const blank = '\u00a0';
+    return (
+      <div className="skill-slot">
+        <div className="item skill skill--empty" data-skill="">
+          <div className="skill__icon" aria-hidden="true" />
+          <div className="skill__title"><span>{blank}</span></div>
+          <Gauge fill="core" pct={0} resetKey={0} label={blank} value={blank} />
+          <Gauge fill="run" pct={0} resetKey={0} label={blank} value={blank} />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      ref={slot} className="skill-slot" onBlur={onBlur}
-      onMouseEnter={() => setOpen((o) => o ?? 'hover')}
-      onMouseLeave={() => setOpen((o) => (o === 'hover' ? null : o))}
-    >
+    <div ref={slot} className="skill-slot" onBlur={onBlur} {...hover}>
       <div
-        ref={cell} className={`item skill${running ? ' skill--on working' : ''}`} data-skill={skill.id}
+        ref={cell} className={`item skill${running ? ' skill--on working' : ''}${idle ? ' skill--idle' : ''}`} data-skill={skill.id}
         role="button" tabIndex={0} aria-haspopup="dialog" aria-expanded={open !== null} aria-controls={open !== null ? ledgerId : undefined}
         onMouseDown={() => { pressing.current = true; }} onFocus={onFocus} onClick={onClick} onKeyDown={onKeyDown}
       >
         <div className="skill__icon"><Icon aria-hidden="true" /></div>
-        <div className="skill__name">
-          <b>{skill.name}</b>
-          <span className="skill__mult">{multiplierText(s, gear)}</span>
-          {running && <span className="visually-hidden">running</span>}
+        <div className="skill__title">
+          <span className="skill__name"><b>{skill.name}</b> <span className="skill__mult">{multiplierText(s, gear)}</span>{running && <span className="visually-hidden">running</span>}</span>
+          <span className="skill__to">{nextMultiplierText(s, gear)}</span>
         </div>
-        <Line ledger={s.core} baseExp={balance.skills.coreMastery.baseExp} running={running} perSecond={perSecond} runFill={false} resetKey={s.core.level} />
-        <Line ledger={s.run} baseExp={balance.skills.runMastery.baseExp} running={running} perSecond={perSecond} runFill={true} resetKey={`${state.life}:${s.run.level}`} />
+        <Gauge fill="core" pct={pctOf(s.core, coreCost)} resetKey={s.core.level}
+          label={<>core Lv {s.core.level}{timers && <b> {'\u2191'} {countdown((coreCost - s.core.exp) / perSecond)}</b>}</>}
+          value={fraction(s.core.exp, coreCost)} />
+        <Gauge fill="run" pct={pctOf(s.run, runCost)} resetKey={`${state.life}:${s.run.level}`}
+          label={<>run Lv {s.run.level}{timers && <b> {'\u2191'} {countdown((runCost - s.run.exp) / perSecond)}</b>}</>}
+          value={fraction(s.run.exp, runCost)} />
       </div>
       {open !== null && (
-        <SkillLedger id={ledgerId} skill={skill} content={content} state={state} running={running} row={row} hover={open === 'hover'} />
+        <SkillLedger id={ledgerId} skill={skill} content={content} state={state} running={running} row={row} hover={open === 'hover'} inline={ledger === 'inline'} />
       )}
     </div>
   );

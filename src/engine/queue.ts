@@ -45,6 +45,7 @@ export function blankRun(skills: Readonly<Record<SkillId, SkillState>>, lifeStar
     finishes: 0,
     rebirthBonus: 0,
     lifeStartCore,
+    lastVerb: null,
     events: [],
   };
 }
@@ -312,6 +313,8 @@ export function work(state: GameState, content: Content): { readonly state: Game
     work: { ...next.work, [action.id]: after.work },
     skills: { ...next.skills, [action.verb]: awarded.skill },
     skillStats: { ...next.skillStats, [action.verb]: { ticks: stats.ticks + 1, bestRun: Math.max(stats.bestRun, awarded.skill.run.level) } },
+    // Written only here, on a tick that did work: an idle step still returns its input object.
+    lastVerb: action.verb,
   };
   for (let l = 0; l < awarded.coreLevelsGained; l++) {
     events.push({ type: 'coreLevel', skill: action.verb, level: awarded.skill.core.level - awarded.coreLevelsGained + l + 1 });

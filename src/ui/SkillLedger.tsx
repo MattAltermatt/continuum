@@ -7,6 +7,7 @@ import { expToNextLevel, multiplier, tickExp } from '../engine/skills';
 import { ticksPerSecond, ticksToSeconds } from '../engine/time';
 import type { GameState, Ledger, SkillState } from '../engine/types';
 import { countdown, duration, fraction } from './format';
+import { ARROW } from './glyphs';
 import { ICONS } from './icons';
 import { itemName } from './words';
 import './skill-ledger.css';
@@ -31,6 +32,12 @@ function percent(perLevel: number): string {
 /** The multiplier as the cell and the ledger's total both print it. One function, so the two strings cannot disagree. */
 export function multiplierText(skill: SkillState, gear: number): string {
   return `×${multiplier(skill, gear).toFixed(2)}`;
+}
+
+/** The multiplier the next core level gives, the cell's title-line promise (spec 2026-09-25 4.2): "→ ×1.05 at Lv 1". */
+export function nextMultiplierText(skill: SkillState, gear: number): string {
+  const up = { ...skill, core: { ...skill.core, level: skill.core.level + 1 } };
+  return `${ARROW} ×${multiplier(up, gear).toFixed(2)} at Lv ${up.core.level}`;
 }
 
 /** Every XP the skill has earned: the core ledger receives every tick's XP, so it is every core level's cost below the level plus what is in hand. */
@@ -99,12 +106,14 @@ function LedgerLine({ name, note, perLevel, ledger, baseExp, running, perSecond,
  * total, the same string as the cell's. Below, right now (only while the skill
  * runs) and lifetime. It shows what is, never what could be.
  */
-export function SkillLedger({ id, skill, content, state, running, row, hover }: {
+export function SkillLedger({ id, skill, content, state, running, row, hover, inline = false }: {
   id: string; skill: SkillDefinition; content: Content; state: GameState;
   /** The skill is working this tick; `row` is the row it works, when known. */
   running: boolean; row: ActionDefinition | null;
   /** Opened by hover alone: the pointer passes through it, so moving down the band opens the next cell's. */
   hover: boolean;
+  /** In flow under its cell rather than a pop-out (the skills sheet, spec 2026-09-25 4.2): never wider than the screen. */
+  inline?: boolean;
 }) {
   const s = state.skills[skill.id]!;
   const stats = state.skillStats[skill.id] ?? NO_STATS;
@@ -118,15 +127,15 @@ export function SkillLedger({ id, skill, content, state, running, row, hover }: 
   const [alignRight, setAlignRight] = useState(false);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el && el.getBoundingClientRect().right > document.documentElement.clientWidth) setAlignRight(true);
-  }, []);
+    if (!inline && el && el.getBoundingClientRect().right > document.documentElement.clientWidth) setAlignRight(true);
+  }, [inline]);
 
   const made = row?.producedItem === undefined ? undefined : content.items[row.producedItem];
 
   return (
     <div
       ref={ref} id={id} role="dialog" aria-label={`${skill.name} ledger`} tabIndex={-1}
-      className={`ledger${hover ? ' ledger--hover' : ''}${alignRight ? ' ledger--right' : ''}`}
+      className={`ledger${hover ? ' ledger--hover' : ''}${alignRight ? ' ledger--right' : ''}${inline ? ' ledger--inline' : ''}`}
     >
       <h4 className="ledger__title"><Icon aria-hidden="true" />{skill.name}</h4>
       <div className="ledger__grid">

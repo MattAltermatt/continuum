@@ -162,6 +162,8 @@ export function reconcile(state: GameState, book: Book): GameState {
     completionCounts: keep(state.completionCounts, row),
     automation: keep(state.automation, row),
     chapter: Math.min(Math.max(0, Math.floor(state.chapter)), book.chapters.length - 1),
+    // A save from before lastVerb has none, and a verb this book's roster lacks is nobody's: both read null.
+    lastVerb: book.roster.some((r) => r.id === state.lastVerb) ? state.lastVerb : null,
     events: [],
   };
   // The page is derived from what is done, so it is read off the kept state. An order for a row the book no longer
