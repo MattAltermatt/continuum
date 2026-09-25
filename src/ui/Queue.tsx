@@ -10,6 +10,7 @@ import type { GameState, QueueEntry } from '../engine/types';
 import { duration, fraction } from './format';
 import { MINUS, WARN } from './glyphs';
 import { ICONS } from './icons';
+import { Region } from './Region';
 import { itemName } from './words';
 
 /** A hurt reads to two decimals, as on the row. Display precision, not tuning. */
@@ -46,8 +47,7 @@ export function Queue({ state, content, working, live, dead = false, onRemove }:
   // "waiting" only when it is true: live, entries queued, and the top cannot run.
   const sum = live && state.queue.length > 0 && working === -1 ? 'waiting' : '';
   return (
-    <section className="queue" aria-label="queue">
-      <header className="chunk__head"><span>queue {'\u00b7'} {state.queue.length}</span><span>{sum}</span></header>
+    <Region name="queue" className="queue" title={`queue \u00b7 ${state.queue.length}`} note={<span>{sum}</span>}>
       {state.queue.map((e, i) => {
         const a = content.actions[e.actionId]!;
         const skill = skillOf(content, a.verb);
@@ -67,7 +67,7 @@ export function Queue({ state, content, working, live, dead = false, onRemove }:
             <button type="button" className="entry__x" aria-disabled={dead ? 'true' : undefined} aria-label={`remove ${name}`} onClick={() => press(e)}>{'\u00d7'}</button>
             <div className="entry__bar">
               {/* Ember while this entry is worked; grey otherwise, since nothing below the top moves. */}
-              <div className="bar" aria-hidden="true"><div className={`bar__fill${isWorking && live ? ' bar__fill--run' : ' bar__fill--wait'}`} style={{ width: `${pct}%` }} /></div>
+              <div className="bar" aria-hidden="true"><div key={state.completionCounts[a.id] ?? 0} className={`bar__fill${isWorking && live ? ' bar__fill--run' : ' bar__fill--wait'}`} style={{ width: `${pct}%` }} /></div>
               <div className="bar__value">{fraction(w.progress, a.expCost)}</div>
             </div>
             <div className="entry__sub">
@@ -87,6 +87,6 @@ export function Queue({ state, content, working, live, dead = false, onRemove }:
           </div>
         );
       })}
-    </section>
+    </Region>
   );
 }

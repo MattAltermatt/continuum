@@ -174,4 +174,24 @@ describe('SkillCell', () => {
       expect(total).toBe(`×${multiplier(fish, net).toFixed(2)}`);
     });
   });
+  it('a skill line glides as it earns and remounts on its reset: core on the level, run on the life and the level (spec 2026-09-24-screen-pass 4)', () => {
+    const base = newState(book.roster);
+    const at = (core: { level: number; exp: number }, run: { level: number; exp: number }, life = 1): GameState =>
+      ({ ...base, life, skills: { ...base.skills, fish: { core, run } } });
+    const fills = (c: HTMLElement) => [...c.querySelectorAll('.bar__fill')];
+    const props = { skill: fishDef, content: book, running: false, row: null };
+    const { container, rerender } = render(<SkillCell {...props} state={at({ level: 3, exp: 1 }, { level: 0, exp: 1 })} />);
+    const [core, run] = fills(container);
+    rerender(<SkillCell {...props} state={at({ level: 3, exp: 2 }, { level: 0, exp: 2 })} />);
+    expect(fills(container)[0]).toBe(core);
+    expect(fills(container)[1]).toBe(run);
+    rerender(<SkillCell {...props} state={at({ level: 4, exp: 0 }, { level: 0, exp: 2 })} />);
+    const levelled = fills(container)[0];
+    expect(levelled).not.toBe(core);
+    expect(fills(container)[1]).toBe(run);
+    // Death: the run ledger was still level 0 with some exp, and goes back to zero; the core survives.
+    rerender(<SkillCell {...props} state={at({ level: 4, exp: 0 }, { level: 0, exp: 0 }, 2)} />);
+    expect(fills(container)[0]).toBe(levelled);
+    expect(fills(container)[1]).not.toBe(run);
+  });
 });

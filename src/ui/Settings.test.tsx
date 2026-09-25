@@ -6,7 +6,7 @@ import { Settings } from './Settings';
 
 describe('Settings', () => {
   it('the gear opens and closes the panel; Escape and a click outside close it', async () => {
-    render(<Settings onErase={() => {}} speed={1} onSpeed={() => {}} dev={false} />);
+    render(<Settings onErase={() => {}} />);
     const gear = screen.getByRole('button', { name: 'settings' });
     expect(gear).toHaveAttribute('aria-expanded', 'false');
     await act(() => realClick(gear));
@@ -23,7 +23,7 @@ describe('Settings', () => {
   });
   it('erase save takes two presses: the first arms it, the second erases', async () => {
     const onErase = vi.fn();
-    render(<Settings onErase={onErase} speed={1} onSpeed={() => {}} dev={false} />);
+    render(<Settings onErase={onErase} />);
     await act(() => realClick(screen.getByRole('button', { name: 'settings' })));
     await act(() => realClick(screen.getByRole('button', { name: 'erase save' })));
     expect(onErase).not.toHaveBeenCalled();
@@ -35,7 +35,7 @@ describe('Settings', () => {
     vi.useFakeTimers();
     try {
       const onErase = vi.fn();
-      render(<Settings onErase={onErase} speed={1} onSpeed={() => {}} dev={false} />);
+      render(<Settings onErase={onErase} />);
       fireEvent.click(screen.getByRole('button', { name: 'settings' }));
       fireEvent.click(screen.getByRole('button', { name: 'erase save' }));
       expect(screen.getByRole('button', { name: 'press again to erase' })).toBeInTheDocument();
@@ -46,16 +46,8 @@ describe('Settings', () => {
       vi.useRealTimers();
     }
   });
-  it('a dev build shows the speed control and sets speed; a production build has none', async () => {
-    const onSpeed = vi.fn();
-    const { unmount } = render(<Settings onErase={() => {}} speed={1} onSpeed={onSpeed} dev={true} />);
-    await act(() => realClick(screen.getByRole('button', { name: 'settings' })));
-    const group = screen.getByRole('group', { name: 'speed' });
-    expect(group.querySelector('[aria-pressed="true"]')?.textContent).toBe('×1');
-    await act(() => realClick(screen.getByRole('button', { name: '×10' })));
-    expect(onSpeed).toHaveBeenCalledWith(10);
-    unmount();
-    render(<Settings onErase={() => {}} speed={1} onSpeed={onSpeed} dev={false} />);
+  it('holds no speed control: that is the debug overlay\'s (spec 2026-09-24-screen-pass 5.2)', async () => {
+    render(<Settings onErase={() => {}} />);
     await act(() => realClick(screen.getByRole('button', { name: 'settings' })));
     expect(screen.queryByRole('group', { name: 'speed' })).toBeNull();
   });

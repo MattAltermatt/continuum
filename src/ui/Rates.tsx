@@ -1,4 +1,5 @@
 import { MINUS, RISING } from './glyphs';
+import { Region } from './Region';
 
 /** Two decimals: the smallest decay shown is 0.10 hp/s. Display precision, not tuning. */
 const RATE_DECIMALS = 2;
@@ -22,7 +23,7 @@ export function Rates({ decay, ceiling, hurts = 0, hurtsBy = 'hurts', stopped }:
   const covered = ceiling >= decay + hurts;
   const hurting = hurts > 0;
   return (
-    <section className={`chunk rates${stopped ? ' rates--stopped' : ''}`} aria-label="rates">
+    <Region name="rates" className={`rates${stopped ? ' rates--stopped' : ''}`}>
       <div className="rates__kv">
         <span className="ink-2">decay</span><span className="rates__v hurt-text">{`${signed(-decay)} ${RISING}`}</span>
         <span className="ink-2">food, up to</span><span className={`rates__v ${covered ? 'rates__food--covers' : 'rates__food--short'}`}>{signed(ceiling)}</span>
@@ -30,6 +31,6 @@ export function Rates({ decay, ceiling, hurts = 0, hurtsBy = 'hurts', stopped }:
         <span className={`ink-2${hurting ? '' : ' rates__blank'}`} aria-hidden={hurting ? undefined : 'true'}>{hurting ? hurtsBy : '\u00A0'}</span>
         <span className={`rates__v hurt-text${hurting ? '' : ' rates__blank'}`} aria-hidden={hurting ? undefined : 'true'}>{hurting ? signed(-hurts) : '\u00A0'}</span>
       </div>
-    </section>
+    </Region>
   );
 }

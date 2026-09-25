@@ -1,18 +1,22 @@
 import { balance } from '../balance';
 import type { Content } from '../data/types';
 import { makersOf } from '../engine/automation';
-import { capOf } from '../engine/effects';
 import { feeding, foodsByHeal } from '../engine/health';
 import { count } from '../engine/inventory';
+import { ticksToSeconds } from '../engine/time';
 import type { GameState } from '../engine/types';
+import { duration } from './format';
+import { Region } from './Region';
 
 /**
  * Spec 8.6 and 2026-09-23-the-windward-run section 7: food is its own chunk
  * because it rides along when the ship casts off. Foods smallest heal first,
  * the order they are eaten in, so the rows never reorder (#45). A food shows
  * while there is some on hand or a row in this port can make it. Each: name,
- * one bite's heal, a cooldown bar that drains until it can be eaten again,
- * count/cap centered under it.
+ * one bite's heal, an ember cooldown bar that drains until it can be eaten
+ * again, and the countdown under it: "3.2s" while cooling, "ready" when a
+ * bite can land, a dimmed "none" when nothing is feeding. Food is timing only
+ * here; the pack carries the stack (spec 2026-09-24-screen-pass section 3).
  */
 export function Food({ state, content }: { state: GameState; content: Content }) {
   const foods = foodsByHeal(content);
@@ -20,25 +24,23 @@ export function Food({ state, content }: { state: GameState; content: Content })
   // Loud only when nothing is feeding the player: eaten-as-it-lands is not starving (plan Revision 3).
   const starving = foods.length > 0 && foods.every((it) => !feeding(state, it.id));
   return (
-    <section className="chunk food" aria-label="food">
-      <header className="chunk__head"><span>food</span>{starving && <span className="hurt-text">nothing to eat</span>}</header>
+    <Region name="food" className="food" note={starving ? <span className="hurt-text">nothing to eat</span> : undefined}>
       {shown.map((it) => {
-        const have = count(state.inventory, it.id);
-        const cap = capOf(state, content, it.id);
-        const full = have >= cap;
-        const cooling = (state.foodCooldowns[it.id] ?? 0) / balance.health.foodCooldownTicks;
-        const cls = !feeding(state, it.id) ? ' food__item--empty' : full ? ' food__item--full' : '';
+        const left = state.foodCooldowns[it.id] ?? 0;
+        const cooling = left / balance.health.foodCooldownTicks;
+        const none = !feeding(state, it.id);
+        const word = left > 0 ? duration(ticksToSeconds(left)) : none ? 'none' : 'ready';
         return (
-          <div key={it.id} data-item={it.id} className={`item food__item${cls}`}>
+          <div key={it.id} data-item={it.id} className={`item food__item${none ? ' food__item--none' : ''}`}>
             <span>{it.name}</span>
             <span>+{it.healPerUnit} hp</span>
             <div className="food__cooldown">
-              <div className="bar" aria-hidden="true"><div className="bar__fill" style={{ width: `${cooling * 100}%` }} /></div>
-              <div className="bar__value">{have}/{cap}</div>
+              <div className="bar" aria-hidden="true"><div key={state.life} className="bar__fill bar__fill--run" style={{ width: `${cooling * 100}%` }} /></div>
+              <div className="bar__value">{word}</div>
             </div>
           </div>
         );
       })}
-    </section>
+    </Region>
   );
 }

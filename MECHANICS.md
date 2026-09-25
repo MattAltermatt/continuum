@@ -18,7 +18,9 @@ over to automation.
 
 The simulation advances on a fixed interval. Everything — progress, decay, XP,
 eating, death — happens on tick boundaries. Nothing is frame-dependent and
-nothing interpolates.
+nothing interpolates. (The display may glide a bar from one tick's value to
+the next over one tick's length, in CSS; no state value is ever interpolated,
+and a reset jumps.)
 
 ```
 TICK_INTERVAL_MS = 100      // 10 ticks per second of real time

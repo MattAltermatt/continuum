@@ -9,7 +9,7 @@ import type { AutoMode, GameState } from '../engine/types';
 import type { Book } from '../data/types';
 import { pagedTestBook as paged, testBook as book } from '../test-utils/book';
 import { realClick } from '../test-utils/realClick';
-import { ActionRow, outputsOf } from './ActionRow';
+import { ActionRow, FADE_MS, INSTRUCTION_MS, outputsOf } from './ActionRow';
 import { STOP, WARN } from './glyphs';
 
 const N = balance.automation.unlockRepeatable;
@@ -78,15 +78,25 @@ describe('ActionRow: what the row reads', () => {
     row(past({ ...fresh(), inventory: { pass: 1 } }), 'raid');
     expect(screen.getByText('needs a pass')).not.toHaveClass('need--unmet');
   });
-  it('an input part spent reads what is still owed; short of it, a warning and what the pack has', () => {
+  it('an input part spent reads what is still owed; short of it, a warning and what the pack has, quiet when the page makes it', () => {
     const kept = { ...fresh(), work: { hull: { progress: 5, costsConsumed: 5 } } };
+    // Salvage is on the page: play pulls it (spec 2026-09-24-pages 4.3), so the shortfall reads in the quiet colour.
     const r = row({ ...kept, inventory: { scrap: 1 } }, 'hull');
     const owed = r.el().querySelector('.row__in > span')!;
-    expect(owed).toHaveClass('row__short');
+    expect(owed).toHaveClass('row__short--quiet');
+    expect(owed).not.toHaveClass('row__short');
     expect(owed).toHaveTextContent(`${WARN} 3 of 8 scrap have 1`);
     r.unmount();
+    // Nothing on the page makes scrap: the shortfall is a warning.
+    const bare = row({ ...kept, inventory: { scrap: 1 } }, 'hull', false, unsalvaged);
+    const warned = bare.el().querySelector('.row__in > span')!;
+    expect(warned).toHaveClass('row__short');
+    expect(warned).not.toHaveClass('row__short--quiet');
+    expect(warned).toHaveTextContent(`${WARN} 3 of 8 scrap have 1`);
+    bare.unmount();
     const paid = row({ ...kept, inventory: { scrap: 3 } }, 'hull');
     expect(paid.el().querySelector('.row__in > span')).not.toHaveClass('row__short');
+    expect(paid.el().querySelector('.row__in > span')).not.toHaveClass('row__short--quiet');
     expect(paid.el().querySelector('.row__in > span')!.textContent).toBe('3 of 8 scrap');
   });
   it('the output: +n for a harvest, a made thing by name, the effect for a one-time, casts off, the end', () => {
@@ -228,6 +238,19 @@ describe('ActionRow: the instruction holds, then fades', () => {
     r.rerenderWith({ ...fresh(), inventory: { scrap: 5 } });
     expect(r.el().querySelector('.row__say')).toHaveTextContent('nothing here makes scrap');
   });
+  it('the words fade over the hold\'s last FADE_MS, then go', () => {
+    const r = row(fresh(), 'hull', false, unsalvaged);
+    act(() => { play().click(); });
+    expect(r.el().querySelector('.row__say')).not.toHaveClass('row__say--fading');
+    // Not a millisecond early: a fade that started at once would leave the row an empty box for most of the hold.
+    act(() => { vi.advanceTimersByTime(INSTRUCTION_MS - FADE_MS - 1); });
+    expect(r.el().querySelector('.row__say')).not.toHaveClass('row__say--fading');
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(r.el().querySelector('.row__say')).toHaveClass('row__say--fading');
+    expect(r.el().querySelector('.row__say')).toHaveTextContent('nothing here makes scrap');
+    act(() => { vi.advanceTimersByTime(FADE_MS); });
+    expect(r.el().querySelector('.row__say')).toBeNull();
+  });
   it('no instruction when play succeeds', () => {
     const r = row(fresh(), 'fish');
     act(() => { play().click(); });
@@ -316,10 +339,11 @@ describe('ActionRow: the automation chip', () => {
 });
 
 describe('ActionRow: pages (spec 2026-09-24-pages)', () => {
-  it('the tag: the end for the finish, casts off for a chapter\'s last closer, turns the page for any other closer', () => {
+  it('the tag: the end for the finish, casts off for a chapter\'s last closer, turns the page for any other closer, after what it makes', () => {
     expect(outputsOf(paged, paged.actions.vault!)).toEqual(['the end']);
     expect(outputsOf(paged, paged.actions.raid!)).toEqual(['casts off']);
-    expect(outputsOf(paged, paged.actions.gate!)).toEqual(['turns the page']);
+    // A closer lists what it makes first, then the tag.
+    expect(outputsOf(paged, paged.actions.gate!)).toEqual(['a pass', 'turns the page']);
     // Not a closer: what it makes, as before.
     expect(outputsOf(paged, paged.actions.satchel!)).toEqual(['stack +5']);
   });

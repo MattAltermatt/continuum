@@ -10,14 +10,18 @@ import { countdown, fraction } from './format';
 import { ICONS } from './icons';
 import { multiplierText, SkillLedger } from './SkillLedger';
 
-function Line({ ledger, baseExp, running, perSecond, runFill }: { ledger: Ledger; baseExp: number; running: boolean; perSecond: number; runFill: boolean }) {
+function Line({ ledger, baseExp, running, perSecond, runFill, resetKey }: {
+  ledger: Ledger; baseExp: number; running: boolean; perSecond: number; runFill: boolean;
+  /** Changes exactly when the ledger resets, so the fill remounts and jumps rather than sliding back (spec 2026-09-24-screen-pass 4). */
+  resetKey: string | number;
+}) {
   const cost = expToNextLevel(baseExp, ledger.level);
   const pct = Math.min(100, (ledger.exp / cost) * 100);
   return (
     <>
       <div className="skill__lv">Lv {ledger.level}</div>
       <div>
-        <div className="bar" aria-hidden="true"><div className={`bar__fill${runFill ? ' bar__fill--run' : ''}`} style={{ width: `${pct}%` }} /></div>
+        <div className="bar" aria-hidden="true"><div key={resetKey} className={`bar__fill${runFill ? ' bar__fill--run' : ''}`} style={{ width: `${pct}%` }} /></div>
         <div className="bar__value">
           {fraction(ledger.exp, cost)}
           {running && <b>↑ {countdown((cost - ledger.exp) / perSecond)}</b>}
@@ -105,8 +109,8 @@ export function SkillCell({ skill, content, state, running, row }: {
           <span className="skill__mult">{multiplierText(s, gear)}</span>
           {running && <span className="visually-hidden">running</span>}
         </div>
-        <Line ledger={s.core} baseExp={balance.skills.coreMastery.baseExp} running={running} perSecond={perSecond} runFill={false} />
-        <Line ledger={s.run} baseExp={balance.skills.runMastery.baseExp} running={running} perSecond={perSecond} runFill={true} />
+        <Line ledger={s.core} baseExp={balance.skills.coreMastery.baseExp} running={running} perSecond={perSecond} runFill={false} resetKey={s.core.level} />
+        <Line ledger={s.run} baseExp={balance.skills.runMastery.baseExp} running={running} perSecond={perSecond} runFill={true} resetKey={`${state.life}:${s.run.level}`} />
       </div>
       {open !== null && (
         <SkillLedger id={ledgerId} skill={skill} content={content} state={state} running={running} row={row} hover={open === 'hover'} />

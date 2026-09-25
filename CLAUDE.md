@@ -261,15 +261,22 @@ unsubscribed event) ship without asking.
   under `src/engine/`.
 - **Ten additions of `0.1` are `0.9999…`.** A test that counts ticks to a
   completion uses `floor(expCost / baseTickExp) + 1`, not `ceil`.
-- **The layout folds rather than scrolls, down to 732px.** The skills band's
-  cells are a fixed 360px and wrap by window width (mockup
-  2026-09-23-wrapping-band). Below 1280 the queue moves into the second
+- **The layout folds rather than scrolls, down to 732px.** One content
+  width, capped at 1600px and centred (spec 2026-09-24-screen-pass); every
+  region is a box with its heading inside (`src/ui/Region.tsx`, mockup
+  2026-09-24-regions treatment A), health alone on top and the clock, gear
+  and pause in a bottom bar, both sticky. The skills band's cells are at
+  least 360px and stretch to fill the band, wrapping by window width (three
+  at 1280, four under the cap). Below 1280 the queue moves into the second
   column *above* the middle one (the middle grows as the log fills; above it,
   the queue's buttons stay put); below 1020 the chapter takes the full width
   with middle and queue side by side under it (`src/styles.css`, two
   `@container` queries on `.screen`, which measure the content box so a
-  classic scrollbar cannot tip a breakpoint; mockup 2026-09-23-fold). The floor is the action row, which cannot shrink below
-  712px; under 732 (747 where scrollbars are classic 15px ones, whose gutter
+  classic scrollbar cannot tip a breakpoint; mockup 2026-09-23-fold). The
+  floor is the action row, which cannot shrink below 712px: the chapter's
+  rows sit flush in their frame with no side borders of their own, so the
+  frame's two border pixels are part of that 712 and the tiers keep their
+  numbers; under 732 (747 where scrollbars are classic 15px ones, whose gutter
   `scrollbar-gutter: stable` keeps reserved so a long queue growing the page
   never shifts it) the page scrolls sideways. A phone layout is #62.
 - **`step()` returns the same object when nothing happened.** React skips
@@ -279,8 +286,18 @@ unsubscribed event) ship without asking.
   with a type the reducer does not know (`'enqueue'` instead of `'queue'`) now
   leaves the game as it is (#67), so a typo fails quietly: read the union in
   `src/state/useGame.ts` (`queue` with `front`/`once`, `remove` with `entryId`,
-  `automate`, `tick` with `n`, `reset`, `load`). The handle also has
-  `step(n)`, `speed(n)`, `save()`, `load()` and `erase()`.
+  `automate`, `tick` with `n`, `reset`, `load`, and the dev-only `setHealth`,
+  `setSkill`, `setItem`, `earnChips` and `die`). The handle also has
+  `step(n)`, `speed(n)`, `save()`, `load()` and `erase()`. **The backtick
+  opens the debug overlay** (`src/ui/Debug.tsx`, dev builds only, a portal on
+  `document.body`) with the same actions as buttons and inputs; `setHealth`
+  to 0 is not a death (death is the tick's decay), `die` is.
+- **Every bar glides one tick and a reset jumps.** `.bar__fill` transitions
+  its width over `--tick` (set on `<main>` from `balance.time.tickIntervalMs`);
+  a fill that resets to zero is keyed on the counter whose change is the
+  reset (a ledger's level, a row's completion count, the life, the chapter),
+  so it remounts and does not slide backwards. A new bar needs its key, or
+  a level-up slides down for one tick.
 - **The game saves itself.** Key `continuum.save` in local storage, every few
   seconds and on hide; a save it cannot load is set aside under
   `continuum.save.aside` (the newest three) and a fresh run starts. Clear it

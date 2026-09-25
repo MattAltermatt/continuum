@@ -1,5 +1,6 @@
 import type { Content, SkillId } from '../data/types';
 import type { GameState } from '../engine/types';
+import { Region } from './Region';
 import { SkillCell } from './SkillCell';
 
 /**
@@ -14,11 +15,11 @@ export function SkillsBand({ content, state, runningSkill }: {
   const top = state.queue[0] === undefined ? undefined : content.actions[state.queue[0].actionId];
   const row = top !== undefined && top.verb === runningSkill ? top : null;
   return (
-    <section className="skills" aria-label="skills">
+    <Region name="skills" className="skills">
       {content.roster.map((s) => {
         const running = s.id === runningSkill;
         return <SkillCell key={s.id} skill={s} content={content} state={state} running={running} row={running ? row : null} />;
       })}
-    </section>
+    </Region>
   );
 }

@@ -3,12 +3,12 @@ import { ticksToSeconds } from '../engine/time';
 import type { LogLine } from '../state/useGame';
 import { clock } from './format';
 import { narrate } from './narrate';
+import { Region } from './Region';
 
 /** The log chunk: newest first, and the screen's live region (spec 8.1, 8.6). */
 export function Log({ lines, content }: { lines: readonly LogLine[]; content: Content }) {
   return (
-    <section className="chunk log" aria-label="log" aria-live="polite">
-      <header className="chunk__head"><span>log</span></header>
+    <Region name="log" className="log" live>
       <ul className="log__list">
         {lines.map((l) => {
           const n = narrate(l.event, content);
@@ -20,6 +20,6 @@ export function Log({ lines, content }: { lines: readonly LogLine[]; content: Co
           );
         })}
       </ul>
-    </section>
+    </Region>
   );
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { balance } from '../balance';
 import { windwardRun } from '../data/windward-run';
 import { built } from '../engine/fixture';
@@ -21,6 +21,17 @@ describe('App', () => {
     for (const name of ['health', 'skills', 'chapter', 'queue', 'rates', 'food', 'pack', 'log']) {
       expect(screen.getByLabelText(name)).toBeInTheDocument();
     }
+  });
+  it('every region is a box whose heading starts with its name; the chapter\'s is the book\'s; health has none (spec 2026-09-24-screen-pass 2.4)', () => {
+    render(<App />);
+    for (const name of ['skills', 'queue', 'rates', 'food', 'pack', 'log']) {
+      const region = screen.getByLabelText(name);
+      expect(region, name).toHaveClass('region');
+      expect(region.querySelector('.region__head'), name).toHaveTextContent(new RegExp(`^${name}`));
+    }
+    expect(screen.getByLabelText('chapter').querySelector('.region__head')).toHaveTextContent(/^The Windward Run/);
+    expect(screen.getByLabelText('health')).toHaveClass('region');
+    expect(screen.getByLabelText('health').querySelector('.region__head')).toBeNull();
   });
   it('starts live, idle, with a pause control and the run clock at zero', () => {
     render(<App />);
@@ -89,15 +100,13 @@ describe('App', () => {
     act(() => window.continuum!.dispatch({ type: 'queue', actionId: 'fish', front: true }));
     expect(container.querySelector('.entry--on')).toHaveTextContent('the cloud shallows');
   });
-  it('the dev handle sets only an offered speed', () => {
-    render(<App />);
-    const handle = window.continuum!;
-    act(() => { screen.getByRole('button', { name: 'settings' }).click(); });
-    const pressed = () => screen.getAllByRole('button', { pressed: true }).map((b) => b.textContent);
-    act(() => handle.speed(7));
-    expect(pressed()).toEqual(['\u00D71']);
-    act(() => handle.speed(10));
-    expect(pressed()).toEqual(['\u00D710']);
+  it('the bottom bar holds the gear, the run clock and pause; nothing is left of the corner', () => {
+    const { container } = render(<App />);
+    const bar = screen.getByLabelText('bottom bar');
+    expect(bar).toBe(container.querySelector('main > .inert-wrap > footer'));
+    expect([...bar.querySelectorAll('button, [role="timer"]')].map((el) => el.getAttribute('aria-label'))).toEqual(['settings', 'run clock', 'pause']);
+    expect(container.querySelector('.corner')).toBeNull();
+    expect(container.querySelector('.top')?.children).toHaveLength(1);
   });
   it('death: the card is up over the chapter, every chunk behind it is inert, and Begin starts life 2', () => {
     const { container } = render(<App />);
@@ -116,7 +125,7 @@ describe('App', () => {
     expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('00:00');
     expect(container.querySelector('.health__value')).toHaveTextContent('100.0 / 100.0');
     expect(screen.getByLabelText('queue')).toHaveTextContent('queue \u00B7 0');
-    expect(screen.getByLabelText('food')).toHaveTextContent(`0/${balance.inventory.stackCap}`);
+    expect(screen.getByLabelText('food').querySelector('[data-item="cloud-fish"] .bar__value')).toHaveTextContent(/^none$/);
     expect(container.querySelector('.rates__food--short')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'add to queue: Fish the cloud shallows' })).not.toHaveAttribute('aria-disabled');
     expect(screen.queryByRole('button', { name: /^(pause|resume)$/ })).toBeNull();   // no corner control behind the card
@@ -187,5 +196,17 @@ describe('App', () => {
     expect(container.querySelector('.rates__food--covers')).toHaveTextContent(`+${fishCeiling} hp/s`);
     expect(container.querySelector('.rates')).not.toHaveClass('rates--stopped');
     expect(screen.getByLabelText('rates')).toHaveTextContent('\u22120.10 hp/s \u25B2');   // decay is wired, not only its color
+  });
+  it('the debug overlay opens on the backquote and its speed group follows the game\'s speed (spec 2026-09-24-screen-pass 5)', () => {
+    render(<App />);
+    expect(screen.queryByRole('dialog', { name: 'debug' })).toBeNull();
+    act(() => { fireEvent.keyDown(document, { code: 'Backquote' }); });
+    act(() => window.continuum!.speed(10));
+    const group = screen.getByRole('group', { name: 'speed' });
+    const pressed = () => Array.from(group.querySelectorAll('[aria-pressed="true"]')).map((b) => b.textContent);
+    expect(pressed()).toEqual(['\u00D710']);
+    // The overlay's own press reaches the hook: App wires onSpeed to setSpeed.
+    act(() => { screen.getByRole('button', { name: '\u00D7100' }).click(); });
+    expect(pressed()).toEqual(['\u00D7100']);
   });
 });

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEV_SPEEDS } from '../state/useGame';
 import { GearIcon } from './icons';
 
 /**
@@ -11,12 +10,12 @@ const ARM_MS = 3000;
 
 /**
  * The gear and what it opens (spec 2026-09-23-the-windward-run section 10,
- * mockup 2026-09-23-settings): one entry, erase save, which takes two presses;
- * in a dev build only, a speed control. Escape and a click outside close it.
+ * mockup 2026-09-23-settings): one entry, erase save, which takes two presses.
+ * Production-only since the screen pass (spec 2026-09-24-screen-pass 5.2):
+ * the dev speed control lives in the debug overlay. Escape and a click
+ * outside close it.
  */
-export function Settings({ onErase, speed, onSpeed, dev }: {
-  onErase: () => void; speed: number; onSpeed: (n: number) => void; dev: boolean;
-}) {
+export function Settings({ onErase }: { onErase: () => void }) {
   const [open, setOpen] = useState(false);
   const [armed, setArmed] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -54,17 +53,6 @@ export function Settings({ onErase, speed, onSpeed, dev }: {
           <button type="button" className={`settings__btn${armed ? ' settings__btn--armed' : ''}`} onClick={erase}>
             {armed ? 'press again to erase' : 'erase save'}
           </button>
-          {dev && (
-            <>
-              <div className="settings__rule" />
-              <h5 className="settings__head"><span>speed</span><span className="settings__dev">dev build</span></h5>
-              <div className="settings__seg" role="group" aria-label="speed">
-                {DEV_SPEEDS.map((n) => (
-                  <button key={n} type="button" aria-pressed={speed === n} onClick={() => onSpeed(n)}>{`×${n}`}</button>
-                ))}
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>

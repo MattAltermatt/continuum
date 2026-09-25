@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { skillOf } from '../data/roster';
 import type { ActionDefinition, ActionId, Content } from '../data/types';
-import { isUnlocked, modeOf, nextMode, unlockAt } from '../engine/automation';
+import { isUnlocked, makersOf, modeOf, nextMode, unlockAt } from '../engine/automation';
 import { gearMultiplier } from '../engine/effects';
 import { count } from '../engine/inventory';
 import { playBlock } from '../engine/fight';
@@ -20,7 +20,15 @@ import { itemName, needPhrase, rowName, words } from './words';
  * seconds"). Presentation timing, not a gameplay value; kept out of balance.ts
  * on the same reasoning as MS_PER_SECOND in src/engine/time.ts.
  */
-const INSTRUCTION_MS = 3000;
+export const INSTRUCTION_MS = 3000;
+
+/**
+ * How long the click instruction takes to fade out, at the end of its hold
+ * (spec 2026-09-24-screen-pass section 6). Presentation timing, not a gameplay
+ * value; kept out of balance.ts on the same reasoning as MS_PER_SECOND in
+ * src/engine/time.ts. App sets it as --fade for the stylesheet's transition.
+ */
+export const FADE_MS = 400;
 
 /** Effects and hurts read to two decimals: a decay factor of 0.80, a hurt of 0.30 hp/s. Display precision, not tuning. */
 const FACTOR_DECIMALS = 2;
@@ -31,15 +39,14 @@ export function modeWord(mode: AutoMode): string {
 }
 
 /**
- * What the row gives, on the right of the arrow (09-22 section 8.4): the
- * book's end, a port's casting off, any other page's turning (spec
- * 2026-09-24-pages), then what it makes (a harvest as "+1
- * scrap", a made thing by its name) and the effects a one-time leaves.
+ * What the row gives, on the right of the arrow (09-22 section 8.4): what it
+ * makes (a harvest as "+1 scrap", a made thing by its name) and the effects a
+ * one-time leaves, then a closer's tag, a port's casting off or any other
+ * page's turning (spec 2026-09-24-pages; spec 2026-09-24-screen-pass section
+ * 6: the tag no longer hides the makes). The book's end reads alone.
  */
 export function outputsOf(content: Content, action: ActionDefinition): readonly string[] {
   if (action.id === content.finish) return ['the end'];
-  if (content.chapters.some((ch) => eventOf(ch) === action.id)) return ['casts off'];
-  if (content.chapters.some((ch) => ch.pages.some((p) => p.closes === action.id))) return ['turns the page'];
   const out: string[] = [];
   if (action.producedItem !== undefined) {
     const harvest = !action.isOneTime && action.itemCosts.length === 0;
@@ -49,6 +56,8 @@ export function outputsOf(content: Content, action: ActionDefinition): readonly 
   if (action.healthDecayMultiplier !== undefined) out.push(`decay \u00D7${action.healthDecayMultiplier.toFixed(FACTOR_DECIMALS)}`);
   if (action.capacityBonus !== undefined) out.push(`stack +${action.capacityBonus}`);
   if (action.gear !== undefined) out.push(`${skillOf(content, action.gear.skill).name} \u00D7${action.gear.multiplier.toFixed(FACTOR_DECIMALS)}`);
+  if (content.chapters.some((ch) => eventOf(ch) === action.id)) out.push('casts off');
+  else if (content.chapters.some((ch) => ch.pages.some((p) => p.closes === action.id))) out.push('turns the page');
   return out;
 }
 
@@ -70,10 +79,15 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
   // A snapshot taken at the click: it holds for INSTRUCTION_MS whatever lands meanwhile. A new object per press restarts the hold.
   const [instruction, setInstruction] = useState<{ readonly text: string } | null>(null);
   const [refused, setRefused] = useState(false);
+  // The hold's last FADE_MS: the words fade out (--fade in the stylesheet) before they go. Keyed to the snapshot, so a
+  // new press, a new object, starts unfaded.
+  const [fadingFor, setFadingFor] = useState<object | null>(null);
+  const fading = instruction !== null && fadingFor === instruction;
   useEffect(() => {
     if (instruction === null) return;
-    const id = setTimeout(() => { setInstruction(null); setRefused(false); }, INSTRUCTION_MS);
-    return () => clearTimeout(id);
+    const fade = setTimeout(() => setFadingFor(instruction), INSTRUCTION_MS - FADE_MS);
+    const id = setTimeout(() => { setInstruction(null); setRefused(false); setFadingFor(null); }, INSTRUCTION_MS);
+    return () => { clearTimeout(fade); clearTimeout(id); };
   }, [instruction]);
 
   // A completed one-time row stays where it was, marked built, so no row below it moves up.
@@ -138,7 +152,7 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
         {built ? (
           <div className="row__say row__built">built</div>
         ) : say !== null ? (
-          <div className={`row__say${instruction === null ? ' row__say--waits' : ''}`} title={say}>{say}</div>
+          <div className={`row__say${instruction === null ? ' row__say--waits' : ''}${fading ? ' row__say--fading' : ''}`} title={say}>{say}</div>
         ) : (
           <>
             <div className="row__in">
@@ -151,10 +165,13 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
                 const owed = stillOwed(action, w, c.item);
                 const have = count(state.inventory, c.item);
                 const short = have < owed;
+                // A shortfall a row on the page makes reads quiet, not red: play pulls that row (spec 2026-09-24-pages 4.3),
+                // by the engine's own rule, the test frontBlock makes.
+                const quiet = short && makersOf(state, content, c.item).some((m) => m.id !== action.id);
                 // Once part is spent the row owes the rest: "3 of 8 scrap".
                 const amount = owed < c.amount ? `${owed} of ${c.amount}` : `${c.amount}`;
                 return (
-                  <span key={c.item} className={short ? 'row__short' : undefined}>
+                  <span key={c.item} className={quiet ? 'row__short--quiet' : short ? 'row__short' : undefined}>
                     {short && `${WARN} `}{amount} {itemName(content, c.item, c.amount)}{short && <small> have {have}</small>}
                   </span>
                 );

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Regions: A inside, B outside</title>
+<style>
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+/* A long queue can grow the page past the window; the gutter is kept either way, so a classic scrollbar appearing never moves the page under the cursor. */
+html {
+  scrollbar-gutter: stable;
+}
+
+
+:root {
+  --bg: oklch(20% 0.012 260);
+  --cell: oklch(24% 0.012 260);
+  --item: oklch(22% 0.012 260);
+  --cell-on: oklch(30% 0.02 260);
+  --edge: oklch(34% 0.012 260);
+  --edge-on: oklch(62% 0.06 260);
+  --track: oklch(17% 0.012 260);
+  --track-edge: oklch(55% 0.012 260);
+  --ink: oklch(90% 0.01 80);
+  --ink-2: oklch(80% 0.01 80);
+  --core: oklch(84% 0.02 80);
+  --run: oklch(70% 0.16 45);
+  --hurt: oklch(66% 0.18 25);
+  --hurt-text: oklch(70% 0.18 25);
+  --warn: oklch(80% 0.15 85);
+  --auto: oklch(72% 0.10 235);
+  --good: oklch(78% 0.12 150);
+  --mono: ui-monospace, Menlo, monospace;
+  --serif: Georgia, "Times New Roman", serif;
+  --bar: 8px;
+  --bar-working: 12px;
+  --bar-health: 20px;
+  --control: 24px;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-size: 12px; }
+:focus-visible { outline: 2px solid var(--edge-on); outline-offset: 2px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.bar { height: var(--bar); border: 1px solid var(--track-edge); border-radius: 3px; background: var(--track); position: relative; overflow: hidden; }
+.bar__fill { position: absolute; inset: 0 auto 0 0; background: var(--core); }
+.bar__fill--run { background: var(--run); }
+.bar__fill--hp { background: var(--hurt); }
+.bar__fill--warn { background: var(--warn); }
+.bar__fill--wait { background: var(--track-edge); }
+.bar__value { font-size: 10px; text-align: center; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
+.bar__value b { color: var(--ink); font-weight: 400; margin-left: 4px; }
+
+.chunk { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; }
+.chunk__head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 4px; }
+.item { border: 1px solid var(--edge); background: var(--item); border-radius: 4px; }
+
+/* After .item on purpose, and scoped to it: .item's border shorthand would otherwise reset the ember colour. */
+.item.working { position: relative; overflow: hidden; border-color: var(--run); }
+@keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.item.working::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--run) 12%, transparent), transparent); animation: sheen 2.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .item.working::after { display: none; } }
+
+.health .bar { height: var(--bar-health); }
+.health__value { text-align: center; font-weight: 700; font-size: 14px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.health__value small { font-weight: 400; color: var(--ink-2); }
+
+/* Fixed-width cells that wrap by window width; the player's window decides how many per row (mockup 2026-09-23-wrapping-band). */
+.skills { display: grid; grid-template-columns: repeat(auto-fill, 360px); gap: 4px; }
+.skill { display: grid; grid-template-columns: 1.4em 4.5em 3em 1fr; gap: 3px 6px; align-items: center; padding: 5px 7px; }
+.skill--on { background: var(--cell-on); }
+.skill__icon, .skill__name { grid-row: span 2; }
+.skill__icon svg { width: 15px; height: 15px; display: block; }
+.skill__name b { display: block; font-weight: 700; }
+.skill__mult { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.skill--on .skill__mult { color: var(--ink); font-weight: 700; }
+.skill__lv { text-align: right; white-space: nowrap; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.skill--on .skill__lv { color: var(--ink); }
+
+.chapter { display: grid; gap: 5px; align-content: start; }
+.head { padding: 6px 8px 8px; }
+.head__line { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.head__story { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
+/* The name column keeps the 24-character budget for skill plus noun (09-22 8.1), "Fight the harbor pirates". */
+.row { display: grid; grid-template-columns: calc(1.6em + 8px + 24ch) minmax(0, 1fr) auto; gap: 0 10px; align-items: center; padding: 6px 8px; }
+.row--on { background: var(--cell-on); }
+.row__c1 { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); gap: 0 8px; align-items: center; white-space: nowrap; }
+.row__c1 > span { overflow: hidden; text-overflow: ellipsis; }
+.row__c1 svg { width: 15px; height: 15px; }
+/* The space between verb and noun is a real character (a screen reader reads "Fight the harbor pirates"), so no margin: 24 characters are 24ch. */
+.row__c1 b { font-weight: 700; }
+/* The middle chunk stacks (09-22 8.4): needs on their own line above the inputs, one input per line, so every row
+   fits the chapter column, which is 712px at the 732px floor and 714px at 1280 (plan Task 7; mockup
+   2026-09-23-queue-orders frame d). Every row reserves three lines of the words at their own size, so no row changes
+   height when an instruction or a waiting look comes or goes, and nothing below it moves under the cursor. */
+.row__c2 { display: grid; grid-template-columns: minmax(0, 1fr) 1.2em 14ch; gap: 0 6px; align-items: center; min-height: calc(3 * 1.15 * 11px); }
+.row__in { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
+.row__in > span { white-space: nowrap; }
+.row__needs { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 4px; }
+.need { border: 1px solid var(--edge); border-radius: 3px; padding: 0 5px; font-size: 11px; color: var(--ink); white-space: nowrap; }
+.need--unmet { border-color: var(--hurt); color: var(--hurt-text); }
+.row__short { color: var(--warn); }
+.row__short small { color: var(--ink-2); margin-left: 6px; font-size: 11px; }
+.row__arr { color: var(--edge-on); text-align: center; }
+.row__out { display: flex; flex-direction: column; white-space: nowrap; }
+.row__say { grid-column: 1 / -1; text-align: center; color: var(--warn); font-size: 11px; line-height: 1.15;
+  overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+.row__c3 { display: grid; grid-template-columns: 5em var(--control) var(--control) auto; gap: 0 8px; align-items: center; justify-items: end; }
+.row__tx { text-align: right; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row__tx small { display: block; color: var(--ink-2); font-size: 10px; }
+.btn { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
+.btn--play { color: var(--run); }
+.btn--stop { background: var(--run); color: var(--bg); cursor: default; }   /* keeps --edge-on: still a focusable control (spec 8.1) */
+/* The refusal (#43, spec 2.5): one red flash on the row and its play button. The class comes off on animationend. */
+@keyframes refuse { from { border-color: var(--hurt); box-shadow: 0 0 0 2px var(--hurt); background: color-mix(in oklch, var(--hurt) 12%, var(--item)); } }
+@keyframes refuse-play { from { background: var(--hurt); color: var(--bg); border-color: var(--hurt); } }
+.row--refused { animation: refuse 700ms ease-out; }
+.row--refused .btn--play { animation: refuse-play 700ms ease-out; }
+/* Pinned to fit "199/200" (spec 8.1): seven characters at the chip's own 9px, plus padding and borders. The mode word
+   is an 11px child, so the box keeps the 9px width in every look and nothing moves when a chip is earned. */
+.auto { width: calc(7ch + 8px); height: var(--control); border: 1px solid var(--edge); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); font-family: var(--mono); font-size: 9px; position: relative; overflow: hidden; box-sizing: border-box; padding: 0; background: transparent; font-variant-numeric: tabular-nums; }
+.auto i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--auto); }
+.auto--btn { border-color: var(--edge-on); cursor: pointer; }
+.auto--btn b { font-size: 11px; font-weight: 400; }
+.auto--lit { border-color: var(--auto); color: var(--auto); }
+.auto--lit b { font-weight: 700; }
+/* Set, but its row cannot start: the stall's dashed look (09-22 8.5). */
+.auto--waits { border-style: dashed; }
+.auto--btn[aria-disabled="true"] { opacity: .7; cursor: default; }
+
+/* The floor is the action row, which cannot shrink below 712px, plus the page padding. Below it the page scrolls sideways; a phone layout is #62. */
+.screen { display: grid; gap: 8px; padding: 10px; min-width: 732px; container-type: inline-size; }
+.top { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.corner { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; font-size: 10px; color: var(--ink-2); gap: 4px; width: 14ch; }   /* pinned: "00:00 waiting" must not resize the health bar */
+.settings { position: relative; }
+.settings__gear { display: grid; place-items: center; padding: 0; }
+.settings__gear svg { width: 14px; height: 14px; }
+/* The panel's width is fixed, so "erase save" and "press again to erase" swap in one box and nothing moves (spec 8.1). */
+.settings__panel { position: absolute; right: 0; top: calc(var(--control) + 4px); z-index: 5; width: 22ch; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--cell); border: 1px solid var(--edge-on); border-radius: 6px; box-shadow: 0 8px 24px #0008; text-align: left; }
+.settings__head { margin: 0; display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); font-weight: 400; }
+.settings__dev { letter-spacing: 0; text-transform: none; color: var(--auto); }
+.settings__btn { min-height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.settings__btn--armed { color: var(--hurt-text); border-color: var(--hurt-text); }
+.settings__rule { border-top: 1px solid var(--edge); }
+.settings__seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.settings__seg button { min-height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.settings__seg button[aria-pressed="true"] { background: var(--core); color: var(--bg); }
+.corner__clock { font-variant-numeric: tabular-nums; color: var(--ink); }
+.corner__clock--dim { color: var(--ink-2); }
+.columns { display: grid; grid-template-columns: 1fr 250px 280px; gap: 8px; align-items: start; }
+.middle { display: grid; gap: 8px; }
+.queue { display: grid; gap: 5px; align-content: start; }
+/* Narrower windows fold the columns rather than scroll (2026-09-23). Container queries on .screen measure the content box, so a classic scrollbar cannot push the page a few pixels past a breakpoint. 1258 = chapter floor 712 + 250 + 280 + two 8px gaps; 1000 = 712 + 280 + one gap. Below 1258 the queue sits in the second column above the middle one: the middle grows as the log fills, the queue grows at its own bottom, so the queue's buttons never move under the cursor. Below 1000 the chapter takes the full width and queue and middle sit side by side under it. */
+@container (max-width: 1257px) {
+  .columns { grid-template-columns: 1fr 280px; }
+  .columns__chapter { grid-column: 1; grid-row: 1 / span 2; }
+  .queue { grid-column: 2; grid-row: 1; }
+  .middle { grid-column: 2; grid-row: 2; }
+}
+@container (max-width: 999px) {
+  .columns { grid-template-columns: 1fr 1fr; }
+  .columns__chapter { grid-column: 1 / -1; grid-row: 1; }
+  .middle { grid-column: 1; grid-row: 2; }
+  .queue { grid-column: 2; grid-row: 2; }
+}
+.entry { display: grid; grid-template-columns: 1.4em 1fr var(--control); gap: 3px 6px; align-items: center; padding: 6px 8px; }
+.entry svg { width: 15px; height: 15px; }
+.entry--on { background: var(--cell-on); }
+.entry__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry__name b { font-weight: 700; }
+.entry__x { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 3px; background: transparent; color: var(--ink-2); font: inherit; cursor: pointer; }
+/* repeat and once share one pinned width, so a tag never shifts the line; auto is in the automation colour. */
+.tag { display: inline-block; min-width: calc(6ch + 10px); text-align: center; border: 1px solid var(--edge); border-radius: 3px; padding: 0 4px; font-size: 10px; color: var(--ink-2); margin-right: 4px; }
+.tag--auto { border-color: var(--auto); color: var(--auto); min-width: 0; }
+.tag--forced { border-color: var(--hurt); color: var(--hurt-text); min-width: 0; }
+.entry__third { justify-content: flex-start; gap: 0 10px; }
+.entry__bar { grid-column: 1 / -1; }
+/* Every entry reserves the working bar's height, so an entry that stops or starts being worked
+   does not shift the entries (and their remove buttons) below it. Padding, not margin: a margin
+   here collapses with .bar__value's and the reservation silently comes up 2px short. */
+.entry__bar { padding-block: calc((var(--bar-working) - var(--bar)) / 2); }
+.entry--on .entry__bar { padding-block: 0; }
+.entry--on .bar { height: var(--bar-working); }
+.entry__sub { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-variant-numeric: tabular-nums; min-height: 18px; white-space: nowrap; overflow: hidden; }
+.warn { color: var(--warn); } .ink-2 { color: var(--ink-2); }
+.pack { display: grid; gap: 4px; }
+.pack__item { display: grid; grid-template-columns: 1fr 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+.pack__item--zero { color: var(--ink-2); }
+.hurt-text { color: var(--hurt-text); }
+.pack__item--full { color: var(--warn); }
+.log__list { list-style: none; margin: 0; padding: 0; max-height: 9em; overflow-y: auto; }
+.log__line { display: grid; grid-template-columns: 3.4em 1fr; gap: 0 8px; padding: 2px 0; border-bottom: 1px solid var(--edge); font-size: 11px; }
+.log__line:last-child { border-bottom: 0; }
+.log__at { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.log__line--story { font-family: var(--serif); font-style: italic; font-size: 12px; }
+.log__line--note { color: var(--ink-2); }
+.top__health { position: relative; }
+.row--built .row__built { color: var(--good); grid-column: 1 / -1; }
+/* A control that does nothing right now says so: a built row, a dead run. Not below 70% (spec 8.1). */
+.btn[aria-disabled="true"]:not(.btn--stop) { opacity: .7; cursor: default; color: var(--ink-2); }
+.entry__x[aria-disabled="true"] { opacity: .7; cursor: default; }
+
+/* A wrapper that only carries inert: it adds no box, so the grid it sits in is unchanged. */
+.inert-wrap { display: contents; }
+.columns__chapter { position: relative; }
+.card { position: absolute; left: 40px; right: 40px; top: 24px; z-index: 1; border: 1px solid var(--edge-on); background: var(--cell-on); border-radius: 6px; padding: 14px 16px; box-shadow: 0 8px 28px oklch(0% 0 0 / .5); font-variant-numeric: tabular-nums; }
+.card__title { font-family: var(--serif); font-style: italic; font-size: 16px; text-align: center; }
+.card__sub, .card__quiet { color: var(--ink-2); text-align: center; }
+.card__sub { margin-bottom: 12px; }
+.card__gains { display: grid; grid-template-columns: 1.4em 6em 1fr auto; gap: 3px 8px; align-items: center; }
+.card__new { color: var(--good); }
+.card__lv { text-align: right; white-space: nowrap; }
+.card__rule { border-top: 1px solid var(--edge); margin: 10px 0; }
+.card__hp { display: flex; justify-content: space-between; align-items: baseline; }
+.card__why { color: var(--ink-2); font-size: 10px; margin-top: 2px; }
+.card__begin { display: block; margin: 14px auto 0; padding: 6px 18px; border: 1px solid var(--run); background: var(--run); color: var(--bg); border-radius: 4px; font: inherit; font-weight: 700; }
+.card__quiet { font-size: 10px; margin-top: 8px; }
+/* The finish card's last line, in the running head's serif (mockup 2026-09-23-finish-card). */
+.card__line { font-family: var(--serif); font-style: italic; font-size: 13px; line-height: 1.45; color: var(--ink-2); text-align: center; max-width: 42ch; margin: 8px auto; }
+.card__facts { text-align: center; margin: -6px 0 12px; line-height: 1.5; }
+.card__count { text-align: center; }
+.card__count b { font-size: 13px; }
+.rates { font-variant-numeric: tabular-nums; }
+.rates--stopped { opacity: .55; }
+.rates__kv { display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; }
+.rates__v { text-align: right; min-width: 13ch; display: inline-block; }
+.rates__food--covers { color: var(--good); }
+.rates__food--short { color: var(--hurt-text); }
+/* The hurts line's box is always there, blank until a hurting row runs, so the chunks below never jump when a fight starts. */
+.rates__blank { visibility: hidden; }
+.food { display: grid; gap: 4px; }
+.food__item { display: grid; grid-template-columns: 1fr auto 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+.food__item > span { white-space: nowrap; }   /* "cloud-fish" broke at its hyphen, and "+4 hp" at its space */
+.food__item--empty { border-color: var(--hurt); }
+.food__item--full { color: var(--warn); }
+.btn--placeholder { visibility: hidden; }
+
+/* ---- mockup shell ---- */
+body { padding: 16px; font-family: var(--mono); }
+h1 { font-size: 14px; margin: 0 0 4px; }
+.note { color: var(--ink-2); font-size: 11px; margin: 0 0 12px; max-width: 120ch; }
+.toggles { display: flex; gap: 16px; margin-bottom: 12px; font-size: 11px; color: var(--ink-2); }
+.frames { display: flex; gap: 24px; align-items: flex-start; }
+.frame { width: 1280px; height: 880px; overflow: auto; flex: none; border: 1px solid oklch(45% 0.02 260); background: var(--bg); scrollbar-gutter: stable; }
+.frame::before { content: attr(data-label); }
+.label { font-size: 11px; color: var(--ink-2); margin: 0 0 4px; }
+/* ---- the proposed shell, both treatments ---- */
+.screen { padding: 0 10px 10px; gap: 8px; }
+.top { display: block; position: sticky; top: 0; z-index: 4; background: var(--bg); padding: 10px 0 2px; }
+.bottom { display: grid; grid-template-columns: var(--control) 1fr var(--control); align-items: center; gap: 8px; padding: 6px 0 0; border-top: 1px solid var(--edge); }
+.bar-clock { justify-self: center; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink); }
+.sticky-bottom .bottom { position: sticky; bottom: 0; background: var(--bg); padding-bottom: 8px; z-index: 4; }
+.sticky-bottom .screen { padding-bottom: 0; }
+.region { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; }
+.region__head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.a .region__head { margin-bottom: 6px; }
+.b .region__head { margin: 0 2px 4px; }
+.region__head--book { color: var(--ink); letter-spacing: .14em; }
+.region--chapter .head__story { margin: 0 0 6px; padding: 0 0 6px; border-top: 0; border-bottom: 1px solid var(--edge); }
+.region--skills .skills { gap: 4px; }
+.stretch .skills { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+/* rows and items sit inside a panel now: the panel is the lighter surface, the items the darker inset */
+.region .item { background: var(--item); }
+.b .columns { align-items: start; }
+.middle { align-items: start; }
+</style></head>
+<body>
+<h1>Regions: A heading inside the box, B heading above it</h1>
+<p class="note">Both: health alone on top, sticky; the corner column gone; a bottom bar with gear, clock and pause; every region boxed at one width, including the band. Live markup from the dev build at 01:08 into a run. The frames scroll: scroll one to see the health bar stick.</p>
+<div class="toggles">
+  <label><input type="checkbox" id="stretch"> stretch skill cells to fill the band (else fixed 360px, left-aligned)</label>
+  <label><input type="checkbox" id="sticky"> bottom bar sticks to the window bottom</label>
+</div>
+<div class="frames">
+  <div><p class="label">A. heading inside</p>
+<div class="frame a">
+  <main class="screen">
+    <div class="top"><div class="top__health"><section class="chunk health" aria-label="health"><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--hp" style="width: 97.2766%;"></div></div><div class="health__value">97 <small>/ 100</small></div></section></div></div>
+    <section class="region region--skills" aria-label="skills"><header class="region__head"><span>skills</span></header><div class="skills"><div class="skill-slot"><div class="item skill" data-skill="fish" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-fishing-rod" aria-hidden="true"><path d="M4 11h1"></path><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"></path><circle cx="18" cy="18" r="2"></circle></svg></div><div class="skill__name"><b>Fish</b><span class="skill__mult">×1.05</span></div><div class="skill__lv">Lv 1</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 93.5%;"></div></div><div class="bar__value">10.3/11.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 81.14%;"></div></div><div class="bar__value">20.3/25.0</div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="salvage" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-recycle" aria-hidden="true"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"></path><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"></path><path d="m14 16-3 3 3 3"></path><path d="M8.293 13.596 7.196 9.5 3.1 10.598"></path><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"></path><path d="m13.378 9.633 4.096 1.098 1.097-4.096"></path></svg></div><div class="skill__name"><b>Salvage</b><span class="skill__mult">×1.11</span></div><div class="skill__lv">Lv 2</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 35.638%;"></div></div><div class="bar__value">4.3/12.1</div></div><div class="skill__lv">Lv 1</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 1.13527%;"></div></div><div class="bar__value">0.3/27.5</div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="tinker" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wrench" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"></path></svg></div><div class="skill__name"><b>Tinker</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0.0/10.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 0%;"></div></div><div class="bar__value">0.0/25.0</div></div></div></div><div class="skill-slot"><div class="item skill skill--on working" data-skill="rig" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sailboat" aria-hidden="true"><path d="M10 2v15"></path><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"></path><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"></path></svg></div><div class="skill__name"><b>Rig</b><span class="skill__mult">×1.05</span><span class="visually-hidden">running</span></div><div class="skill__lv">Lv 1</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 55.3182%;"></div></div><div class="bar__value">6.1/11.0<b>↑ 5s</b></div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 64.34%;"></div></div><div class="bar__value">16.1/25.0<b>↑ 9s</b></div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="fight" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sword" aria-hidden="true"><path d="m11 19-6-6"></path><path d="m5 21-2-2"></path><path d="m8 16-4 4"></path><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"></path></svg></div><div class="skill__name"><b>Fight</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0.0/10.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 0%;"></div></div><div class="bar__value">0.0/25.0</div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="search" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="3"></circle></svg></div><div class="skill__name"><b>Search</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0.0/10.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 0%;"></div></div><div class="bar__value">0.0/25.0</div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="talk" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-circle" aria-hidden="true"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"></path></svg></div><div class="skill__name"><b>Talk</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0.0/10.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 0%;"></div></div><div class="bar__value">0.0/25.0</div></div></div></div></div></section>
+    <div class="columns">
+      <div class="columns__chapter"><section class="region region--chapter" aria-label="chapter"><header class="region__head region__head--book"><span>The Windward Run</span><span>I · Port Cinder · Fitting out</span></header><p class="head__story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p><div class="chapter"><div class="item row" data-action="fish"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-fishing-rod" aria-hidden="true"><path d="M4 11h1"></path><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"></path><circle cx="18" cy="18" r="2"></circle></svg><span><b>Fish</b> the cloud shallows</span></div><div class="row__c2"><div class="row__in"></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>+1 cloud-fish</span></div></div><div class="row__c3"><div class="row__tx">3.8s<small>+4.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Fish the cloud shallows">▶</button><button type="button" class="btn" aria-label="add to queue: Fish the cloud shallows">+</button><span class="auto"><span class="visually-hidden">automation, 5 of 200 to earn</span><span aria-hidden="true">5/200<i style="width: 2.5%;"></i></span></span></div></div><div class="item row" data-action="salvage"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-recycle" aria-hidden="true"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"></path><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"></path><path d="m14 16-3 3 3 3"></path><path d="M8.293 13.596 7.196 9.5 3.1 10.598"></path><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"></path><path d="m13.378 9.633 4.096 1.098 1.097-4.096"></path></svg><span><b>Salvage</b> drifting scrap</span></div><div class="row__c2"><div class="row__in"></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>+1 scrap</span></div></div><div class="row__c3"><div class="row__tx">4.5s<small>+5.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Salvage drifting scrap">▶</button><button type="button" class="btn" aria-label="add to queue: Salvage drifting scrap">+</button><span class="auto"><span class="visually-hidden">automation, 5 of 200 to earn</span><span aria-hidden="true">5/200<i style="width: 2.5%;"></i></span></span></div></div><div class="item row row--on working" data-action="hull"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sailboat" aria-hidden="true"><path d="M10 2v15"></path><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"></path><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"></path></svg><span><b>Rig</b> the hull<span class="visually-hidden">running</span></span></div><div class="row__c2"><div class="row__in"><span class="row__short">⚠ 11 of 16 scrap<small> have 0</small></span></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>decay ×0.80</span></div></div><div class="row__c3"><div class="row__tx">57s<small>+60.0 xp</small></div><button type="button" class="btn btn--stop" aria-label="running: Rig the hull" aria-disabled="true">■</button><button type="button" class="btn" aria-label="add to queue: Rig the hull">+</button><span class="auto"><span class="visually-hidden">automation, not yet earned</span></span></div></div><div class="item row" data-action="net"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wrench" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"></path></svg><span><b>Tinker</b> a trawl net</span></div><div class="row__c2"><div class="row__in"><span class="row__short">⚠ 12 scrap<small> have 0</small></span></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>Fish ×1.25</span></div></div><div class="row__c3"><div class="row__tx">40s<small>+40.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Tinker a trawl net">▶</button><button type="button" class="btn" aria-label="add to queue: Tinker a trawl net">+</button><span class="auto"><span class="visually-hidden">automation, not yet earned</span></span></div></div><div class="item row" data-action="satchel"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wrench" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"></path></svg><span><b>Tinker</b> a canvas satchel</span></div><div class="row__c2"><div class="row__in"><span class="row__short">⚠ 20 scrap<small> have 0</small></span></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>stack +5</span></div></div><div class="row__c3"><div class="row__tx">50s<small>+50.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Tinker a canvas satchel">▶</button><button type="button" class="btn" aria-label="add to queue: Tinker a canvas satchel">+</button><span class="auto"><span class="visually-hidden">automation, not yet earned</span></span></div></div><div class="item row" data-action="sails"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sailboat" aria-hidden="true"><path d="M10 2v15"></path><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"></path><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"></path></svg><span><b>Rig</b> the sails</span></div><div class="row__c2"><div class="row__say row__say--waits" title="after: the hull, a trawl net, a canvas satchel">after: the hull, a trawl net, a canvas satchel</div></div><div class="row__c3"><div class="row__tx">19s<small>+20.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Rig the sails">▶</button><button type="button" class="btn" aria-label="add to queue: Rig the sails">+</button><span class="auto"><span class="visually-hidden">automation, not yet earned</span></span></div></div></div></section></div>
+      <div class="middle">
+        <section class="region region--rates" aria-label="rates"><header class="region__head"><span>rates</span></header><div class="rates__kv"><span class="ink-2">decay</span><span class="rates__v hurt-text">−0.13 hp/s ▲</span><span class="ink-2">food, up to</span><span class="rates__v rates__food--covers">+0.80 hp/s</span><span class="ink-2 rates__blank" aria-hidden="true">&nbsp;</span><span class="rates__v hurt-text rates__blank" aria-hidden="true">&nbsp;</span></div></section>
+        <section class="region region--food" aria-label="food"><header class="region__head"><span>food</span></header><div class="food"><div data-item="cloud-fish" class="item food__item"><span>cloud-fish</span><span>+4 hp</span><div class="food__cooldown"><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">4/5</div></div></div></div></section>
+        <section class="region region--pack" aria-label="pack"><header class="region__head"><span>pack</span></header><div class="pack"><div data-item="scrap" class="item pack__item pack__item--zero"><span>scrap</span><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0/5</div></div></div></div></section>
+        <section class="region region--log" aria-label="log"><header class="region__head"><span>log</span></header><ul class="log__list"><li class="log__line log__line--note"><span class="log__at">00:54</span><span>Rig reaches Lv 1</span></li><li class="log__line log__line--note"><span class="log__at">00:40</span><span>Salvage reaches Lv 2</span></li><li class="log__line log__line--note"><span class="log__at">00:29</span><span>Salvage reaches Lv 1</span></li><li class="log__line log__line--note"><span class="log__at">00:10</span><span>Fish reaches Lv 1</span></li><li class="log__line log__line--note"><span class="log__at">00:00</span><span>Life 1 begins</span></li></ul></section>
+      </div>
+      <section class="region region--queue" aria-label="queue"><header class="region__head"><span>queue</span><span>2</span></header><div class="queue"><div data-entry="2" data-mode="once" data-by="player" class="item entry entry--on working"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sailboat" aria-hidden="true"><path d="M10 2v15"></path><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"></path><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"></path></svg><span class="entry__name"><b>Rig</b> the hull<span class="visually-hidden">running</span></span><button type="button" class="entry__x" aria-label="remove Rig the hull">×</button><div class="entry__bar"><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 26.8083%;"></div></div><div class="bar__value">16.1/60.0</div></div><div class="entry__sub"><span><span class="tag">once</span></span><span class="ink-2">2.5s</span></div><div class="entry__sub entry__third"><span>scrap 5/16</span></div></div></div></section>
+    </div>
+    <div class="bottom"><div class="settings"><button type="button" class="btn settings__gear" aria-label="settings" aria-expanded="false"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div><span class="bar-clock" role="timer">01:08</span><button type="button" class="btn" aria-label="pause">❚❚</button></div>
+  </main>
+</div></div>
+  <div><p class="label">B. heading above</p>
+<div class="frame b">
+  <main class="screen">
+    <div class="top"><div class="top__health"><section class="chunk health" aria-label="health"><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--hp" style="width: 97.2766%;"></div></div><div class="health__value">97 <small>/ 100</small></div></section></div></div>
+    <div class="region-wrap region-wrap--skills"><header class="region__head"><span>skills</span></header><section class="region region--skills" aria-label="skills"><div class="skills"><div class="skill-slot"><div class="item skill" data-skill="fish" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-fishing-rod" aria-hidden="true"><path d="M4 11h1"></path><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"></path><circle cx="18" cy="18" r="2"></circle></svg></div><div class="skill__name"><b>Fish</b><span class="skill__mult">×1.05</span></div><div class="skill__lv">Lv 1</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 93.5%;"></div></div><div class="bar__value">10.3/11.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 81.14%;"></div></div><div class="bar__value">20.3/25.0</div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="salvage" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-recycle" aria-hidden="true"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"></path><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"></path><path d="m14 16-3 3 3 3"></path><path d="M8.293 13.596 7.196 9.5 3.1 10.598"></path><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"></path><path d="m13.378 9.633 4.096 1.098 1.097-4.096"></path></svg></div><div class="skill__name"><b>Salvage</b><span class="skill__mult">×1.11</span></div><div class="skill__lv">Lv 2</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 35.638%;"></div></div><div class="bar__value">4.3/12.1</div></div><div class="skill__lv">Lv 1</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 1.13527%;"></div></div><div class="bar__value">0.3/27.5</div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="tinker" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wrench" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"></path></svg></div><div class="skill__name"><b>Tinker</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0.0/10.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 0%;"></div></div><div class="bar__value">0.0/25.0</div></div></div></div><div class="skill-slot"><div class="item skill skill--on working" data-skill="rig" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sailboat" aria-hidden="true"><path d="M10 2v15"></path><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"></path><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"></path></svg></div><div class="skill__name"><b>Rig</b><span class="skill__mult">×1.05</span><span class="visually-hidden">running</span></div><div class="skill__lv">Lv 1</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 55.3182%;"></div></div><div class="bar__value">6.1/11.0<b>↑ 5s</b></div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 64.34%;"></div></div><div class="bar__value">16.1/25.0<b>↑ 9s</b></div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="fight" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sword" aria-hidden="true"><path d="m11 19-6-6"></path><path d="m5 21-2-2"></path><path d="m8 16-4 4"></path><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"></path></svg></div><div class="skill__name"><b>Fight</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0.0/10.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 0%;"></div></div><div class="bar__value">0.0/25.0</div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="search" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="3"></circle></svg></div><div class="skill__name"><b>Search</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0.0/10.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 0%;"></div></div><div class="bar__value">0.0/25.0</div></div></div></div><div class="skill-slot"><div class="item skill" data-skill="talk" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false"><div class="skill__icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-circle" aria-hidden="true"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"></path></svg></div><div class="skill__name"><b>Talk</b><span class="skill__mult">×1.00</span></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0.0/10.0</div></div><div class="skill__lv">Lv 0</div><div><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 0%;"></div></div><div class="bar__value">0.0/25.0</div></div></div></div></div></section></div>
+    <div class="columns">
+      <div class="columns__chapter"><div class="region-wrap region-wrap--chapter"><header class="region__head region__head--book"><span>The Windward Run</span><span>I · Port Cinder · Fitting out</span></header><section class="region region--chapter" aria-label="chapter"><p class="head__story">A market town adrift on warm air. Word is, something old sleeps on a drifting ruin.</p><div class="chapter"><div class="item row" data-action="fish"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-fishing-rod" aria-hidden="true"><path d="M4 11h1"></path><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"></path><circle cx="18" cy="18" r="2"></circle></svg><span><b>Fish</b> the cloud shallows</span></div><div class="row__c2"><div class="row__in"></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>+1 cloud-fish</span></div></div><div class="row__c3"><div class="row__tx">3.8s<small>+4.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Fish the cloud shallows">▶</button><button type="button" class="btn" aria-label="add to queue: Fish the cloud shallows">+</button><span class="auto"><span class="visually-hidden">automation, 5 of 200 to earn</span><span aria-hidden="true">5/200<i style="width: 2.5%;"></i></span></span></div></div><div class="item row" data-action="salvage"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-recycle" aria-hidden="true"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"></path><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"></path><path d="m14 16-3 3 3 3"></path><path d="M8.293 13.596 7.196 9.5 3.1 10.598"></path><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"></path><path d="m13.378 9.633 4.096 1.098 1.097-4.096"></path></svg><span><b>Salvage</b> drifting scrap</span></div><div class="row__c2"><div class="row__in"></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>+1 scrap</span></div></div><div class="row__c3"><div class="row__tx">4.5s<small>+5.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Salvage drifting scrap">▶</button><button type="button" class="btn" aria-label="add to queue: Salvage drifting scrap">+</button><span class="auto"><span class="visually-hidden">automation, 5 of 200 to earn</span><span aria-hidden="true">5/200<i style="width: 2.5%;"></i></span></span></div></div><div class="item row row--on working" data-action="hull"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sailboat" aria-hidden="true"><path d="M10 2v15"></path><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"></path><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"></path></svg><span><b>Rig</b> the hull<span class="visually-hidden">running</span></span></div><div class="row__c2"><div class="row__in"><span class="row__short">⚠ 11 of 16 scrap<small> have 0</small></span></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>decay ×0.80</span></div></div><div class="row__c3"><div class="row__tx">57s<small>+60.0 xp</small></div><button type="button" class="btn btn--stop" aria-label="running: Rig the hull" aria-disabled="true">■</button><button type="button" class="btn" aria-label="add to queue: Rig the hull">+</button><span class="auto"><span class="visually-hidden">automation, not yet earned</span></span></div></div><div class="item row" data-action="net"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wrench" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"></path></svg><span><b>Tinker</b> a trawl net</span></div><div class="row__c2"><div class="row__in"><span class="row__short">⚠ 12 scrap<small> have 0</small></span></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>Fish ×1.25</span></div></div><div class="row__c3"><div class="row__tx">40s<small>+40.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Tinker a trawl net">▶</button><button type="button" class="btn" aria-label="add to queue: Tinker a trawl net">+</button><span class="auto"><span class="visually-hidden">automation, not yet earned</span></span></div></div><div class="item row" data-action="satchel"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wrench" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"></path></svg><span><b>Tinker</b> a canvas satchel</span></div><div class="row__c2"><div class="row__in"><span class="row__short">⚠ 20 scrap<small> have 0</small></span></div><div class="row__arr" aria-hidden="true">→</div><div class="row__out"><span>stack +5</span></div></div><div class="row__c3"><div class="row__tx">50s<small>+50.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Tinker a canvas satchel">▶</button><button type="button" class="btn" aria-label="add to queue: Tinker a canvas satchel">+</button><span class="auto"><span class="visually-hidden">automation, not yet earned</span></span></div></div><div class="item row" data-action="sails"><div class="row__c1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sailboat" aria-hidden="true"><path d="M10 2v15"></path><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"></path><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"></path></svg><span><b>Rig</b> the sails</span></div><div class="row__c2"><div class="row__say row__say--waits" title="after: the hull, a trawl net, a canvas satchel">after: the hull, a trawl net, a canvas satchel</div></div><div class="row__c3"><div class="row__tx">19s<small>+20.0 xp</small></div><button type="button" class="btn btn--play" aria-label="do it now: Rig the sails">▶</button><button type="button" class="btn" aria-label="add to queue: Rig the sails">+</button><span class="auto"><span class="visually-hidden">automation, not yet earned</span></span></div></div></div></section></div></div>
+      <div class="middle">
+        <div class="region-wrap region-wrap--rates"><header class="region__head"><span>rates</span></header><section class="region region--rates" aria-label="rates"><div class="rates__kv"><span class="ink-2">decay</span><span class="rates__v hurt-text">−0.13 hp/s ▲</span><span class="ink-2">food, up to</span><span class="rates__v rates__food--covers">+0.80 hp/s</span><span class="ink-2 rates__blank" aria-hidden="true">&nbsp;</span><span class="rates__v hurt-text rates__blank" aria-hidden="true">&nbsp;</span></div></section></div>
+        <div class="region-wrap region-wrap--food"><header class="region__head"><span>food</span></header><section class="region region--food" aria-label="food"><div class="food"><div data-item="cloud-fish" class="item food__item"><span>cloud-fish</span><span>+4 hp</span><div class="food__cooldown"><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">4/5</div></div></div></div></section></div>
+        <div class="region-wrap region-wrap--pack"><header class="region__head"><span>pack</span></header><section class="region region--pack" aria-label="pack"><div class="pack"><div data-item="scrap" class="item pack__item pack__item--zero"><span>scrap</span><div><div class="bar" aria-hidden="true"><div class="bar__fill" style="width: 0%;"></div></div><div class="bar__value">0/5</div></div></div></div></section></div>
+        <div class="region-wrap region-wrap--log"><header class="region__head"><span>log</span></header><section class="region region--log" aria-label="log"><ul class="log__list"><li class="log__line log__line--note"><span class="log__at">00:54</span><span>Rig reaches Lv 1</span></li><li class="log__line log__line--note"><span class="log__at">00:40</span><span>Salvage reaches Lv 2</span></li><li class="log__line log__line--note"><span class="log__at">00:29</span><span>Salvage reaches Lv 1</span></li><li class="log__line log__line--note"><span class="log__at">00:10</span><span>Fish reaches Lv 1</span></li><li class="log__line log__line--note"><span class="log__at">00:00</span><span>Life 1 begins</span></li></ul></section></div>
+      </div>
+      <div class="region-wrap region-wrap--queue"><header class="region__head"><span>queue</span><span>2</span></header><section class="region region--queue" aria-label="queue"><div class="queue"><div data-entry="2" data-mode="once" data-by="player" class="item entry entry--on working"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sailboat" aria-hidden="true"><path d="M10 2v15"></path><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"></path><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"></path></svg><span class="entry__name"><b>Rig</b> the hull<span class="visually-hidden">running</span></span><button type="button" class="entry__x" aria-label="remove Rig the hull">×</button><div class="entry__bar"><div class="bar" aria-hidden="true"><div class="bar__fill bar__fill--run" style="width: 26.8083%;"></div></div><div class="bar__value">16.1/60.0</div></div><div class="entry__sub"><span><span class="tag">once</span></span><span class="ink-2">2.5s</span></div><div class="entry__sub entry__third"><span>scrap 5/16</span></div></div></div></section></div>
+    </div>
+    <div class="bottom"><div class="settings"><button type="button" class="btn settings__gear" aria-label="settings" aria-expanded="false"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div><span class="bar-clock" role="timer">01:08</span><button type="button" class="btn" aria-label="pause">❚❚</button></div>
+  </main>
+</div></div>
+</div>
+<script>
+  const on = (id, cls) => { const el = document.getElementById(id); const apply = () => document.querySelectorAll('.frame').forEach(f => f.classList.toggle(cls, el.checked)); el.addEventListener('change', apply); apply(); };
+  on('stretch', 'stretch'); on('sticky', 'sticky-bottom');
+</script>
+</body></html>

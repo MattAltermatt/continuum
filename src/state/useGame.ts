@@ -8,11 +8,13 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { balance } from '../balance';
-import type { ActionId, Book, Content } from '../data/types';
-import { setAutomation } from '../engine/automation';
+import type { ActionId, Book, Content, ItemId, SkillId } from '../data/types';
+import { setAutomation, unlockAt } from '../engine/automation';
+import { applyDecay } from '../engine/health';
 import { enqueue, newState, removeEntry } from '../engine/queue';
 import { deathSummary, rebirth, type DeathSummary } from '../engine/rebirth';
 import { resolve } from '../engine/resolve';
+import { pageOf } from '../engine/rows';
 import { setPaused, step } from '../engine/tick';
 import type { AutoMode, GameEvent, GameState } from '../engine/types';
 import { ASIDE_KEY, asideText, AUTOSAVE_MS, loadSave, SAVE_KEY, saveText } from './save';
@@ -35,8 +37,23 @@ export type GameAction =
   | { type: 'load'; model: Model }
   /** Lifts the death card and starts the next life (spec 2026-09-23 section 2.4). */
   | { type: 'begin' }
-  /** Dev handle only: a fast path to death for verification. Play reaches it too, through the hall, but only after minutes. */
-  | { type: 'setHealth'; health: number };
+  /** Dev only: sets health, clamped to [0, max]. Health at zero is not death (that is the tick's decay); `die` is. */
+  | { type: 'setHealth'; health: number }
+  /** Dev only (the debug overlay, spec 2026-09-24-screen-pass 5.3): one ledger to a level with fresh XP; the other untouched. */
+  | { type: 'setSkill'; skill: SkillId; ledger: 'core' | 'run'; level: number }
+  /** Dev only: an item's count, not clamped to the cap; a new item joins the end of the pack (#45). */
+  | { type: 'setItem'; item: ItemId; count: number }
+  /**
+   * Dev only: every row on the current page to its unlock count, so its chip appears by the game's own rule. The
+   * skill ledger's "completions" line sums these counts, so after a grant it reads high by the grant: a dev build's
+   * honest lie.
+   */
+  | { type: 'earnChips' }
+  /**
+   * Dev only: the engine's own death, from a state at zero health with an empty event list (the committed state
+   * still carries the last tick's events, which applyDecay would append to and withLog would log twice).
+   */
+  | { type: 'die' };
 
 export type LogEvent =
   | GameEvent
@@ -107,6 +124,11 @@ function settled(model: Model, content: Content): Model {
   return r.state === s ? model : withLog(model, { ...r.state, events: r.events });
 }
 
+/** A level or a count: a whole number, zero or more. The debug overlay validates with the same rule. */
+export function whole(n: number): boolean {
+  return Number.isInteger(n) && n >= 0;
+}
+
 function reduce(content: Content) {
   const act = (model: Model, action: GameAction): Model => {
     const s = model.state;
@@ -116,7 +138,29 @@ function reduce(content: Content) {
       case 'automate': return { ...model, state: setAutomation(s, content, action.actionId, action.mode) };
       case 'pause': return { ...model, state: setPaused(s, 'player') };
       case 'resume': return { ...model, state: setPaused(s, 'none') };
-      case 'setHealth': return s.dead ? model : { ...model, state: { ...s, health: Math.min(s.maxHealth, action.health) } };
+      case 'setHealth': return s.dead ? model : { ...model, state: { ...s, health: Math.max(0, Math.min(s.maxHealth, action.health)) } };
+      case 'setSkill': {
+        const skill = s.skills[action.skill];
+        if (s.dead || skill === undefined || !whole(action.level)) return model;
+        const ledger = { level: action.level, exp: 0 };
+        const next = action.ledger === 'core' ? { ...skill, core: ledger } : { ...skill, run: ledger };
+        return { ...model, state: { ...s, skills: { ...s.skills, [action.skill]: next } } };
+      }
+      case 'setItem': {
+        if (s.dead || content.items[action.item] === undefined || !whole(action.count)) return model;
+        const acquired = action.count > 0 && !s.acquired.includes(action.item) ? [...s.acquired, action.item] : s.acquired;
+        return { ...model, state: { ...s, inventory: { ...s.inventory, [action.item]: action.count }, acquired } };
+      }
+      case 'earnChips': {
+        if (s.dead) return model;
+        const counts = { ...s.completionCounts };
+        for (const id of pageOf(s, content).order) {
+          const a = content.actions[id];
+          if (a) counts[id] = Math.max(counts[id] ?? 0, unlockAt(a));
+        }
+        return { ...model, state: { ...s, completionCounts: counts } };
+      }
+      case 'die': return s.dead ? model : withLog(model, applyDecay({ ...s, health: 0, events: [] }));
       case 'begin': {
         if (!s.dead) return model;
         const next = setPaused(rebirth(s), 'none');

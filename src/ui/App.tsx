@@ -1,26 +1,30 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { flushSync } from 'react-dom';
+import { balance } from '../balance';
 import { skillOf } from '../data/roster';
 import { windwardRun } from '../data/windward-run';
 import { decayPerSecond, foodCeilingPerSecond, hurtsPerSecond } from '../engine/health';
 import { topWorks } from '../engine/resolve';
 import { chapterOf, pageOf } from '../engine/rows';
-import { ticksPerSecond, ticksToSeconds } from '../engine/time';
+import { ticksToSeconds } from '../engine/time';
 import { installDevHandle } from '../state/devHandle';
 import { useGame } from '../state/useGame';
+import { FADE_MS } from './ActionRow';
+import { BottomBar } from './BottomBar';
 import { ChapterPanel } from './ChapterPanel';
+import { Debug } from './Debug';
 import { DeathCard } from './DeathCard';
 import { FinishCard } from './FinishCard';
 import { Food } from './Food';
-import { clock } from './format';
-import { PAUSE, PLAY } from './glyphs';
 import { HealthBar } from './HealthBar';
 import { Log } from './Log';
 import { Pack } from './Pack';
 import { Queue } from './Queue';
 import { Rates } from './Rates';
-import { Settings } from './Settings';
 import { SkillsBand } from './SkillsBand';
+
+/** One tick, as CSS: every bar's transition is this long (spec 2026-09-24-screen-pass section 4); and the instruction's fade (section 6). */
+const tickVars = { '--tick': `${balance.time.tickIntervalMs}ms`, '--fade': `${FADE_MS}ms` } as CSSProperties;
 
 export function App() {
   const { state, view, log, dispatch, card, speed, setSpeed, save, load, erase } = useGame(windwardRun);
@@ -62,22 +66,10 @@ export function App() {
   const inert = card ? true : undefined;
 
   return (
-    <main className="screen">
+    <main className="screen" style={tickVars}>
+      {/* Health alone on top, sticky (spec 2026-09-24-screen-pass 2.1); the clock, the gear and pause are the bottom bar's. */}
       <div className="top" inert={inert}>
-        <div className="top__health">
-          <HealthBar health={screen.health} max={screen.maxHealth} />
-        </div>
-        <div className="corner">
-          <Settings onErase={erase} speed={speed} onSpeed={setSpeed} dev={import.meta.env.DEV} />
-          <span role="timer" className={`corner__clock${clockNote ? ' corner__clock--dim' : ''}`} aria-label="run clock">
-            {clock(ticksToSeconds(screen.runTicks))}{clockNote && <small> {clockNote}</small>}
-          </span>
-          {/* Behind the card the control's box stays, unseen, so the corner does not reflow on death or Begin. */}
-          {card ? <span className="btn btn--placeholder" aria-hidden="true" /> : view.paused === 'none'
-            ? <button type="button" className="btn" aria-label="pause" onClick={() => dispatch({ type: 'pause' })}>{PAUSE}</button>
-            : <button type="button" className="btn btn--play" aria-label="resume" onClick={() => dispatch({ type: 'resume' })}>{PLAY}</button>}
-          <span className="visually-hidden">{ticksPerSecond()} ticks per second</span>
-        </div>
+        <HealthBar health={screen.health} max={screen.maxHealth} life={screen.life} />
       </div>
       <div className="inert-wrap" inert={inert}><SkillsBand content={windwardRun} state={screen} runningSkill={runningSkill} /></div>
       <div className="columns">
@@ -103,6 +95,12 @@ export function App() {
         </div>
         <div className="inert-wrap" inert={inert}><Queue state={screen} content={windwardRun} working={working} live={live} onRemove={(entryId) => dispatch({ type: 'remove', entryId })} /></div>
       </div>
+      {/* Wrapped with display: contents, so the footer stays a direct grid item: a bare wrapper would be its containing block and sticky would have nowhere to stick. */}
+      <div className="inert-wrap" inert={inert}>
+        <BottomBar clockSeconds={ticksToSeconds(screen.runTicks)} note={clockNote} live={live} card={card !== null} onPause={() => dispatch({ type: 'pause' })} onResume={() => dispatch({ type: 'resume' })} onErase={erase} />
+      </div>
+      {/* Dev builds only, outside every inert wrapper: dying and beginning again from it is the point (spec 2026-09-24-screen-pass 5.1). It reads the committed state. */}
+      {import.meta.env.DEV && <Debug content={windwardRun} state={state} stopped={stopped} speed={speed} onSpeed={setSpeed} dispatch={dispatch} />}
     </main>
   );
 }

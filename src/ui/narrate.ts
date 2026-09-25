@@ -10,7 +10,11 @@ export interface Narration { readonly kind: 'story' | 'note'; readonly text: str
 
 export function narrate(e: LogEvent, content: Content): Narration {
   switch (e.type) {
-    case 'lifeBegins': return { kind: 'note', text: `Life ${e.life} begins` };
+    // The life's first line names page 1 too, when it has a name (spec 2026-09-24-screen-pass section 6).
+    case 'lifeBegins': {
+      const first = content.chapters[0]?.pages[0]?.name;
+      return { kind: 'note', text: first === undefined || first === '' ? `Life ${e.life} begins` : `Life ${e.life} begins: ${first}` };
+    }
     case 'saveAside': return { kind: 'note', text: 'An old save was set aside' };
     // The row's own words (src/ui/words.ts), so the row and the log never disagree. A log line is a record, so an
     // unearned maker reads without its n/N: a count frozen at the pop would contradict the chip, and a live one the past.
@@ -24,10 +28,10 @@ export function narrate(e: LogEvent, content: Content): Narration {
       const head = content.chapters[e.chapter]?.head;
       return { kind: 'note', text: head === undefined ? `Port ${e.chapter + 1}` : `Port ${head.numeral} \u00B7 ${head.chapter}` };
     }
-    // The closing row's beat has printed on its `completed` line; this names the page now turned to.
+    // The closing row's beat has printed on its `completed` line; this numbers and names the page now turned to.
     case 'pageTurn': {
       const name = content.chapters[e.chapter]?.pages[e.page]?.name;
-      return { kind: 'note', text: name === undefined || name === '' ? `Page ${e.page + 1}` : name };
+      return { kind: 'note', text: name === undefined || name === '' ? `Page ${e.page + 1}` : `Page ${e.page + 1}: ${name}` };
     }
     case 'finished': return { kind: 'note', text: 'The book is finished' };
     case 'completed': {

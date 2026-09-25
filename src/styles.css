@@ -52,7 +52,9 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .bar { height: var(--bar); border: 1px solid var(--track-edge); border-radius: 3px; background: var(--track); position: relative; overflow: hidden; }
-.bar__fill { position: absolute; inset: 0 auto 0 0; background: var(--core); }
+/* Spec 2026-09-24-screen-pass 4: every bar glides into the next tick's value. A reset jumps instead, because each fill
+   element is keyed on the counter whose change is the reset, so it remounts, and a new element does not transition. */
+.bar__fill { position: absolute; inset: 0 auto 0 0; background: var(--core); transition: width var(--tick) linear; }
 .bar__fill--run { background: var(--run); }
 .bar__fill--hp { background: var(--hurt); }
 .bar__fill--warn { background: var(--warn); }
@@ -60,8 +62,22 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .bar__value { font-size: 10px; text-align: center; color: var(--ink-2); font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; }
 .bar__value b { color: var(--ink); font-weight: 400; margin-left: 4px; }
 
-.chunk { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; }
-.chunk__head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 4px; }
+ /* Every region of the screen is one box with its heading inside at the top edge (spec 2026-09-24-screen-pass 2.4, mockup
+   2026-09-24-regions treatment A). The heading spans every column: several regions are grids, and the band's is multi-column,
+   so without the span its heading would sit in the first 360px cell. */
+.region { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; }
+.region__head { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); grid-column: 1 / -1; }
+.region__head--book { color: var(--ink); letter-spacing: .14em; }
+/* The chapter's rows sit flush in their frame: no side padding, the rows' side borders dropped and the frame's standing in, so
+   the row's 712px floor is 710 of row plus the frame's two border pixels and the chapter column's minimum is unchanged (spec
+   2.4; the user's pick for the phone's sake). The heading and the story keep the region's inset. Written after .region: the
+   padding rules share a specificity, so order decides. */
+.region--chapter { padding: 8px 0; }
+.region--chapter > .region__head, .region--chapter > .head__story { padding-inline: 10px; }
+.region--chapter .row { border-inline: 0; border-radius: 0; }
+/* The running row's ember frame keeps its two vertical edges (the user, on the live build): with no side borders they are
+   painted inside the row as an inset shadow, so the row's width does not change. */
+.region--chapter .row.working { box-shadow: inset 1px 0 0 var(--run), inset -1px 0 0 var(--run); }
 .item { border: 1px solid var(--edge); background: var(--item); border-radius: 4px; }
 
 /* After .item on purpose, and scoped to it: .item's border shorthand would otherwise reset the ember colour. */
@@ -69,14 +85,15 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .item.working::after { content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--run) 12%, transparent), transparent); animation: sheen 2.2s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .item.working::after { display: none; } }
+@media (prefers-reduced-motion: reduce) { .item.working::after { display: none; } .bar__fill { transition: none; } }
 
 .health .bar { height: var(--bar-health); }
 .health__value { text-align: center; font-weight: 700; font-size: 14px; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .health__value small { font-weight: 400; color: var(--ink-2); }
 
-/* Fixed-width cells that wrap by window width; the player's window decides how many per row (mockup 2026-09-23-wrapping-band). */
-.skills { display: grid; grid-template-columns: repeat(auto-fill, 360px); gap: 4px; }
+/* Cells at least 360px that stretch to fill the band and wrap by window width (mockup 2026-09-23-wrapping-band, amended by spec
+   2026-09-24-screen-pass 2.5 for one width): three at 1280, four under the 1600 cap. */
+.skills { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 4px; }
 .skill { display: grid; grid-template-columns: 1.4em 4.5em 3em 1fr; gap: 3px 6px; align-items: center; padding: 5px 7px; }
 .skill--on { background: var(--cell-on); }
 .skill__icon, .skill__name { grid-row: span 2; }
@@ -88,9 +105,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .skill--on .skill__lv { color: var(--ink); }
 
 .chapter { display: grid; gap: 5px; align-content: start; }
-.head { padding: 6px 8px 8px; }
-.head__line { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
-.head__story { margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
+.head__story { margin: 0 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--edge); font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); }
 /* The name column keeps the 24-character budget for skill plus noun (09-22 8.1), "Fight the harbor pirates". */
 .row { display: grid; grid-template-columns: calc(1.6em + 8px + 24ch) minmax(0, 1fr) auto; gap: 0 10px; align-items: center; padding: 6px 8px; }
 .row--on { background: var(--cell-on); }
@@ -101,8 +116,11 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .row__c1 b { font-weight: 700; }
 /* The middle chunk stacks (09-22 8.4): needs on their own line above the inputs, one input per line, so every row
    fits the chapter column, which is 712px at the 732px floor and 714px at 1280 (plan Task 7; mockup
-   2026-09-23-queue-orders frame d). Every row reserves three lines of the words at their own size, so no row changes
-   height when an instruction or a waiting look comes or goes, and nothing below it moves under the cursor. */
+   2026-09-23-queue-orders frame d): the row is that width less the frame's two border pixels, 710 and 712, since its
+   own side borders are gone. That floor is a chosen width, the one the words in the middle chunk fit at, held by
+   .screen's min-width and the column tiers; the row's own grid would shrink far below it. Every row reserves three
+   lines of the words at their own size, so no row changes height when an instruction or a waiting look comes or goes,
+   and nothing below it moves under the cursor. */
 .row__c2 { display: grid; grid-template-columns: minmax(0, 1fr) 1.2em 14ch; gap: 0 6px; align-items: center; min-height: calc(3 * 1.15 * 11px); }
 .row__in { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
 .row__in > span { white-space: nowrap; }
@@ -111,10 +129,13 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .need--unmet { border-color: var(--hurt); color: var(--hurt-text); }
 .row__short { color: var(--warn); }
 .row__short small { color: var(--ink-2); margin-left: 6px; font-size: 11px; }
+.row__short--quiet { color: var(--ink-2); }
+.row__short--quiet small { color: var(--ink-2); margin-left: 6px; font-size: 11px; }
 .row__arr { color: var(--edge-on); text-align: center; }
 .row__out { display: flex; flex-direction: column; white-space: nowrap; }
 .row__say { grid-column: 1 / -1; text-align: center; color: var(--warn); font-size: 11px; line-height: 1.15;
   overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+.row__say--fading { opacity: 0; transition: opacity var(--fade); }
 .row__c3 { display: grid; grid-template-columns: 5em var(--control) var(--control) auto; gap: 0 8px; align-items: center; justify-items: end; }
 .row__tx { text-align: right; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .row__tx small { display: block; color: var(--ink-2); font-size: 10px; }
@@ -138,25 +159,48 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .auto--waits { border-style: dashed; }
 .auto--btn[aria-disabled="true"] { opacity: .7; cursor: default; }
 
-/* The floor is the action row, which cannot shrink below 712px, plus the page padding. Below it the page scrolls sideways; a phone layout is #62. */
-.screen { display: grid; gap: 8px; padding: 10px; min-width: 732px; container-type: inline-size; }
-.top { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
-.corner { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; font-size: 10px; color: var(--ink-2); gap: 4px; width: 14ch; }   /* pinned: "00:00 waiting" must not resize the health bar */
+/* The floor is the action row, which cannot shrink below 712px, plus the page padding. Below it the page scrolls sideways; a phone layout is #62.
+   One content width, capped (spec 2026-09-24-screen-pass 2.3): at 1920 the chapter no longer stretches to ~1354px. The four rows are the
+   top, the band, the columns and the bottom bar (the inert wrappers are display: contents); min-height reaches the window bottom so the
+   bottom bar sits there on a short page, and the 1fr row takes that slack, or a grid's default align-content would stretch every box. */
+.screen { display: grid; gap: 8px; grid-template-rows: auto auto 1fr auto; padding: 0 10px; min-width: 732px; max-width: 1600px; min-height: 100%; margin: 0 auto; container-type: inline-size; }
+/* The two bars stick (spec 2.1, 2.2). Each bleeds into the page's side padding and carries its own padding in place of the grid's gap,
+   so nothing scrolls past it through a strip either side or through the gap. */
+.top { position: sticky; top: 0; z-index: 4; background: var(--bg); margin: 0 -10px; padding: 10px 10px 4px; }
+.bottom { position: sticky; bottom: 0; z-index: 4; background: var(--bg); margin: 0 -10px; padding: 6px 10px 10px; border-top: 1px solid var(--edge);
+  display: grid; grid-template-columns: var(--control) 1fr var(--control); align-items: center; gap: 8px; }
+.bottom__clock { justify-self: center; min-width: 14ch; text-align: center; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink); }   /* pinned: "00:00 waiting" must not move the controls */
+.bottom__clock--dim { color: var(--ink-2); }
+.bottom__clock small { font-size: 10px; }
 .settings { position: relative; }
 .settings__gear { display: grid; place-items: center; padding: 0; }
 .settings__gear svg { width: 14px; height: 14px; }
-/* The panel's width is fixed, so "erase save" and "press again to erase" swap in one box and nothing moves (spec 8.1). */
-.settings__panel { position: absolute; right: 0; top: calc(var(--control) + 4px); z-index: 5; width: 22ch; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--cell); border: 1px solid var(--edge-on); border-radius: 6px; box-shadow: 0 8px 24px #0008; text-align: left; }
+/* The panel's width is fixed, so "erase save" and "press again to erase" swap in one box and nothing moves (spec 8.1). It opens upward
+   from the bottom-left gear. */
+.settings__panel { position: absolute; left: 0; bottom: calc(var(--control) + 4px); z-index: 5; width: 22ch; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--cell); border: 1px solid var(--edge-on); border-radius: 6px; box-shadow: 0 8px 24px #0008; text-align: left; }
 .settings__head { margin: 0; display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); font-weight: 400; }
-.settings__dev { letter-spacing: 0; text-transform: none; color: var(--auto); }
 .settings__btn { min-height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
 .settings__btn--armed { color: var(--hurt-text); border-color: var(--hurt-text); }
-.settings__rule { border-top: 1px solid var(--edge); }
-.settings__seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.settings__seg button { min-height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
-.settings__seg button[aria-pressed="true"] { background: var(--core); color: var(--bg); }
-.corner__clock { font-variant-numeric: tabular-nums; color: var(--ink); }
-.corner__clock--dim { color: var(--ink-2); }
+/* The debug overlay (spec 2026-09-24-screen-pass 5): dev builds only, on document.body through a portal, so position: fixed is the
+   window's. Above the settings panel (5) and the card (6). Fixed width; at most 70% of the window tall, then it scrolls inside. */
+.debug { position: fixed; z-index: 7; width: 44ch; max-height: 70vh; overflow-y: auto; display: grid; gap: 6px; padding: 0 8px 8px; background: var(--cell); border: 1px solid var(--edge-on); border-radius: 6px; box-shadow: 0 8px 24px #0008; color: var(--ink); font-family: var(--mono); font-size: 12px; }
+.debug__title { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; margin: 0 -8px; padding: 4px 8px; background: var(--cell-on); border-bottom: 1px solid var(--edge); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); cursor: move; user-select: none; }
+.debug__close { border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 14px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.debug__row { display: grid; grid-template-columns: 7ch 1fr; align-items: center; gap: 4px 6px; }
+.debug__label { color: var(--ink-2); }
+.debug__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.debug__btn, .debug__speed button { min-height: var(--control); padding: 0 6px; border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.debug__btn[aria-disabled="true"] { opacity: .7; cursor: default; color: var(--ink-2); }
+.debug__btn--end { margin-left: auto; }
+.debug__speed { display: flex; gap: 4px; margin-left: auto; }
+.debug__speed button[aria-pressed="true"] { background: var(--core); color: var(--bg); }
+.debug__note { grid-column: 2; margin: 0; font-size: 10px; color: var(--ink-2); }
+.debug__input { width: 8ch; min-height: var(--control); padding: 0 4px; border: 1px solid var(--edge-on); border-radius: 4px; background: var(--track); color: var(--ink); font: inherit; }
+.debug__toggle { grid-column: 1 / -1; justify-self: start; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+/* The markers are plain glyphs without the Emoji property; the alt text after the slash keeps them out of the accessible name. */
+.debug__toggle[aria-expanded="false"]::before { content: "\25B8  " / ""; white-space: pre; }
+.debug__toggle[aria-expanded="true"]::before { content: "\25BE  " / ""; white-space: pre; }
+.debug__line { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px; padding-left: 2ch; }
 .columns { display: grid; grid-template-columns: 1fr 250px 280px; gap: 8px; align-items: start; }
 .middle { display: grid; gap: 8px; }
 .queue { display: grid; gap: 5px; align-content: start; }
@@ -196,6 +240,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .pack { display: grid; gap: 4px; }
 .pack__item { display: grid; grid-template-columns: 1fr 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
 .pack__item--zero { color: var(--ink-2); }
+.pack__hp { color: var(--ink-2); margin-left: 4px; }
 .hurt-text { color: var(--hurt-text); }
 .pack__item--full { color: var(--warn); }
 .log__list { list-style: none; margin: 0; padding: 0; max-height: 9em; overflow-y: auto; }
@@ -204,7 +249,6 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .log__at { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .log__line--story { font-family: var(--serif); font-style: italic; font-size: 12px; }
 .log__line--note { color: var(--ink-2); }
-.top__health { position: relative; }
 .row--built .row__built { color: var(--good); grid-column: 1 / -1; }
 /* A control that does nothing right now says so: a built row, a dead run. Not below 70% (spec 8.1). */
 .btn[aria-disabled="true"]:not(.btn--stop) { opacity: .7; cursor: default; color: var(--ink-2); }
@@ -212,8 +256,13 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 
 /* A wrapper that only carries inert: it adds no box, so the grid it sits in is unchanged. */
 .inert-wrap { display: contents; }
-.columns__chapter { position: relative; }
-.card { position: absolute; left: 40px; right: 40px; top: 24px; z-index: 1; border: 1px solid var(--edge-on); background: var(--cell-on); border-radius: 6px; padding: 14px 16px; box-shadow: 0 8px 28px oklch(0% 0 0 / .5); font-variant-numeric: tabular-nums; }
+/* The chapter and its card share one grid cell, so the column is as tall as the taller of the two and the card never overhangs
+   (spec 2026-09-24-screen-pass 2.7). The card's z-index works as a static grid item, and it outranks the sticky bars' 4 only while
+   neither .columns__chapter nor .columns forms a stacking context (no z-index, opacity under 1, transform, filter, contain: paint
+   or isolation on either), or Begin goes under the bottom bar with no error. */
+.columns__chapter { display: grid; }
+.columns__chapter > * { grid-area: 1 / 1; }
+.card { align-self: start; margin: 24px 40px 0; z-index: 6; border: 1px solid var(--edge-on); background: var(--cell-on); border-radius: 6px; padding: 14px 16px; box-shadow: 0 8px 28px oklch(0% 0 0 / .5); font-variant-numeric: tabular-nums; }
 .card__title { font-family: var(--serif); font-style: italic; font-size: 16px; text-align: center; }
 .card__sub, .card__quiet { color: var(--ink-2); text-align: center; }
 .card__sub { margin-bottom: 12px; }
@@ -241,6 +290,5 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .food { display: grid; gap: 4px; }
 .food__item { display: grid; grid-template-columns: 1fr auto 90px; gap: 0 10px; align-items: center; padding: 5px 8px; font-variant-numeric: tabular-nums; }
 .food__item > span { white-space: nowrap; }   /* "cloud-fish" broke at its hyphen, and "+4 hp" at its space */
-.food__item--empty { border-color: var(--hurt); }
-.food__item--full { color: var(--warn); }
+.food__item--none { color: var(--ink-2); }
 .btn--placeholder { visibility: hidden; }

@@ -1,6 +1,7 @@
 import type { ActionId, Chapter, Content, Page } from '../data/types';
 import type { AutoMode, GameState } from '../engine/types';
 import { ActionRow } from './ActionRow';
+import { Region } from './Region';
 import { RunningHead } from './RunningHead';
 
 /** The port the life is in: its running head and its current page's rows, in the book's order (spec 2026-09-23-the-windward-run section 4). */
@@ -11,13 +12,12 @@ export function ChapterPanel({ content, book, chapter, page, state, runningActio
   onAutomate: (id: ActionId, mode: AutoMode) => void;
 }) {
   return (
-    <section className="chapter" aria-label="chapter">
-      <RunningHead book={book} head={chapter.head} page={page.name} />
+    <Region name="chapter" className="chapter" head={<RunningHead book={book} head={chapter.head} page={page.name} />}>
       {page.order.map((id) => {
         const action = content.actions[id];
         if (!action) return null;
         return <ActionRow key={id} action={action} content={content} state={state} running={id === runningActionId} onNow={onNow} onQueue={onQueue} onAutomate={onAutomate} />;
       })}
-    </section>
+    </Region>
   );
 }

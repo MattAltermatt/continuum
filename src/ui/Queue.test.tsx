@@ -160,4 +160,15 @@ describe('Queue', () => {
     }
     expect(onRemove).not.toHaveBeenCalled();
   });
+  it('an entry\'s fill glides with its row\'s progress and remounts when the row completes (spec 2026-09-24-screen-pass 4)', () => {
+    const s = enqueue(fresh(), book, 'hull');
+    const at = (progress: number, done: number): GameState =>
+      ({ ...s, work: { hull: { progress, costsConsumed: 0 } }, completionCounts: done > 0 ? { hull: done } : {} });
+    const { container, rerender } = render(<Queue state={at(1, 0)} content={book} working={0} live={true} onRemove={noop} />);
+    const before = container.querySelector('.bar__fill');
+    rerender(<Queue state={at(2, 0)} content={book} working={0} live={true} onRemove={noop} />);
+    expect(container.querySelector('.bar__fill')).toBe(before);
+    rerender(<Queue state={at(0, 1)} content={book} working={0} live={true} onRemove={noop} />);
+    expect(container.querySelector('.bar__fill')).not.toBe(before);
+  });
 });
