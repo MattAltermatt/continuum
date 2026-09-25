@@ -5,7 +5,7 @@
 Spec: `docs/specs/2026-09-24-proving-ground-and-housekeeping.md` (#54, #82, #73,
 #70, #66, #35). Branch `feature/proving-ground-and-housekeeping`.
 
-**Status (2026-09-24): executed on the branch after four plan panel rounds (the user chose to execute after round 4). Tasks 2-7 landed as b7ccb29, 4599cad, 0295321, 75ca546, 8d32582, 343448f; code panel round 1 (engine reviewer, vacuous-test hunter, plan-vs-diff reviewer, naysayer) fixed in a55e28f: MECHANICS.md, the noun title, held tabs at rest, a heal through step pinned, the hurt counter's completion branch pinned, exact proving-ground readings, the case-3 tripwire, the fake's double-grant guard, the one-tick wait pinned, the gate list. 768 tests. Awaiting the user's Chrome verify before the squash and FF-merge.**
+**Status (2026-09-25): shipped to main as a359584 (squashed), live on GitHub Pages; CI's first version check read 0.0.0 -> 0.2.0. Four plan panel rounds (the user chose to execute after round 4; every remaining finding was text-level); code panel round 1 fixed in the same slice. 768 tests. #54 #82 #73 #70 #66 closed; #35 closed on the measurement. The Chrome pass was the agent's (spec section 8's list, plus the two-tab takeover); the user can eyeball ?book=proving and two tabs at any time.**
 
 ## Revision 4 (2026-09-24, panel round 4)
 
