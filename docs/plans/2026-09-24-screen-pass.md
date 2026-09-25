@@ -3,7 +3,7 @@
 Spec: `docs/specs/2026-09-24-screen-pass.md` (#46, #76, #83, #63; leftovers on
 #43 and #78). Branch `feature/screen-pass`.
 
-**Status (2026-09-24): built, tasks 1 to 7 committed on `feature/screen-pass` (721 tests, production grep clean, Chrome pass done); code panel next, then the ship.**
+**Status (2026-09-24): shipped to main as 6aaf382 (squashed). Plan panel clean in round 5; code panel clean in round 2 (round 1: the overlay clamped only on open, a blur writing the focus-time value back, four test survivors, all fixed). 726 tests. The user saw the shell live and asked for the running row's vertical ember edges, which landed.**
 
 ## Revision 5 (2026-09-24, panel round 5)
 
