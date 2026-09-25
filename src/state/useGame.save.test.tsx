@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { balance } from '../balance';
 import type { Book } from '../data/types';
 import { saltRoadFixture } from '../test-utils/salt-road';
-import { ASIDE_KEY, AUTOSAVE_MS, SAVE_KEY } from './save';
+import { ASIDE_KEY, AUTOSAVE_MS, SAVE_KEY, saveKey } from './save';
 import { useGame, type SaveStorage } from './useGame';
 
 /** A storage the test can read back. */
@@ -27,6 +27,8 @@ const longBook: Book = {
   chapters: [{ head: { numeral: 'I', chapter: 'One', story: 'A start.' }, pages: [{ name: '', order: ['long'], closes: 'long' }] }],
 };
 
+const other: Book = { ...longBook, id: 'other' };
+
 const interval = balance.time.tickIntervalMs;
 
 describe('useGame: the save', () => {
@@ -47,14 +49,14 @@ describe('useGame: the save', () => {
     expect(again.result.current.state.work).toEqual(saved.work);
   });
   it('a corrupt save opens fresh, is set aside, and says so; a second one is kept beside it', () => {
-    const storage = fakeStorage({ [SAVE_KEY]: '{ not json' });
+    const storage = fakeStorage({ [saveKey(saltRoadFixture)]: '{ not json' });
     const { result, unmount } = renderHook(() => useGame(saltRoadFixture, { storage }));
     expect(result.current.state.life).toBe(1);
     expect(result.current.state.runTicks).toBe(0);
     expect(result.current.log[0]!.event).toEqual({ type: 'saveAside', why: 'corrupt' });
     expect(JSON.parse(storage.data[ASIDE_KEY]!)).toEqual(['{ not json']);
     unmount();
-    storage.data[SAVE_KEY] = '{"format":99}';
+    storage.data[saveKey(saltRoadFixture)] = '{"format":99}';
     renderHook(() => useGame(saltRoadFixture, { storage }));
     expect(JSON.parse(storage.data[ASIDE_KEY]!)).toEqual(['{ not json', '{"format":99}']);
   });
@@ -72,13 +74,13 @@ describe('useGame: the save', () => {
     // Two acts: one act batches every dispatch until it ends, while a browser commits between intervals.
     act(() => vi.advanceTimersByTime(AUTOSAVE_MS - interval));
     act(() => vi.advanceTimersByTime(interval));
-    const written = JSON.parse(storage.data[SAVE_KEY]!);
+    const written = JSON.parse(storage.data[saveKey(saltRoadFixture)]!);
     expect(written).toMatchObject({ bookId: saltRoadFixture.id });
     expect(written.model.state.runTicks).toBeGreaterThan(0);
-    delete storage.data[SAVE_KEY];
+    delete storage.data[saveKey(saltRoadFixture)];
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
     act(() => { document.dispatchEvent(new Event('visibilitychange')); });
-    expect(storage.data[SAVE_KEY]).toBeDefined();
+    expect(storage.data[saveKey(saltRoadFixture)]).toBeDefined();
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
   });
   it('erase removes the save and starts life 1 fresh', () => {
@@ -88,7 +90,7 @@ describe('useGame: the save', () => {
     act(() => vi.advanceTimersByTime(interval * 10));
     act(() => result.current.save());
     act(() => result.current.erase());
-    expect(storage.data[SAVE_KEY]).toBeUndefined();
+    expect(storage.data[saveKey(saltRoadFixture)]).toBeUndefined();
     expect(result.current.state.runTicks).toBe(0);
     expect(result.current.state.queue).toEqual([]);
     expect(result.current.log).toHaveLength(1);
@@ -103,6 +105,14 @@ describe('useGame: the save', () => {
     act(() => vi.advanceTimersByTime(interval * 10));
     act(() => result.current.load());
     expect(result.current.state.runTicks).toBe(saved);
+  });
+  it("another book saves under its own key and never touches the Windward Run's", () => {
+    const storage = fakeStorage({ [SAVE_KEY]: 'a windward save nobody reads here' });
+    const { result } = renderHook(() => useGame(other, { storage }));
+    act(() => result.current.save());
+    expect(storage.data[SAVE_KEY]).toBe('a windward save nobody reads here');
+    expect(storage.data[saveKey(other)]).toContain('"bookId":"other"');
+    expect(storage.data[ASIDE_KEY]).toBeUndefined();
   });
 });
 

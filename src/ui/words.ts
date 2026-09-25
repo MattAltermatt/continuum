@@ -58,7 +58,7 @@ function reason(content: Content, item: ItemId, maker: ActionId | null, gap: Sup
     case 'off': return `${row} automation is off`;
     case 'unearned': {
       const a = content.actions[maker];
-      const fraction = counts !== undefined && a !== undefined ? ` (${counts[maker] ?? 0}/${unlockAt(a)})` : '';
+      const fraction = counts !== undefined && a !== undefined ? ` (${counts[maker] ?? 0}/${unlockAt(content, a)})` : '';
       // Say what would change it, not only that it has not happened: a chip nobody earns by hand never moves (plan round five).
       return `${row} automation is not yet earned${fraction} \u00B7 earn it by hand`;
     }

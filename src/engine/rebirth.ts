@@ -56,7 +56,7 @@ export function deathSummary(dead: GameState, content: Content): DeathSummary {
   // From and to are computed the same way (Revision 1, accepted risk 1).
   // The dead state still holds its queue (rebirth clears it), so its top is what the life ended on.
   const top = dead.queue[0];
-  const during = top !== undefined && (content.actions[top.actionId]?.hurts ?? 0) > 0 ? top.actionId : null;
+  const during = top !== undefined && (content.actions[top.actionId]?.healthRate ?? 0) < 0 ? top.actionId : null;
   return {
     life: dead.life, runTicks: dead.runTicks, gain, maxHealthFrom: maxHealthFor(dead.rebirthBonus), maxHealthTo: maxHealthFor(dead.rebirthBonus + gain), coreGains,
     chapter: dead.chapter, finished: dead.finished, finishes: dead.finishes + (dead.finished ? 1 : 0), during,

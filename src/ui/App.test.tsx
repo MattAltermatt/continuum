@@ -17,13 +17,13 @@ const fishCeiling = (w.cloudFish.healPerUnit / ticksToSeconds(balance.health.foo
 
 describe('App', () => {
   it('renders every chunk', () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     for (const name of ['health', 'skills', 'chapter', 'queue', 'rates', 'food', 'pack', 'log']) {
       expect(screen.getByLabelText(name)).toBeInTheDocument();
     }
   });
   it('every region is a box whose heading starts with its name; the chapter\'s is the book\'s; health has none (spec 2026-09-24-screen-pass 2.4)', () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     for (const name of ['skills', 'queue', 'rates', 'food', 'pack', 'log']) {
       const region = screen.getByLabelText(name);
       expect(region, name).toHaveClass('region');
@@ -34,17 +34,17 @@ describe('App', () => {
     expect(screen.getByLabelText('health').querySelector('.region__head')).toBeNull();
   });
   it('starts live, idle, with a pause control and the run clock at zero', () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     expect(screen.getByRole('button', { name: 'pause' })).toBeInTheDocument();
     expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('00:00');
     expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('idle');
   });
   it('reports the tick rate as visually hidden text (the tuning hook, not this test, keeps it off a literal)', () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     expect(screen.getByText(`${ticksPerSecond()} ticks per second`)).toHaveClass('visually-hidden');
   });
   it('the dev handle commits synchronously: a read right after step sees the new state', () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     const handle = window.continuum!;
     // Outside act on purpose: Chrome drives the handle with no test harness to flush React.
     // Without flushSync this reads 0. (The layout effect keeps the ref current within the
@@ -61,7 +61,7 @@ describe('App', () => {
     }
   });
   it('queued work shows the sheen while live, and none of it while paused', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     act(() => { screen.getAllByRole('button', { name: /^add to queue/ })[0]!.click(); });
     expect(container.querySelector('.working')).toBeInTheDocument();
     act(() => { screen.getByRole('button', { name: 'pause' }).click(); });
@@ -69,7 +69,7 @@ describe('App', () => {
     expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('paused');
   });
   it('a producer that fills hands over with no stopped frame: the hull runs on the frame the last scrap lands', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     const handle = window.continuum!;
     act(() => { handle.dispatch({ type: 'queue', actionId: 'salvage' }); handle.dispatch({ type: 'queue', actionId: 'hull' }); });
     const cap = balance.inventory.stackCap;
@@ -81,7 +81,7 @@ describe('App', () => {
     expect(container.querySelector('.entry.working')).toHaveTextContent('the hull');
   }, 30_000);   // steps the real App tick by tick: fast on a laptop, generous for a slow runner
   it('an empty queue refilled by a priority row hands over with no stopped frame: no idle note, the row runs', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     const handle = window.continuum!;
     const fresh = newState(windwardRun.roster);
     const state = { ...fresh, paused: 'none' as const, completionCounts: { salvage: balance.automation.unlockRepeatable }, automation: { salvage: 'mid' as const }, queue: [{ id: 0, actionId: 'fish', mode: 'once' as const, by: 'player' as const }], nextEntryId: 1 };
@@ -92,7 +92,7 @@ describe('App', () => {
     expect(container.querySelector('.row.working')).toHaveTextContent('drifting scrap');
   }, 30_000);   // steps the real App tick by tick: fast on a laptop, generous for a slow runner
   it('paused, a top that would leave on resume is not lit as where work resumes', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     act(() => { screen.getByRole('button', { name: 'pause' }).click(); });
     act(() => window.continuum!.dispatch({ type: 'queue', actionId: 'hull' }));
     expect(window.continuum!.state().queue.map((e) => e.actionId)).toEqual(['hull']);
@@ -101,7 +101,7 @@ describe('App', () => {
     expect(container.querySelector('.entry--on')).toHaveTextContent('the cloud shallows');
   });
   it('the bottom bar holds the gear, the run clock and pause; nothing is left of the corner', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     const bar = screen.getByLabelText('bottom bar');
     expect(bar).toBe(container.querySelector('main > .inert-wrap > footer'));
     expect([...bar.querySelectorAll('button, [role="timer"]')].map((el) => el.getAttribute('aria-label'))).toEqual(['settings', 'run clock', 'pause']);
@@ -109,7 +109,7 @@ describe('App', () => {
     expect(container.querySelector('.top')?.children).toHaveLength(1);
   });
   it('death: the card is up over the chapter, every chunk behind it is inert, and Begin starts life 2', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     const handle = window.continuum!;
     act(() => { handle.dispatch({ type: 'queue', actionId: 'fish' }); handle.step(ticksPerFish); handle.dispatch({ type: 'setHealth', health: 0.001 }); handle.step(1); });
     expect(handle.state().dead).toBe(true);
@@ -136,7 +136,7 @@ describe('App', () => {
     expect(container.querySelector('[inert]')).toBeNull();
   });
   it('the book finished: the finish card is up in the death card\'s place, and Read again starts the next life at port I', async () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     const handle = window.continuum!;
     const done = { ...newState(windwardRun.roster), dead: true, finished: true, paused: 'system' as const, chapter: 2, runTicks: 600, life: 7 };
     act(() => { handle.dispatch({ type: 'load', model: { state: done, log: [], nextSeq: 0 } }); });
@@ -150,7 +150,7 @@ describe('App', () => {
     expect(handle.state()).toMatchObject({ life: 8, finishes: 1, chapter: 0, dead: false, finished: false, paused: 'none' });
   });
   it('a hurting row that runs puts its hurt on the rates chunk, by its skill', () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     const handle = window.continuum!;
     const hurts = balance.content.windward.pirates.hurts;
     expect(screen.getByLabelText('rates')).not.toHaveTextContent(/fight/);
@@ -162,7 +162,7 @@ describe('App', () => {
     expect(screen.getByLabelText('rates')).not.toHaveTextContent(/fight/);
   });
   it('on Port Cinder\'s second page the chapter shows that page: its name in the running head, only its rows listed', () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     const handle = window.continuum!;
     act(() => { handle.dispatch({ type: 'load', model: { state: built(handle.state(), 'hull', 'net', 'satchel', 'sails'), log: [], nextSeq: 0 } }); });
     const chapter = screen.getByLabelText('chapter');
@@ -171,7 +171,7 @@ describe('App', () => {
     expect(rows).toEqual(['add to queue: Fish the cloud shallows', 'add to queue: Fight the harbor pirates']);
   });
   it('an earned chip pressed sets the row\'s automation', async () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     const handle = window.continuum!;
     const earned = { ...newState(windwardRun.roster), paused: 'none' as const, completionCounts: { fish: balance.automation.unlockRepeatable } };
     act(() => { handle.dispatch({ type: 'load', model: { state: earned, log: [], nextSeq: 0 } }); });
@@ -179,16 +179,16 @@ describe('App', () => {
     expect(handle.state().automation.fish).toBe('jit');
   });
   it('the middle column stacks rates, food, pack, then the log (spec 8.6)', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     const labels = [...container.querySelectorAll('.middle > [aria-label]')].map((e) => e.getAttribute('aria-label'));
     expect(labels).toEqual(['rates', 'food', 'pack', 'log']);
   });
   it('rates dim while the clock is stopped (idle at the start)', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     expect(container.querySelector('.rates')).toHaveClass('rates--stopped');
   });
   it('the food line is wired to covers: short with an empty larder, covered once a fish lands, and live while working', () => {
-    const { container } = render(<App />);
+    const { container } = render(<App book={windwardRun} />);
     const handle = window.continuum!;
     expect(container.querySelector('.rates__food--short')).toHaveTextContent('+0.00 hp/s');
     act(() => { handle.dispatch({ type: 'queue', actionId: 'fish' }); handle.step(ticksPerFish); });
@@ -198,7 +198,7 @@ describe('App', () => {
     expect(screen.getByLabelText('rates')).toHaveTextContent('\u22120.10 hp/s \u25B2');   // decay is wired, not only its color
   });
   it('the debug overlay opens on the backquote and its speed group follows the game\'s speed (spec 2026-09-24-screen-pass 5)', () => {
-    render(<App />);
+    render(<App book={windwardRun} />);
     expect(screen.queryByRole('dialog', { name: 'debug' })).toBeNull();
     act(() => { fireEvent.keyDown(document, { code: 'Backquote' }); });
     act(() => window.continuum!.speed(10));
@@ -208,5 +208,10 @@ describe('App', () => {
     // The overlay's own press reaches the hook: App wires onSpeed to setSpeed.
     act(() => { screen.getByRole('button', { name: '\u00D7100' }).click(); });
     expect(pressed()).toEqual(['\u00D7100']);
+  });
+  it('shows no tab card where there is no lock manager (the hook test covers that it plays)', () => {
+    render(<App book={windwardRun} />);
+    expect(screen.queryByLabelText('open in another tab')).toBeNull();
+    expect(screen.queryByLabelText('continued in another tab')).toBeNull();
   });
 });

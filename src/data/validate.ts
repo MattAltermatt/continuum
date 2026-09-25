@@ -66,7 +66,8 @@ export function validateBook(book: Book): readonly string[] {
       // Held, not spent: it has to fit in a stack before any capacity row is done (spec 2026-09-24-pages section 4.1).
       else if (n.amount > balance.inventory.stackCap) problems.push(`row "${a.id}" needs ${n.amount} of "${n.item}", more than a stack holds at the base cap (${balance.inventory.stackCap})`);
     }
-    if (a.hurts !== undefined && !(Number.isFinite(a.hurts) && a.hurts > 0)) problems.push(`row "${a.id}" hurts by ${a.hurts}, which is not a positive number`);
+    if (a.healthRate !== undefined && !(Number.isFinite(a.healthRate) && a.healthRate !== 0)) problems.push(`row "${a.id}" has a health rate of ${a.healthRate}; it must be a number other than zero`);
+    if (a.unlockAt !== undefined && !positiveWhole(a.unlockAt)) problems.push(`row "${a.id}" earns its chip at ${a.unlockAt} completions, which is not a positive whole number`);
     const effect = a.healthDecayMultiplier !== undefined || a.capacityBonus !== undefined || a.gear !== undefined;
     if (effect && !a.isOneTime) problems.push(`row "${a.id}" has an effect but is repeatable`);
     if (a.capacityBonus !== undefined && !(Number.isInteger(a.capacityBonus) && a.capacityBonus > 0)) problems.push(`row "${a.id}" raises the stack by ${a.capacityBonus}, which is not a positive whole number`);
@@ -74,6 +75,10 @@ export function validateBook(book: Book): readonly string[] {
       if (!(Number.isFinite(a.gear.multiplier) && a.gear.multiplier > 0)) problems.push(`row "${a.id}" gears by ${a.gear.multiplier}, which is not a positive number`);
       if (!seen.has(a.gear.skill)) problems.push(`row "${a.id}" gears "${a.gear.skill}", which is not in the roster`);
     }
+  }
+  for (const key of ['unlockRepeatable', 'unlockOneTime'] as const) {
+    const n = book.automation?.[key];
+    if (n !== undefined && !positiveWhole(n)) problems.push(`${key} is ${n}, which is not a positive whole number`);
   }
   for (const item of Object.values(book.items)) {
     if (item.one !== undefined && item.one.trim() === '') problems.push(`item "${item.id}" has an empty name for one unit`);

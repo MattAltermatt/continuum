@@ -85,7 +85,7 @@ function foodDue(state: GameState, content: Content, tried: ReadonlySet<ActionId
   for (const a of rowsHere(state, content)) {
     // Any chip, not only JIT (#81, the user: "if the player runs out of food, and the action is automated, it
     // goes to the top of this list"): priority food otherwise waited for an empty queue behind a press's chain.
-    if (!makesFood(content, a) || tried.has(a.id) || modeOf(state, a) === 'off') continue;
+    if (!makesFood(content, a) || tried.has(a.id) || modeOf(state, content, a) === 'off') continue;
     if (count(state.inventory, a.producedItem!) > 0) continue;
     if (fillUnderWay(state, a.id)) continue;
     if (startBlock(state, content, a.id) !== null) continue;
@@ -101,7 +101,7 @@ function foodDue(state: GameState, content: Content, tried: ReadonlySet<ActionId
  */
 function provisionDue(state: GameState, content: Content, tried: ReadonlySet<ActionId>): ActionId | null {
   for (const a of rowsHere(state, content)) {
-    if (!makesFood(content, a) || tried.has(a.id) || modeOf(state, a) !== 'jit' || state.provisioned.includes(a.id)) continue;
+    if (!makesFood(content, a) || tried.has(a.id) || modeOf(state, content, a) !== 'jit' || state.provisioned.includes(a.id)) continue;
     if (count(state.inventory, a.producedItem!) >= capOf(state, content, a.producedItem!)) continue;
     if (startBlock(state, content, a.id) !== null) continue;
     return a.id;
@@ -117,7 +117,7 @@ function provisionDue(state: GameState, content: Content, tried: ReadonlySet<Act
  */
 function jitMeal(state: GameState, content: Content, tried: ReadonlySet<ActionId>): ActionId | null {
   const avoid = killers(state, content);
-  return rowsHere(state, content).find((a) => makesFood(content, a) && modeOf(state, a) === 'jit' && !tried.has(a.id) && !avoid.has(a.id) && startBlock(state, content, a.id, avoid) === null)?.id ?? null;
+  return rowsHere(state, content).find((a) => makesFood(content, a) && modeOf(state, content, a) === 'jit' && !tried.has(a.id) && !avoid.has(a.id) && startBlock(state, content, a.id, avoid) === null)?.id ?? null;
 }
 
 /**
@@ -128,7 +128,7 @@ function jitMeal(state: GameState, content: Content, tried: ReadonlySet<ActionId
 function bestIdle(state: GameState, content: Content, tried: ReadonlySet<ActionId>): ActionId | null {
   let best: { readonly id: ActionId; readonly rank: number } | null = null;
   for (const a of rowsHere(state, content)) {
-    const mode = modeOf(state, a);
+    const mode = modeOf(state, content, a);
     if (!isPriority(mode) || tried.has(a.id)) continue;
     const rank = rankOf(mode);
     if (best !== null && rank >= best.rank) continue;
@@ -161,7 +161,7 @@ function fillLeft(state: GameState, content: Content, id: ActionId): number {
 function readyHigher(state: GameState, content: Content, tried: ReadonlySet<ActionId>, betterThan: number, except: ActionId): ActionId | null {
   let best: { readonly id: ActionId; readonly rank: number } | null = null;
   for (const a of rowsHere(state, content)) {
-    const mode = modeOf(state, a);
+    const mode = modeOf(state, content, a);
     if (!isPriority(mode) || tried.has(a.id) || a.id === except || a.isOneTime || a.producedItem === undefined) continue;
     const rank = rankOf(mode);
     if (rank >= betterThan || (best !== null && rank >= best.rank)) continue;
@@ -257,7 +257,7 @@ export function resolve(state: GameState, content: Content): Resolved {
       // Tied to the fight (`for`), so it leaves if the fight does (code panel round two: delays outlived their fight).
       if (delay !== null) { byAutomation(delay, 'delay', undefined, top.id); continue; }
       // An automated fight never stops (the user: "it should kill the player if there is no other action to run").
-      if (!automated(s, action) && anyCalm(s, content)) {
+      if (!automated(s, content, action) && anyCalm(s, content)) {
         pop(); tried.add(action.id); events.push({ type: 'popped', actionId: action.id, reason: 'hurt' }); continue;
       }
     }

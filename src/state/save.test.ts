@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Book } from '../data/types';
 import { validateBook } from '../data/validate';
+import { windwardRun } from '../data/windward-run';
 import { enqueue, newState } from '../engine/queue';
 import { setPaused, step } from '../engine/tick';
 import type { GameState } from '../engine/types';
 import { testBook } from '../test-utils/book';
 import { saltRoadFixture as book } from '../test-utils/salt-road';
-import { ASIDE_KEEP, asideText, loadSave, reconcile, SAVE_FORMAT, saveText } from './save';
+import { ASIDE_KEEP, asideText, loadSave, reconcile, SAVE_FORMAT, SAVE_KEY, saveKey, saveText } from './save';
 import type { Model } from './useGame';
 
 /** A mid-run model: a queue with the player's orders and automation's (a supply and a fill), kept work, automation and counters, and a log. */
@@ -191,5 +192,12 @@ describe('reconcile', () => {
     expect(reconcile({ ...m.state, chapter: 0.5 }, twoPorts).chapter).toBe(0);
     expect(reconcile({ ...m.state, chapter: -1 }, twoPorts).chapter).toBe(0);
     expect(reconcile({ ...m.state, chapter: 1 }, twoPorts).chapter).toBe(1);
+  });
+});
+
+describe('saveKey', () => {
+  it('is the bare key for the Windward Run, so every existing save keeps loading, and a suffixed key for any other book', () => {
+    expect(saveKey(windwardRun)).toBe(SAVE_KEY);
+    expect(saveKey({ id: 'proving-ground' })).toBe(`${SAVE_KEY}.proving-ground`);
   });
 });

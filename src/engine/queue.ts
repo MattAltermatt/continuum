@@ -83,12 +83,12 @@ export type Supply =
  */
 export function supplyVia(state: GameState, content: Content, item: ItemId, seen: ReadonlySet<ActionId>): Supply {
   const makers = makersOf(state, content, item);
-  const on = makers.filter((a) => modeOf(state, a) !== 'off').sort((a, b) => rankOf(modeOf(state, a)) - rankOf(modeOf(state, b)));
+  const on = makers.filter((a) => modeOf(state, content, a) !== 'off').sort((a, b) => rankOf(modeOf(state, content, a)) - rankOf(modeOf(state, content, b)));
   let blocked: Supply | null = null;
   for (const m of on) {
     if (seen.has(m.id)) { blocked ??= { kind: 'gap', maker: m.id, gap: 'blocked' }; continue; }
     const block = blockOf(state, content, m.id, new Set([...seen, m.id]));
-    if (block === null) return { kind: 'ok', maker: m.id, mode: modeOf(state, m) };
+    if (block === null) return { kind: 'ok', maker: m.id, mode: modeOf(state, content, m) };
     if (blocked === null) {
       const cause = causeOf(block, seen, m.id);
       blocked = cause === undefined ? { kind: 'gap', maker: m.id, gap: 'blocked' } : { kind: 'gap', maker: m.id, gap: 'blocked', cause };
@@ -97,7 +97,7 @@ export function supplyVia(state: GameState, content: Content, item: ItemId, seen
   if (blocked !== null) return blocked;
   const first = makers[0];
   if (first === undefined) return { kind: 'gap', maker: null, gap: 'none' };
-  const gap = isUnlocked(state, first) ? 'off' : 'unearned';
+  const gap = isUnlocked(state, content, first) ? 'off' : 'unearned';
   // A maker the player would run by hand that cannot start by hand either: name what stops it, as for an automated one.
   // `seen` stops the walk at a row already on the chain, so a cycle of makers ends instead of recursing.
   if (!seen.has(first.id)) {
@@ -192,7 +192,7 @@ export function enqueue(state: GameState, content: Content, id: ActionId, opts: 
   const mode = action.isOneTime || opts.once === true ? 'once' : 'repeat';
   // Shift on a hurting row forces it (#74 section 3.3): fought to the end, never backed off. Automation never forces.
   // A hurting repeatable too (code panel): the refusal names Shift+play, so Shift+play must keep that promise.
-  const forced = by === 'player' && opts.once === true && (action.hurts ?? 0) > 0;
+  const forced = by === 'player' && opts.once === true && (action.healthRate ?? 0) < 0;
   const base: QueueEntry = forced ? { id: state.nextEntryId, actionId: id, mode, by, forced: true } : { id: state.nextEntryId, actionId: id, mode, by };
   const filled: QueueEntry = by === 'auto' && mode === 'repeat' && opts.left !== undefined ? { ...base, left: opts.left } : base;
   const entry: QueueEntry = by === 'auto' && opts.for !== undefined ? { ...filled, for: opts.for } : filled;
@@ -247,7 +247,7 @@ function complete(state: GameState, content: Content, action: ActionDefinition, 
   const done = (s.completionCounts[action.id] ?? 0) + 1;
   s = { ...s, completionCounts: { ...s.completionCounts, [action.id]: done }, work: { ...s.work, [action.id]: NO_WORK } };
   events.push({ type: 'completed', actionId: action.id, oneTime: action.isOneTime });
-  if (done === unlockAt(action)) events.push({ type: 'unlocked', actionId: action.id });
+  if (done === unlockAt(content, action)) events.push({ type: 'unlocked', actionId: action.id });
   if (action.isOneTime) s = { ...s, completedOneTime: [...s.completedOneTime, action.id] };
   const top = s.queue[0];
   if (action.isOneTime || top?.mode === 'once' || (top?.left !== undefined && top.left <= 1)) s = { ...s, queue: s.queue.slice(1) };

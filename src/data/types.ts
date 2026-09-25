@@ -41,8 +41,10 @@ export interface ActionDefinition {
   /** Checked, never spent (section 6.2). */
   readonly needs?: readonly ItemCost[];
   readonly isOneTime: boolean;
-  /** Health lost per second while this row runs (section 6.1). */
-  readonly hurts?: number;
+  /** This row's own completions-to-chip, over its book's and balance's (spec 2026-09-24-proving-ground section 2.1). */
+  readonly unlockAt?: number;
+  /** Health per second while this row is on top and works: negative takes it, positive gives it, never past max (spec 2026-09-24-proving-ground section 1). */
+  readonly healthRate?: number;
   /** Effects on completion, for the rest of the life. One-time rows only (section 6.3). */
   readonly healthDecayMultiplier?: number;
   readonly capacityBonus?: number;
@@ -89,6 +91,8 @@ export interface Content {
   readonly chapters: readonly Chapter[];
   /** The last chapter's event: its completion finishes the book. */
   readonly finish: ActionId;
+  /** The book's completions-to-chip by kind, over balance.automation's; a row's unlockAt is over both (section 2.1). */
+  readonly automation?: { readonly unlockRepeatable?: number; readonly unlockOneTime?: number };
 }
 
 /** A book: content plus what the shelf and the play need. The format a generator emits. */

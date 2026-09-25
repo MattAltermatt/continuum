@@ -14,7 +14,7 @@ const content = fixture;
 const live = (s: GameState) => setPaused(s, 'none');
 /** Gives rows their chips. Takes the content, so a local variant's rows work too. */
 const earned = (c: Content, s: GameState, ...ids: string[]): GameState =>
-  ({ ...s, completionCounts: { ...s.completionCounts, ...Object.fromEntries(ids.map((id) => [id, unlockAt(c.actions[id]!)])) } });
+  ({ ...s, completionCounts: { ...s.completionCounts, ...Object.fromEntries(ids.map((id) => [id, unlockAt(c, c.actions[id]!)])) } });
 /**
  * Steps `c` until the predicate holds (bounded), collecting every event. An
  * idle step returns its input, whose events are the previous tick's, so events
@@ -222,20 +222,20 @@ describe('progress never runs past an unpaid unit (MECHANICS section 2)', () => 
 describe('completion', () => {
   const on = (s: GameState, id: string, mode: 'repeat' | 'once' = 'repeat'): GameState => ({ ...s, queue: [{ id: 0, actionId: id, mode, by: 'player' }], work: { [id]: { progress: content.actions[id]!.expCost - 0.05, costsConsumed: 0 } } });
   it('counts up completionCounts, and unlocked fires on the completion that reaches unlockAt, not the next', () => {
-    const before = { ...fresh(), completionCounts: { salvage: unlockAt(content.actions.salvage!) - 1 } };
+    const before = { ...fresh(), completionCounts: { salvage: unlockAt(content, content.actions.salvage!) - 1 } };
     const first = work(on(before, 'salvage'), content);
-    expect(first.state.completionCounts.salvage).toBe(unlockAt(content.actions.salvage!));
+    expect(first.state.completionCounts.salvage).toBe(unlockAt(content, content.actions.salvage!));
     expect(first.events).toContainEqual({ type: 'unlocked', actionId: 'salvage' });
     const second = work(on(first.state, 'salvage'), content);
     expect(second.events.some((e) => e.type === 'unlocked')).toBe(false);
   });
   it('a one-time earns its chip on the completion that reaches its own threshold, through a once entry', () => {
     const gate = content.actions.gate!;
-    expect(unlockAt(gate)).toBe(balance.automation.unlockOneTime);
-    const before = { ...fresh(), completionCounts: { gate: unlockAt(gate) - 1 } };
+    expect(unlockAt(content, gate)).toBe(balance.automation.unlockOneTime);
+    const before = { ...fresh(), completionCounts: { gate: unlockAt(content, gate) - 1 } };
     const after = work(on(before, 'gate', 'once'), content);
     expect(after.state.completedOneTime).toEqual(['gate']);
-    expect(after.state.completionCounts.gate).toBe(unlockAt(gate));
+    expect(after.state.completionCounts.gate).toBe(unlockAt(content, gate));
     expect(after.events).toContainEqual({ type: 'unlocked', actionId: 'gate' });
   });
   it("the port's event counts its completion on the cast-off path, and the book's finish on the finishing path", () => {

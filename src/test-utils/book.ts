@@ -17,7 +17,7 @@ export const testBook: Book = {
   length: { hours: 30 },
   actions: {
     ...fixture.actions,
-    raid: { ...fixture.actions.raid!, hurts: 1, beat: 'The raiders scatter. We cast off.' },
+    raid: { ...fixture.actions.raid!, healthRate: -1, beat: 'The raiders scatter. We cast off.' },
     net: {
       id: 'net', verb: 'rig', noun: 'a net', expCost: 2, itemCosts: [{ item: 'scrap', amount: 2 }], isOneTime: true,
       gear: { skill: 'fish', multiplier: 1.25 },

@@ -4,6 +4,7 @@
  * aside under a second key, never loaded and never silently overwritten.
  */
 import type { Book } from '../data/types';
+import { windwardRun } from '../data/windward-run';
 import { cycleOf, withoutOrphans } from '../engine/automation';
 import { NO_STATS } from '../engine/queue';
 import { here } from '../engine/rows';
@@ -12,6 +13,14 @@ import type { GameState } from '../engine/types';
 import type { Model } from './useGame';
 
 export const SAVE_KEY = 'continuum.save';
+/**
+ * The Windward Run keeps the bare key, so every save written before books had
+ * keys still loads; any other book has its own. (A book id of "aside" would
+ * collide with ASIDE_KEY; no book is called that.)
+ */
+export function saveKey(book: Pick<Book, 'id'>): string {
+  return book.id === windwardRun.id ? SAVE_KEY : `${SAVE_KEY}.${book.id}`;
+}
 export const ASIDE_KEY = 'continuum.save.aside';
 /** Bumped by hand whenever the saved shape changes. */
 export const SAVE_FORMAT = 1;

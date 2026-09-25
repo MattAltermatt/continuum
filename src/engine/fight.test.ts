@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Content } from '../data/types';
 import { unlockAt } from './automation';
-import { delayFor, fightWindow, hurtBlock, playBlock, stops, wouldKill } from './fight';
+import { delayFor, fightWindow, hurtBlock, hurts, playBlock, stops, wouldKill } from './fight';
 import { built, fixture, withOrder } from './fixture';
 import { damagePerTick } from './health';
 import { enqueue, newState, removeEntry, startBlock } from './queue';
@@ -11,7 +11,7 @@ import { ticksPerSecond } from './time';
 import type { GameState, QueueEntry } from './types';
 
 /** The fixture's raid hurts; a pass is in hand, and the rest of its page is built, so it can start. */
-const content: Content = { ...fixture, actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, hurts: 1 } } };
+const content: Content = { ...fixture, actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, healthRate: -1 } } };
 const raid = content.actions.raid!;
 const live = (s: GameState) => setPaused(s, 'none');
 /** The raid closes its page (spec 2026-09-24-pages): these tests are about the fight, so they start past the rows it waits on. */
@@ -33,7 +33,7 @@ const threshold = (s: GameState) => {
 };
 /** Health just under the threshold: about to die. */
 const edge = (extra: Partial<GameState> = {}) => { const s = at(extra); return { ...s, health: threshold(s) - 1e-6 }; };
-const fishOnJit = { completionCounts: { fish: unlockAt(content.actions.fish!) }, automation: { fish: 'jit' as const } };
+const fishOnJit = { completionCounts: { fish: unlockAt(content, content.actions.fish!) }, automation: { fish: 'jit' as const } };
 
 describe('about to die (#74, spec 2026-09-24 section 3.1)', () => {
   it('would kill agrees with fighting the window out, across health, with and without food in the pack', () => {
@@ -105,20 +105,20 @@ describe('the three cases (section 3.2)', () => {
       ...content,
       actions: {
         ...content.actions,
-        gate: { ...content.actions.gate!, hurts: 1 },
+        gate: { ...content.actions.gate!, healthRate: -1 },
         tolls: { id: 'tolls', verb: 'salvage', noun: 'tolls', expCost: 1, producedItem: 'scrap', producedAmount: 1, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: false },
       },
       chapters: [withOrder(content.chapters[0]!, ['fish', 'tolls', 'gate', 'raid']), content.chapters[1]!],
     };
-    const counts = { tolls: unlockAt(tolls.actions.tolls!), gate: unlockAt(tolls.actions.gate!) };
+    const counts = { tolls: unlockAt(tolls, tolls.actions.tolls!), gate: unlockAt(tolls, tolls.actions.gate!) };
     const s = { ...at({ completionCounts: counts, automation: { tolls: 'jit' as const, gate: 'jit' as const }, completedOneTime: [] }), inventory: {} };
     expect(startBlock(s, tolls, 'tolls')).toBeNull();
     expect(delayFor(s, tolls, new Set())).toBeNull();
   });
   it('an automated fight that would kill, with no harvest to buy time, fights on though a row could be run by hand (the user)', () => {
-    const gateHurts: Content = { ...content, actions: { ...content.actions, gate: { ...content.actions.gate!, hurts: 1 } } };
+    const gateHurts: Content = { ...content, actions: { ...content.actions, gate: { ...content.actions.gate!, healthRate: -1 } } };
     const gate = gateHurts.actions.gate!;
-    const low = live({ ...newState(content.roster), health: 0.05, completionCounts: { gate: unlockAt(gate) }, automation: { gate: 'high' } });
+    const low = live({ ...newState(content.roster), health: 0.05, completionCounts: { gate: unlockAt(gateHurts, gate) }, automation: { gate: 'high' } });
     expect(wouldKill(low, gateHurts, gate)).toBe(true);
     expect(stops(low, gateHurts, gate)).toBe(false);
     const after = step(low, gateHurts);
@@ -133,18 +133,18 @@ describe('the three cases (section 3.2)', () => {
 describe('what buys time (section 3.2 case 1)', () => {
   it('foods first: with fish and salvage both on JIT, the fish delays the fight even when salvage comes first in order', () => {
     const c: Content = { ...content, chapters: [withOrder(content.chapters[0]!, ['salvage', 'fish', 'hull', 'satchel', 'gate', 'raid']), content.chapters[1]!] };
-    const both = { completionCounts: { fish: unlockAt(c.actions.fish!), salvage: unlockAt(c.actions.salvage!) }, automation: { fish: 'jit' as const, salvage: 'jit' as const } };
+    const both = { completionCounts: { fish: unlockAt(c, c.actions.fish!), salvage: unlockAt(c, c.actions.salvage!) }, automation: { fish: 'jit' as const, salvage: 'jit' as const } };
     expect(delayFor(edge({ ...both, inventory: { pass: 1, fish: 1 } }), c, new Set())).toBe('fish');
   });
   it('then the best rank: salvage on high goes before salvage on low when no food is automated', () => {
-    const counts = { salvage: unlockAt(content.actions.salvage!) };
+    const counts = { salvage: unlockAt(content, content.actions.salvage!) };
     const withAlt = { ...content, actions: { ...content.actions, salvage2: { ...content.actions.salvage!, id: 'salvage2' } },
       chapters: [withOrder(content.chapters[0]!, ['fish', 'salvage', 'salvage2', 'raid']), content.chapters[1]!] };
-    const s = edge({ completionCounts: { ...counts, salvage2: unlockAt(content.actions.salvage!) }, automation: { salvage: 'low', salvage2: 'high' } });
+    const s = edge({ completionCounts: { ...counts, salvage2: unlockAt(content, content.actions.salvage!) }, automation: { salvage: 'low', salvage2: 'high' } });
     expect(delayFor(s, withAlt, new Set())).toBe('salvage2');
   });
   it('a one-time never buys time, though it is automated and could start', () => {
-    const s = edge({ completionCounts: { gate: unlockAt(content.actions.gate!) }, automation: { gate: 'jit' }, inventory: {}, completedOneTime: [] });
+    const s = edge({ completionCounts: { gate: unlockAt(content, content.actions.gate!) }, automation: { gate: 'jit' }, inventory: {}, completedOneTime: [] });
     expect(startBlock(s, content, 'gate')).toBeNull();
     expect(delayFor(s, content, new Set())).toBeNull();
   });
@@ -161,19 +161,19 @@ describe('what buys time (section 3.2 case 1)', () => {
     const c: Content = {
       ...content,
       items: { ...content.items, stew: { id: 'stew', name: 'stew', kind: 'food', healPerUnit: 4 } },
-      actions: { ...content.actions, gate: { ...content.actions.gate!, hurts: 1 },
+      actions: { ...content.actions, gate: { ...content.actions.gate!, healthRate: -1 },
         stew: { id: 'stew', verb: 'fish', noun: 'a stew', expCost: 1, producedItem: 'stew', producedAmount: 1, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: false } },
       chapters: [withOrder(content.chapters[0]!, ['stew', 'gate']), content.chapters[1]!],
     };
     const s = live({ ...newState(content.roster), health: 0.05, inventory: { stew: 1 },
-      completionCounts: { stew: unlockAt(c.actions.stew!), gate: unlockAt(c.actions.gate!) }, automation: { stew: 'jit', gate: 'jit' } });
+      completionCounts: { stew: unlockAt(c, c.actions.stew!), gate: unlockAt(c, c.actions.gate!) }, automation: { stew: 'jit', gate: 'jit' } });
     expect(wouldKill(s, c, c.actions.gate!)).toBe(true);
     expect(startBlock(s, c, 'stew')).toBeNull();
     expect(step(s, c)).toBe(s);
   });
   it('an automated fight still waits behind a harvest that buys time, and no play is refused on it', () => {
     const s = live({ ...newState(content.roster), completedOneTime: raidPage, inventory: { pass: 1, fish: 1 }, foodCooldowns: { fish: 50 }, health: 0.5, work: { raid: { progress: 5, costsConsumed: 0 } },
-      queue: [entry()], nextEntryId: 1, completionCounts: { raid: unlockAt(raid), fish: unlockAt(content.actions.fish!) }, automation: { raid: 'high', fish: 'jit' } });
+      queue: [entry()], nextEntryId: 1, completionCounts: { raid: unlockAt(content, raid), fish: unlockAt(content, content.actions.fish!) }, automation: { raid: 'high', fish: 'jit' } });
     expect(wouldKill(s, content, raid)).toBe(true);
     const r = step(s, content);
     expect(r.queue.map((e) => e.actionId)).toEqual(['fish', 'raid']);
@@ -183,7 +183,7 @@ describe('what buys time (section 3.2 case 1)', () => {
 });
 
 describe('code panel round two', () => {
-  const salvageOnJit = { completionCounts: { salvage: unlockAt(content.actions.salvage!) }, automation: { salvage: 'jit' as const } };
+  const salvageOnJit = { completionCounts: { salvage: unlockAt(content, content.actions.salvage!) }, automation: { salvage: 'jit' as const } };
   it('a harvest the player would not live through buys no time: the fight stops instead of draining them to death', () => {
     const doomed = at({ ...salvageOnJit, health: 0.05 });
     expect(wouldKill(doomed, content, raid)).toBe(true);
@@ -206,11 +206,11 @@ describe('code panel round two', () => {
 describe('code panel round three', () => {
   const guarded: Content = {
     ...content,
-    actions: { ...content.actions, gate: { ...content.actions.gate!, hurts: 1 },
+    actions: { ...content.actions, gate: { ...content.actions.gate!, healthRate: -1 },
       door: { id: 'door', verb: 'rig', noun: 'the door', expCost: 1, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: true } },
     chapters: [withOrder(content.chapters[0]!, ['fish', 'salvage', 'gate', 'door', 'raid']), content.chapters[1]!],
   };
-  const gateJit = { gate: unlockAt(guarded.actions.gate!) };
+  const gateJit = { gate: unlockAt(guarded, guarded.actions.gate!) };
   it('Shift on a fight carries through the fight that supplies it: the gate is forced too, and time passes', () => {
     // The raid closes the page, so it pulls the gate as a page prerequisite, not as its pass's supply (spec
     // 2026-09-24-pages section 4.2). The wardens are a fight the page does not close, listed after the gate,
@@ -218,7 +218,7 @@ describe('code panel round three', () => {
     const warded: Content = {
       ...guarded,
       actions: { ...guarded.actions,
-        wardens: { id: 'wardens', verb: 'fight', noun: 'the wardens', expCost: 1, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: true, hurts: 1 } },
+        wardens: { id: 'wardens', verb: 'fight', noun: 'the wardens', expCost: 1, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: true, healthRate: -1 } },
       chapters: [withOrder(guarded.chapters[0]!, ['fish', 'salvage', 'gate', 'door', 'wardens', 'raid']), guarded.chapters[1]!],
     };
     const s = live({ ...newState(content.roster), health: 0.3, completionCounts: gateJit, automation: { gate: 'jit' } });
@@ -254,7 +254,7 @@ describe('an automated fight yields to what is ranked above it (the user: "nothi
   // The raid closes its page and waits on the hull there (spec 2026-09-24-pages); here it is a fight the page
   // does not close, so the hull goes before it by rank alone, which is what these tests are about.
   const unclosed: Content = { ...content, chapters: [withOrder(content.chapters[0]!, ['fish', 'salvage', 'hull', 'satchel', 'raid', 'gate'], 'gate'), content.chapters[1]!] };
-  const chips = { raid: unlockAt(raid), hull: unlockAt(unclosed.actions.hull!) };
+  const chips = { raid: unlockAt(unclosed, raid), hull: unlockAt(unclosed, unclosed.actions.hull!) };
   const at2 = (raidMode: 'low' | 'high', hullMode: 'top' | 'last') => ({ ...edge({ inventory: { pass: 1, scrap: 8 },
     completionCounts: chips, automation: { raid: raidMode, hull: hullMode }, completedOneTime: [] }) });
   it('a one-time ranked above the fight runs first, once, in front of it', () => {
@@ -272,7 +272,7 @@ describe('an automated fight yields to what is ranked above it (the user: "nothi
     expect(r.runTicks).toBe(s.runTicks + 1);
   });
   it('one short of materials is no delay: its supply would run past what the player survives', () => {
-    const s = { ...at2('low', 'top'), inventory: { pass: 1 }, completionCounts: { ...chips, salvage: unlockAt(unclosed.actions.salvage!) }, automation: { raid: 'low' as const, hull: 'top' as const, salvage: 'mid' as const } };
+    const s = { ...at2('low', 'top'), inventory: { pass: 1 }, completionCounts: { ...chips, salvage: unlockAt(unclosed, unclosed.actions.salvage!) }, automation: { raid: 'low' as const, hull: 'top' as const, salvage: 'mid' as const } };
     expect(startBlock(s, unclosed, 'hull')).toBeNull();   // it could start, through Salvage
     expect(delayFor(s, unclosed, new Set(), raid)).not.toBe('hull');
   });
@@ -300,7 +300,7 @@ describe('settled while a fight would kill (panel round two: the state churned w
     ...content,
     actions: {
       ...content.actions,
-      gate: { ...content.actions.gate!, hurts: 1 },
+      gate: { ...content.actions.gate!, healthRate: -1 },
       door: { id: 'door', verb: 'rig', noun: 'the door', expCost: 1, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: true },
     },
     chapters: [withOrder(content.chapters[0]!, ['fish', 'gate', 'door', 'raid']), content.chapters[1]!],
@@ -308,7 +308,7 @@ describe('settled while a fight would kill (panel round two: the state churned w
   const gate = churn.actions.gate!;
   const low = (automation: GameState['automation']) => live({
     ...newState(content.roster), health: 0.05, inventory: { fish: 200 },
-    completionCounts: { gate: unlockAt(gate), door: unlockAt(churn.actions.door!) }, automation,
+    completionCounts: { gate: unlockAt(churn, gate), door: unlockAt(churn, churn.actions.door!) }, automation,
   });
   it('a JIT fight waits for demand (#79): with nothing asking for its pass, an idle step is the same object', () => {
     const s = low({ gate: 'jit' });
@@ -330,7 +330,7 @@ describe('Shift forces (section 3.3)', () => {
     expect(enqueue(base, content, 'raid').queue[0]!.forced).toBeUndefined();
     expect(enqueue(base, content, 'fish', { once: true }).queue[0]!.forced).toBeUndefined();
     // A hurting repeatable forces too: its refusal names Shift+play, so Shift+play must keep that promise.
-    const hurtingSalvage: Content = { ...content, actions: { ...content.actions, salvage: { ...content.actions.salvage!, hurts: 1 } } };
+    const hurtingSalvage: Content = { ...content, actions: { ...content.actions, salvage: { ...content.actions.salvage!, healthRate: -1 } } };
     expect(enqueue(base, hurtingSalvage, 'salvage', { once: true }).queue[0]!.forced).toBe(true);
     expect(enqueue(base, content, 'raid', { once: true, by: 'auto' }).queue[0]!.forced).toBeUndefined();
   });
@@ -346,5 +346,13 @@ describe('Shift forces (section 3.3)', () => {
     expect(playBlock(s, content, 'raid')).toEqual({ kind: 'hurt' });
     expect(playBlock(s, content, 'raid', true)).toBeNull();
     expect(playBlock({ ...s, health: 50 }, content, 'raid')).toBeNull();
+  });
+});
+
+describe('hurts', () => {
+  it('reads the sign: a healing row is not a fight', () => {
+    expect(hurts({ ...fixture.actions.raid!, healthRate: 1 })).toBe(false);
+    expect(hurts({ ...fixture.actions.raid!, healthRate: -1 })).toBe(true);
+    expect(hurts({ ...fixture.actions.raid!, healthRate: undefined })).toBe(false);
   });
 });

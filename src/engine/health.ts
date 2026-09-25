@@ -85,17 +85,20 @@ export function covers(state: GameState, content: Content): boolean {
   return foodCeilingPerSecond(state, content) >= decayPerSecond(state);
 }
 
-/** Health a hurting top row takes this second (section 6.1). 0 when the top does not hurt. */
-export function hurtsPerSecond(state: GameState, content: Content): number {
+/** The top row's health rate this second, signed (spec 2026-09-24-proving-ground section 1). 0 when the top has none. */
+export function rowHealthPerSecond(state: GameState, content: Content): number {
   const top = state.queue[0];
-  return (top === undefined ? undefined : content.actions[top.actionId]?.hurts) ?? 0;
+  return (top === undefined ? undefined : content.actions[top.actionId]?.healthRate) ?? 0;
 }
 
-/** Applied per tick after decay, only on a tick the top works (step calls it after resolve said ready). */
-export function applyHurts(state: GameState, content: Content): GameState {
-  const perTick = hurtsPerSecond(state, content) / ticksPerSecond();
+/**
+ * Applied per tick after decay, only on a tick the top works (step calls it
+ * after resolve said ready). A drain can kill; a heal stops at max, like eating.
+ */
+export function applyRowHealth(state: GameState, content: Content): GameState {
+  const perTick = rowHealthPerSecond(state, content) / ticksPerSecond();
   if (perTick === 0) return state;
-  const health = state.health - perTick;
+  const health = state.health + perTick;
   if (health <= 0) return { ...state, health: 0, dead: true, paused: 'system', events: [...state.events, { type: 'died', runTicks: state.runTicks }] };
-  return { ...state, health };
+  return { ...state, health: Math.min(state.maxHealth, health) };
 }

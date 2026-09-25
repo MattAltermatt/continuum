@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import type { Content } from '../data/types';
 import { newState } from './queue';
-import { applyDecay, covers, damagePerTick, decayPerSecond, eat, feeding, foodCeilingPerSecond, foodsByHeal } from './health';
+import { applyDecay, applyRowHealth, covers, damagePerTick, decayPerSecond, eat, feeding, foodCeilingPerSecond, foodsByHeal, rowHealthPerSecond } from './health';
 import { ticksPerSecond, ticksToSeconds } from './time';
 import type { GameState } from './types';
 
@@ -154,5 +154,40 @@ describe('rates, true this second (spec 2026-09-23 section 4.1)', () => {
     const late = { ...newState(content.roster), runTicks: balance.time.ticksPerMinute * 12, inventory: { berries: 5 } };
     expect(decayPerSecond(late)).toBeGreaterThan(perBite);
     expect(covers(late, content)).toBe(false);
+  });
+});
+
+describe('applyRowHealth', () => {
+  const rows = (healthRate: number): Content => ({
+    ...content,
+    actions: { camp: { id: 'camp', verb: 'build', noun: 'camp', expCost: 1, itemCosts: [], isOneTime: false, healthRate } },
+  });
+  const onTop = (c: Content, hp: number): GameState => ({ ...newState(c.roster), health: hp, queue: [{ id: 0, actionId: 'camp', mode: 'repeat', by: 'player' }] });
+  it('a positive rate heals by its per-tick share', () => {
+    const s = applyRowHealth(onTop(rows(2), 50), rows(2));
+    expect(s.health).toBeCloseTo(50 + 2 / ticksPerSecond(), 9);
+    expect(s.dead).toBe(false);
+  });
+  it('a heal stops at max and never overheals', () => {
+    const c = rows(2);
+    expect(applyRowHealth({ ...onTop(c, 100), maxHealth: 100 }, c).health).toBe(100);
+    expect(applyRowHealth({ ...onTop(c, 99.95), maxHealth: 100 }, c).health).toBe(100);
+  });
+  it('a negative rate drains and can kill, with the death event', () => {
+    const c = rows(-30);
+    const s = applyRowHealth(onTop(c, 1), c);
+    expect(s.health).toBe(0);
+    expect(s.dead).toBe(true);
+    expect(s.events).toContainEqual({ type: 'died', runTicks: 0 });
+  });
+  it('no rate on top: the same state object', () => {
+    const c = rows(2);
+    const s = { ...onTop(c, 50), queue: [] };
+    expect(applyRowHealth(s, c)).toBe(s);
+    expect(rowHealthPerSecond(s, c)).toBe(0);
+  });
+  it('rowHealthPerSecond is signed', () => {
+    expect(rowHealthPerSecond(onTop(rows(-0.5), 50), rows(-0.5))).toBe(-0.5);
+    expect(rowHealthPerSecond(onTop(rows(2), 50), rows(2))).toBe(2);
   });
 });

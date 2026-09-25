@@ -78,6 +78,15 @@ describe('ActionRow: what the row reads', () => {
     row(past({ ...fresh(), inventory: { pass: 1 } }), 'raid');
     expect(screen.getByText('needs a pass')).not.toHaveClass('need--unmet');
   });
+  it('the noun carries its full text as a title, since the column clips a long one', () => {
+    const r = row(fresh(), 'hull');
+    expect(r.el().querySelector('.row__c1 > span')).toHaveAttribute('title', book.actions.hull!.noun);
+  });
+  it('a healing row prints its rate with a plus in heal-text', () => {
+    const past = (s: GameState) => built(s, 'hull', 'satchel', 'net', 'gate');
+    row(past(fresh()), 'raid', false, { ...book, actions: { ...book.actions, raid: { ...book.actions.raid!, healthRate: 1 } } });
+    expect(screen.getByText('+1.00 hp/s')).toHaveClass('heal-text');
+  });
   it('an input part spent reads what is still owed; short of it, a warning and what the pack has, quiet when the page makes it', () => {
     const kept = { ...fresh(), work: { hull: { progress: 5, costsConsumed: 5 } } };
     // Salvage is on the page: play pulls it (spec 2026-09-24-pages 4.3), so the shortfall reads in the quiet colour.
@@ -174,7 +183,7 @@ describe('ActionRow: play and +', () => {
     expect(r.el().querySelector('.row__say')).toHaveTextContent('too hurt to fight: one more push would end this life \u00B7 Shift+play fights to the end');
   });
   it('a set chip on a fight that would kill does not wait and is not refused: automated, it fights on (the user, 2026-09-24)', async () => {
-    const s = built({ ...fresh(), inventory: { pass: 1 }, health: 0.5, completionCounts: { raid: unlockAt(book.actions.raid!) }, automation: { raid: 'high' as const } }, 'hull', 'satchel', 'net', 'gate');
+    const s = built({ ...fresh(), inventory: { pass: 1 }, health: 0.5, completionCounts: { raid: unlockAt(book, book.actions.raid!) }, automation: { raid: 'high' as const } }, 'hull', 'satchel', 'net', 'gate');
     const r = row(s, 'raid');
     expect(r.el().querySelector('.row__say')).toBeNull();
     await act(() => realClick(play()));

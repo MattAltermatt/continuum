@@ -72,6 +72,16 @@ new issues, milestone moves — and ask once for the whole thing.
 
 ## 5. Squash, then stop
 
+Bump `version` in `package.json` (patch; minor when a milestone closes) before
+the squash commit, and check it the way CI will, before the push:
+
+```bash
+git diff --quiet main -- src || [ "$(git show main:package.json | jq -r .version)" != "$(jq -r .version package.json)" ] || echo "src changed since main: bump the version"
+```
+
+CI's `verify` job fails on a push to `main` that changed `src/` since its
+previous tip without a bump, and the site does not update until one lands.
+
 ```bash
 git reset --soft main && git commit    # one commit that reads as "what shipped"
 ```

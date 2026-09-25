@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { anyCalm, automated, delayFor, hurts } from './fight';
 import type { ActionId, Content } from '../data/types';
+import { provingGround } from '../data/proving-ground';
 import { windwardRun } from '../data/windward-run';
 import { cycleOf, modeOf, setAutomation, unlockAt } from './automation';
 import { capOf } from './effects';
@@ -57,7 +58,7 @@ function starving(s: GameState, content: Content): readonly ActionId[] {
   return pageOf(s, content).order.filter((id) => {
     const a = content.actions[id]!;
     const food = a.producedItem !== undefined && content.items[a.producedItem]?.kind === 'food';
-    if (!food || modeOf(s, a) === 'off' || (s.inventory[a.producedItem!] ?? 0) > 0 || startBlock(s, content, id) !== null) return false;
+    if (!food || modeOf(s, content, a) === 'off' || (s.inventory[a.producedItem!] ?? 0) > 0 || startBlock(s, content, id) !== null) return false;
     const i = s.queue.findIndex((e) => e.actionId === id);
     if (i < 0) return true;
     const above = s.queue.slice(0, i);
@@ -72,6 +73,8 @@ function starving(s: GameState, content: Content): readonly ActionId[] {
 let backedOff = 0;
 /** Deaths under an automated fight the invariant checked. */
 let automatedDeaths = 0;
+/** Case 3 (#74): a chip-off fight dying with nothing at all to run. The proving ground's last stand is the one page that reaches it. */
+let case3Deaths = 0;
 /** Page turns, closer pulls and prerequisites moved up, so the page tests show they were exercised (spec 2026-09-24-pages). */
 let pageTurns = 0;
 let movedUp = 0;
@@ -90,7 +93,7 @@ function play(content: Content, seed: number, actions: number, chapter = 0, page
   const rand = lcg(seed);
   const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)]!;
   const ids = Object.keys(content.actions);
-  const earned = Object.fromEntries(ids.map((id) => [id, unlockAt(content.actions[id]!)]));
+  const earned = Object.fromEntries(ids.map((id) => [id, unlockAt(content, content.actions[id]!)]));
   const start = startAt(content, chapter, page);
   let s: GameState = setPaused({ ...newState(content.roster), completionCounts: earned, chapter, ...start }, 'none');
   const settle = (x: GameState): GameState => (x.paused === 'none' && !x.dead ? resolve(x, content).state : x);
@@ -137,12 +140,12 @@ function play(content: Content, seed: number, actions: number, chapter = 0, page
       // delay to take. A fight queued by hand with its chip off kills only when nothing at all could run.
       const fight = top === undefined ? undefined : content.actions[top.actionId];
       if (s.dead && !s.finished && top !== undefined && top.forced !== true && hurts(fight)) {
-        if (automated(before, fight!)) {
+        if (automated(before, content, fight!)) {
           automatedDeaths++;
           expect(delayFor(before, content, new Set(), fight), `seed ${seed}, action ${n}: ${top.actionId} killed with a delay to take`).toBeNull();
         // Random play has never reached this branch (a chip-off fight dying with nothing at all to run): case 3 is
         // pinned by fight.test.ts, not here. It stays as a tripwire.
-        } else expect(anyCalm(before, content), `seed ${seed}, action ${n}: ${top.actionId} killed with something else to run`).toBe(false);
+        } else { case3Deaths++; expect(anyCalm(before, content), `seed ${seed}, action ${n}: ${top.actionId} killed with something else to run`).toBe(false); }
       }
       // Liveness (round five): a JIT food out and makeable is on its way by the next tick.
       const now = new Set(starving(s, content));
@@ -172,7 +175,7 @@ function play(content: Content, seed: number, actions: number, chapter = 0, page
     if (s.paused === 'none') for (const id of pageOf(s, content).order) {
       const a = content.actions[id]!;
       const food = a.producedItem !== undefined && content.items[a.producedItem]?.kind === 'food';
-      if (!food || modeOf(s, a) === 'off' || (s.inventory[a.producedItem!] ?? 0) > 0 || startBlock(s, content, id) !== null) continue;
+      if (!food || modeOf(s, content, a) === 'off' || (s.inventory[a.producedItem!] ?? 0) > 0 || startBlock(s, content, id) !== null) continue;
       const i = s.queue.findIndex((e) => e.actionId === id);
       expect(i >= 0 && !s.queue.slice(0, i).some((e) => e.by === 'player'), `${at}: ${id} out and not on its way: ${shown}`).toBe(true);
     }
@@ -206,5 +209,12 @@ describe('seeded random play keeps the queue sound', () => {
     }));
     expect(backedOff, 'the fight rule never came up: the invariant checked nothing').toBeGreaterThan(0);
     expect(automatedDeaths, 'no automated fight died: its invariant checked nothing').toBeGreaterThan(0);
+  }, 60_000);
+  it('on the proving ground, from each page of each chapter', () => {
+    case3Deaths = 0;
+    provingGround.chapters.forEach((ch, chapter) => ch.pages.forEach((_, page) => {
+      for (const seed of [31, 32]) play(provingGround, seed + 10 * chapter + 100 * page, 3000, chapter, page);
+    }));
+    expect(case3Deaths, 'the last stand never killed with nothing calm: case 3 checked nothing').toBeGreaterThan(0);
   }, 60_000);
 });

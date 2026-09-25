@@ -121,6 +121,11 @@ describe('Queue', () => {
     const { container } = render(<Queue state={enqueue(fresh(), book, 'raid')} content={book} working={-1} live={true} onRemove={noop} />);
     expect(container.querySelector('.entry__third')).toHaveTextContent('\u22121.00 hp/s');
   });
+  it('a healing row shows its rate with a plus on its order', () => {
+    const healing = { ...book, actions: { ...book.actions, raid: { ...book.actions.raid!, healthRate: 1 } } };
+    const { container } = render(<Queue state={enqueue(fresh(), healing, 'raid')} content={healing} working={-1} live={true} onRemove={noop} />);
+    expect(container.querySelector('.entry__third .heal-text')).toHaveTextContent('+1.00 hp/s');
+  });
   it('every entry keeps all its lines, so none changes height and no x moves', () => {
     const s = enqueue(enqueue(enqueue(fresh(), book, 'fish'), book, 'hull'), book, 'raid');
     const { container } = render(<Queue state={s} content={book} working={0} live={true} onRemove={noop} />);

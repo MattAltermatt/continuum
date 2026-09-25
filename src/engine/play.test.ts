@@ -6,7 +6,7 @@ import { canJit } from './automation';
 import { declaredTicks, attentive, formatGameTime, freezeCause, handsOn, play, prioritized, type Policy } from './play';
 import { fixture, withOrder } from './fixture';
 import { stops } from './fight';
-import { unlockAt } from './automation';
+import { setAutomation, unlockAt } from './automation';
 import { enqueue, newState } from './queue';
 import { setPaused, step } from './tick';
 import type { GameState } from './types';
@@ -264,7 +264,7 @@ describe('play', { timeout: 30_000 }, () => {
     // The fixture's raid hurts and is the port's only one-time; a pass is in hand. Salvage is always there to run
     // instead, so a raid that would kill stops (case 2) rather than carrying on as the only row (case 3).
     const book: Book = { ...fixture, id: 'raid-book', name: 'Raid', version: 1, length: { hours: 1 },
-      actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, hurts: 1 } },
+      actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, healthRate: -1 } },
       chapters: [withOrder(fixture.chapters[0]!, ['fish', 'salvage', 'raid']), fixture.chapters[1]!] };
     const low = (fish: number) => setPaused({ ...newState(book.roster), health: 0.3, inventory: { pass: 1, fish }, work: { raid: { progress: 5, costsConsumed: 0 } } }, 'none');
     it('is a freeze the policy caused, found only by Shift+play: the plain press backs off, the forced one fights', () => {
@@ -283,12 +283,12 @@ describe('play', { timeout: 30_000 }, () => {
       const forced = attentive.decide(full, book);
       expect(forced.queue[0]).toMatchObject({ actionId: 'raid', forced: true });
       // The prioritized player puts the raid on a chip: automated, it fights on by itself, so nothing is forced.
-      const chipped = prioritized.decide({ ...full, completionCounts: { raid: unlockAt(book.actions.raid!) } }, book);
+      const chipped = prioritized.decide({ ...full, completionCounts: { raid: unlockAt(book, book.actions.raid!) } }, book);
       expect(chipped.automation.raid).toBeDefined();
       expect(chipped.queue.some((e) => e.forced === true)).toBe(false);
     });
     it('under case 1 they leave the time-buying to automation: the fight is queued plain, never forced', () => {
-      const one = { ...low(1), foodCooldowns: { fish: balance.health.foodCooldownTicks }, completionCounts: { fish: unlockAt(book.actions.fish!) }, automation: { fish: 'jit' as const } };
+      const one = { ...low(1), foodCooldowns: { fish: balance.health.foodCooldownTicks }, completionCounts: { fish: unlockAt(book, book.actions.fish!) }, automation: { fish: 'jit' as const } };
       expect(stops(one, book, book.actions.raid!)).toBe(false);
       const d = attentive.decide(one, book);
       expect(d.queue.some((e) => e.forced === true)).toBe(false);
@@ -351,11 +351,69 @@ describe('prioritized, when automation leaves the queue empty (#78 task 6)', () 
     // The state the probe froze in: the hull, net and satchel chipped high, Salvage not yet earned, fish full.
     const book = windwardRun;
     const chips = { hull: 'high', net: 'high', satchel: 'high', sails: 'low', fish: 'jit' } as const;
-    const counts = Object.fromEntries(Object.keys(chips).map((id) => [id, unlockAt(book.actions[id]!)]));
+    const counts = Object.fromEntries(Object.keys(chips).map((id) => [id, unlockAt(book, book.actions[id]!)]));
     const s: GameState = setPaused({ ...newState(book.roster), completionCounts: counts, automation: chips, inventory: { 'cloud-fish': balance.inventory.stackCap } }, 'none');
     expect(step(s, book).runTicks).toBe(s.runTicks);
     const decided = prioritized.decide(s, book);
     expect(decided.queue.map((e) => e.actionId)).toContain('hull');
     expect(step(decided, book).runTicks).toBeGreaterThan(s.runTicks);
+  });
+});
+
+describe('touches and hurt share', () => {
+  const book = monumentBook(3, 30);
+  it('one ask that changed the state is one touch, whatever it queued; an ask that changed nothing is none', () => {
+    // One ask queues three orders (one touch); every later ask returns the state as it is. The run then freezes
+    // once the orders are spent, so the count is exactly one, not a function of how fast berries are eaten.
+    const once: Policy = {
+      name: 'three at once', sane: false, checkEverySeconds: 0,
+      decide: (s, b) => (s.queue.length > 0 || (s.completionCounts.shelter ?? 0) > 0 ? s : ['forage', 'mine', 'shelter'].reduce((acc, id) => enqueue(acc, b, id), s)),
+    };
+    const run = play(book, once);
+    expect(run.outcome).toBe('frozen');
+    expect(run.touchesPerLife).toEqual([1]);
+  });
+  it('a chip switched is a touch, like an order', () => {
+    // The book earns a chip at one completion: one ask orders forage (a touch), a later ask switches it to JIT
+    // (a touch), and every ask after that changes nothing. Two touches in the one life; the run freezes when the
+    // full stack blocks JIT's idle fill.
+    const ready = { ...book, automation: { unlockRepeatable: 1 } };
+    let switched = false;
+    const chip: Policy = {
+      name: 'one chip', sane: false, checkEverySeconds: 0,
+      decide: (s, b) => {
+        if ((s.completionCounts.forage ?? 0) >= 1 && !switched) { switched = true; return setAutomation(s, b, 'forage', 'jit'); }
+        return switched || s.queue.length > 0 ? s : enqueue(s, b, 'forage');
+      },
+    };
+    const run = play(ready, chip);
+    expect(run.outcome).toBe('frozen');
+    expect(run.touchesPerLife[0]).toBe(2);
+  });
+  it('hurt share is the share of ticks the working row drained on, the killing tick included; 0 for a book that does not hurt', () => {
+    expect(play(book, attentive).hurtShare).toBe(0);
+    // The monument drains: it hurts on every tick it works, and the run still finishes.
+    const fight = { ...book, actions: { ...book.actions, monument: { ...book.actions.monument!, healthRate: -0.1 } } };
+    const run = play(fight, attentive);
+    expect(run.outcome).toBe('finished');
+    expect(run.hurtShare).toBeGreaterThan(0);
+    expect(run.hurtShare).toBeLessThanOrEqual(1);
+    // Every row drains, so nothing calm can run instead and the fight guard lets the drain go on (#74 case 3):
+    // 3 hp a tick kills a fresh player on tick 34, and every tick of every life is a hurt tick, the killing one included.
+    const killer = { ...book, actions: Object.fromEntries(Object.entries(book.actions).map(([id, a]) => [id, { ...a, healthRate: -30 }])) };
+    const dead = play(killer, attentive, { ...balance.play, maxBookDays: 1 / 24 / 60 });
+    expect(dead.lives).toBeGreaterThan(1);
+    expect(dead.hurtShare).toBe(1);   // without the killing tick it would be (total - deaths) / total
+  });
+  it('the completing tick counts for the row that completed, not for whatever is on top after it', () => {
+    // One hurting one-time row that is the finish: every tick drains, and the last one pops the queue empty, so a
+    // counter that read the top after the tick would miss it (30 ticks at 0.1 xp a tick; 29/30 without the event).
+    const one: Book = {
+      id: 'one', name: 'One', version: 1, finish: 'stand', length: { hours: 1 },
+      roster: [{ id: 'fight', name: 'Fight', icon: 'sword' }], items: {},
+      chapters: [{ head: { numeral: 'I', chapter: 'One', story: '.' }, pages: [{ name: '', order: ['stand'], closes: 'stand' }] }],
+      actions: { stand: { id: 'stand', verb: 'fight', noun: 'it', expCost: 3, itemCosts: [], isOneTime: true, healthRate: -1 } },
+    };
+    expect(play(one, attentive)).toMatchObject({ outcome: 'finished', totalTicks: 30, hurtShare: 1 });
   });
 });

@@ -81,7 +81,7 @@ export const windwardRun: Book = {
       capacityBonus: n.satchel.capacity, beat: 'A canvas satchel. Room for more of everything.',
     },
     pirates: {
-      id: 'pirates', verb: 'fight', noun: 'the harbor pirates', expCost: n.pirates.expCost, itemCosts: [], isOneTime: true, hurts: n.pirates.hurts,
+      id: 'pirates', verb: 'fight', noun: 'the harbor pirates', expCost: n.pirates.expCost, itemCosts: [], isOneTime: true, healthRate: -n.pirates.hurts,
       beat: 'The harbor pirates scatter. The dock is ours again.',
     },
     sails: {
@@ -96,7 +96,7 @@ export const windwardRun: Book = {
     ruin: { id: 'ruin', verb: 'salvage', noun: 'the ruin', expCost: n.ruin.expCost, producedItem: 'brass', producedAmount: 1, itemCosts: [], isOneTime: false },
     wardens: {
       id: 'wardens', verb: 'fight', noun: 'the wardens', expCost: n.wardens.expCost, producedItem: 'inner-door', producedAmount: 1, itemCosts: [], isOneTime: true,
-      hurts: n.wardens.hurts, beat: 'The last warden stills. The inner door stands open.',
+      healthRate: -n.wardens.hurts, beat: 'The last warden stills. The inner door stands open.',
     },
     halls: {
       id: 'halls', verb: 'search', noun: 'the halls', expCost: n.halls.expCost, producedItem: 'star-chart', producedAmount: 1, itemCosts: [],
@@ -116,7 +116,7 @@ export const windwardRun: Book = {
     },
     compass: {
       id: 'compass', verb: 'fight', noun: 'the guardian', expCost: n.compass.expCost, itemCosts: [], needs: [{ item: 'star-chart', amount: 1 }], isOneTime: true,
-      hurts: n.compass.hurts,
+      healthRate: -n.compass.hurts,
       beat: 'The Sky Compass is ours. A maker’s mark nobody aboard can read, and a rumor: the one man who knows it deals cards on the Gilded Fortune.',
     },
     dealers: { id: 'dealers', verb: 'talk', noun: 'to the dealers', expCost: n.dealers.expCost, producedItem: 'chips', producedAmount: 1, itemCosts: [], isOneTime: false },
@@ -138,7 +138,7 @@ export const windwardRun: Book = {
     },
     enforcers: {
       id: 'enforcers', verb: 'fight', noun: 'the enforcers', expCost: n.enforcers.expCost, producedItem: 'lift-key', producedAmount: 1, itemCosts: [],
-      needs: [{ item: 'deck-pass', amount: 1 }], isOneTime: true, hurts: n.enforcers.hurts,
+      needs: [{ item: 'deck-pass', amount: 1 }], isOneTime: true, healthRate: -n.enforcers.hurts,
       beat: 'Bruised and grinning, we take the lift key off the last of them.',
     },
     salons: {

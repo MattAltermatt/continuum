@@ -1,3 +1,5 @@
+import { MINUS } from './glyphs';
+
 /** Display formatting only. Spec section 8.1: fractions are a/b, no spaces. */
 export function fraction(a: number, b: number): string {
   return `${a.toFixed(1)}/${b.toFixed(1)}`;
@@ -62,4 +64,14 @@ export function tenths(n: number): string {
 export function healthPair(health: number, max: number): { now: string; max: string } {
   if (Number.isInteger(max)) return { now: String(health > 0 ? Math.max(1, Math.floor(health)) : 0), max: String(max) };
   return { now: health > 0 ? tenths(Math.max(0.1, health)) : '0', max: tenths(max) };
+}
+
+/** A row's health rate, signed, two decimals: -0.30 hp/s, +1.00 hp/s. Display precision, not tuning. */
+const RATE_DECIMALS = 2;
+export function hpRate(n: number): string {
+  return `${n < 0 ? MINUS : '+'}${Math.abs(n).toFixed(RATE_DECIMALS)} hp/s`;
+}
+/** The class a signed rate prints in: red for a drain, the covered-food green for a heal. */
+export function hpClass(n: number): 'hurt-text' | 'heal-text' {
+  return n < 0 ? 'hurt-text' : 'heal-text';
 }

@@ -41,13 +41,16 @@ npm run dev
 
 Then open the URL Vite prints (usually <http://localhost:5173>). The game saves
 to the browser's local storage every few seconds and when the tab is hidden;
-the gear's **erase save** starts over.
+the gear's **erase save** starts over. One tab plays at a time; a second tab
+offers to take over.
 
 **In a dev build, the backtick key** (`` ` ``) opens a movable debug overlay
 for play-testing: step time (+10s, +1m, +10m) and set the speed (×1, ×10,
 ×100), set health or die on the spot, earn every automation chip on the page
 at once, and set any skill's levels or any item's count. It is stripped from
 the production build, along with the `window.continuum` handle.
+**`?book=proving`** opens the proving ground, a dev-only book with no story
+whose rows say what should happen: one page per mechanic, for play-testing.
 
 ```sh
 npm test           # engine + component tests, one shot

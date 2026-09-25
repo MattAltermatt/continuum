@@ -13,7 +13,7 @@ const content = fixture;
 const live = (s: GameState) => setPaused(s, 'none');
 /** Gives rows their chips. Takes the content, so a local variant's rows work too. */
 const earned = (c: Content, s: GameState, ...ids: string[]): GameState =>
-  ({ ...s, completionCounts: { ...s.completionCounts, ...Object.fromEntries(ids.map((id) => [id, unlockAt(c.actions[id]!)])) } });
+  ({ ...s, completionCounts: { ...s.completionCounts, ...Object.fromEntries(ids.map((id) => [id, unlockAt(c, c.actions[id]!)])) } });
 /** Earns the rows and sets their modes. */
 const withModes = (s: GameState, c: Content, modes: Record<string, AutoMode>): GameState =>
   ({ ...earned(c, s, ...Object.keys(modes)), automation: { ...s.automation, ...modes } });
@@ -527,7 +527,7 @@ describe('a chain that cannot close (review focus 2)', () => {
     expect(step(first, press)).toBe(first);
   });
   it('a blocked row on a priority is never taken by the idle fill', () => {
-    const s = live({ ...base, completionCounts: { ...base.completionCounts, satchel: unlockAt(press.actions.satchel!) }, automation: { ...base.automation, satchel: 'high' } });
+    const s = live({ ...base, completionCounts: { ...base.completionCounts, satchel: unlockAt(press, press.actions.satchel!) }, automation: { ...base.automation, satchel: 'high' } });
     expect(step(s, press)).toBe(s);
   });
 });

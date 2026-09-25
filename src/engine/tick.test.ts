@@ -3,7 +3,7 @@ import { balance } from '../balance';
 import { built, fixture } from './fixture';
 import type { Content } from '../data/types';
 import { unlockAt } from './automation';
-import { damagePerTick, hurtsPerSecond } from './health';
+import { damagePerTick, rowHealthPerSecond } from './health';
 import { deathSummary } from './rebirth';
 import { ticksPerSecond } from './time';
 import { enqueue, newState } from './queue';
@@ -66,17 +66,25 @@ describe('step', () => {
 });
 
 describe('hurts (section 6.1)', () => {
-  const hurting: Content = { ...content, actions: { ...content.actions, raid: { ...content.actions.raid!, hurts: 1 } } };
+  const hurting: Content = { ...content, actions: { ...content.actions, raid: { ...content.actions.raid!, healthRate: -1 } } };
   /** The raid closes its page (spec 2026-09-24-pages): the rest of the page is built, so the raid itself runs. */
   const raidOn = (extra: Partial<GameState> = {}): GameState => live({ ...built(fresh(), 'hull', 'satchel', 'gate'), inventory: { pass: 1 }, queue: [{ id: 0, actionId: 'raid', mode: 'once', by: 'player' }], nextEntryId: 1, work: { raid: { progress: 5, costsConsumed: 0 } }, ...extra });
   it('a hurting top loses decay plus its hurt per tick', () => {
     const s = raidOn();
     const after = step(s, hurting);
-    expect(hurtsPerSecond(s, hurting)).toBe(1);
+    expect(rowHealthPerSecond(s, hurting)).toBe(-1);
     expect(after.health).toBeCloseTo(balance.health.base - damagePerTick(1, 1) - 1 / ticksPerSecond(), 12);
   });
+  it('a healing top gains its rate per tick after decay, and stops at max (spec 2026-09-24-proving-ground section 1)', () => {
+    const healing: Content = { ...content, actions: { ...content.actions, raid: { ...content.actions.raid!, healthRate: 2 } } };
+    const after = step(raidOn({ health: 50 }), healing);
+    expect(after.health).toBeCloseTo(50 - damagePerTick(1, 1) + 2 / ticksPerSecond(), 12);
+    // Review Focus 1: at max, decay bites first and the heal fills exactly back to max, never past it.
+    const full = step(raidOn(), healing);
+    expect(full.health).toBe(balance.health.base);
+  });
   it('with JIT food on top instead, decay only, and the fight keeps its work', () => {
-    const s = raidOn({ completionCounts: { fish: unlockAt(content.actions.fish!) }, automation: { fish: 'jit' } });
+    const s = raidOn({ completionCounts: { fish: unlockAt(content, content.actions.fish!) }, automation: { fish: 'jit' } });
     const after = step(s, hurting);
     expect(after.queue.map((e) => e.actionId)).toEqual(['fish', 'raid']);
     expect(after.health).toBeCloseTo(balance.health.base - damagePerTick(1, 1), 12);

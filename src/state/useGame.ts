@@ -17,7 +17,8 @@ import { resolve } from '../engine/resolve';
 import { pageOf } from '../engine/rows';
 import { setPaused, step } from '../engine/tick';
 import type { AutoMode, GameEvent, GameState } from '../engine/types';
-import { ASIDE_KEY, asideText, AUTOSAVE_MS, loadSave, SAVE_KEY, saveText } from './save';
+import { ASIDE_KEY, asideText, AUTOSAVE_MS, loadSave, saveKey, saveText } from './save';
+import { acquire, defaultLocks, lockName, type Held, type LockManagerLike } from './tabs';
 
 /** The part of `Storage` the save uses; a test passes a fake, a private window may throw on any call. */
 export type SaveStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -156,7 +157,7 @@ function reduce(content: Content) {
         const counts = { ...s.completionCounts };
         for (const id of pageOf(s, content).order) {
           const a = content.actions[id];
-          if (a) counts[id] = Math.max(counts[id] ?? 0, unlockAt(a));
+          if (a) counts[id] = Math.max(counts[id] ?? 0, unlockAt(content, a));
         }
         return { ...model, state: { ...s, completionCounts: counts } };
       }
@@ -203,18 +204,19 @@ function defaultStorage(): SaveStorage | null {
   try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
 }
 
-interface Opened { readonly model: Model; readonly aside: string | null }
+/** `raw` is what this tab read from its key, whatever it made of it: the loser's one write is guarded on it (#73). */
+interface Opened { readonly model: Model; readonly aside: string | null; readonly raw: string | null }
 
 /** Opens the saved run, or a fresh one; a save that cannot be loaded comes back as `aside`, to be set aside once mounted. */
 function open(book: Book, storage: SaveStorage | null): Opened {
   let raw: string | null = null;
-  try { raw = storage?.getItem(SAVE_KEY) ?? null; } catch { return { model: fresh(book), aside: null }; }
+  try { raw = storage?.getItem(saveKey(book)) ?? null; } catch { return { model: fresh(book), aside: null, raw: null }; }
   const loaded = loadSave(raw, book);
-  if (loaded.kind === 'loaded') return { model: loaded.model, aside: null };
-  if (loaded.kind === 'none' || raw === null) return { model: fresh(book), aside: null };
+  if (loaded.kind === 'loaded') return { model: loaded.model, aside: null, raw };
+  if (loaded.kind === 'none' || raw === null) return { model: fresh(book), aside: null, raw };
   const start = fresh(book);
   const line: LogLine = { seq: start.nextSeq, at: 0, event: { type: 'saveAside', why: loaded.why } };
-  return { model: { ...start, log: [line, ...start.log], nextSeq: start.nextSeq + 1 }, aside: raw };
+  return { model: { ...start, log: [line, ...start.log], nextSeq: start.nextSeq + 1 }, aside: raw, raw };
 }
 
 /** Dev builds' speed control (section 10): ticks per tick. Tooling, never in a production build. */
@@ -229,11 +231,16 @@ export interface GameHandle {
   load: () => void;
   /** Removes the save and starts a fresh run. */
   erase: () => void;
+  /** One tab plays (#73): another tab holds the game (held), or took it from this one (lost). */
+  elsewhere: 'none' | 'held' | 'lost';
+  /** Takes the game from the tab that holds it. */
+  playHere: () => void;
 }
 
-export function useGame(book: Book, opts: { storage?: SaveStorage | null } = {}): GameHandle {
+export function useGame(book: Book, opts: { storage?: SaveStorage | null; locks?: LockManagerLike | null } = {}): GameHandle {
   const content: Content = book;
   const storage = 'storage' in opts ? opts.storage ?? null : defaultStorage();
+  const locks = 'locks' in opts ? opts.locks ?? null : defaultLocks();
   // Read once, at mount. (React may run this twice in development; the aside write below is idempotent.)
   const [opened] = useState<Opened>(() => open(book, storage));
   const [model, dispatch] = useReducer(reduce(content), opened.model);
@@ -246,9 +253,84 @@ export function useGame(book: Book, opts: { storage?: SaveStorage | null } = {})
   const speedRef = useRef(speed);
   useLayoutEffect(() => { speedRef.current = speed; }, [speed]);
 
-  const save = useCallback(() => {
-    try { storage?.setItem(SAVE_KEY, saveText(latest.current, book)); } catch { /* storage full or blocked: the next write tries again */ }
+  // One tab plays (#73, spec 2026-09-24-proving-ground section 3). The seat: pending until the lock answers, mine
+  // while this tab holds it, held while another does, lost once another took it. The loop and the writes read it
+  // through a ref, as they read `latest`.
+  const [seat, setSeat] = useState<'pending' | 'mine' | 'held' | 'lost'>(locks === null ? 'mine' : 'pending');
+  const seatRef = useRef(seat);
+  useLayoutEffect(() => { seatRef.current = seat; }, [seat]);
+  const heldRef = useRef<Held | null>(null);
+  const mountedRef = useRef(false);
+  // What this tab last read from or wrote to its key: the loser writes once only if the key still holds it.
+  const lastSeenRef = useRef<string | null>(opened.raw);
+
+  const writeNow = useCallback(() => {
+    try {
+      const text = saveText(latest.current, book);
+      storage?.setItem(saveKey(book), text);
+      lastSeenRef.current = text;
+    } catch { /* storage full or blocked: the next write tries again */ }
   }, [storage, book]);
+  const save = useCallback(() => { if (seatRef.current !== 'mine') return; writeNow(); }, [writeNow]);
+
+  // The loser's one write, in the commit that turns the seat lost and after the `latest` effect above, so every
+  // tick dispatched before this commit is in `latest` (earlier batches have committed; one pending in the same
+  // lane commits with the seat), a throttled hidden tab's whole catch-up batch included, and once the seat is
+  // lost the loop dispatches nothing more. Only if nobody else has written since this tab last read or wrote: a
+  // tab Chrome froze learns of its loss when it thaws, and its stale state must not overwrite the winner's. A
+  // read that throws is "unknown": no write.
+  useLayoutEffect(() => {
+    if (seat !== 'lost') return;
+    let current: string | null = null;
+    try { current = storage?.getItem(saveKey(book)) ?? null; } catch { return; }
+    if (current === lastSeenRef.current) writeNow();
+  }, [seat, storage, book, writeNow]);
+
+  const watch = useCallback((held: Held) => {
+    void held.lost.then(() => {
+      if (!mountedRef.current || heldRef.current !== held) return;
+      setSeat('lost');
+    });
+  }, []);
+
+  useEffect(() => {
+    if (locks === null) return;
+    mountedRef.current = true;
+    // This effect's own request, apart from mountedRef: StrictMode's first request resolves after its cleanup,
+    // while the remount is mounted, and must release what it was granted.
+    let cancelled = false;
+    void acquire(locks, lockName(saveKey(book)), { steal: false, waitMs: balance.time.tickIntervalMs }).then((held) => {
+      if (cancelled) { held?.release(); return; }
+      heldRef.current = held;
+      setSeat(held === null ? 'held' : 'mine');
+      if (held !== null) watch(held);
+    });
+    return () => { cancelled = true; mountedRef.current = false; heldRef.current?.release(); heldRef.current = null; };
+  }, [locks, book, watch]);
+
+  const playHere = useCallback(() => {
+    if (locks === null || seatRef.current !== 'held') return;
+    void acquire(locks, lockName(saveKey(book)), { steal: true, waitMs: 0 }).then((held) => {
+      if (held === null || !mountedRef.current) { held?.release(); return; }
+      heldRef.current = held;
+      watch(held);
+      // One tick for the loser's last write to land, then play from it. A write this build cannot load (an
+      // old-build tab's last minutes, #73's second comment) is set aside first, as a mount would set it aside:
+      // save.ts's contract is that a save is never silently overwritten.
+      setTimeout(() => {
+        if (!mountedRef.current || heldRef.current !== held) return;
+        let raw: string | null = null;
+        try { raw = storage?.getItem(saveKey(book)) ?? null; } catch { raw = null; }
+        lastSeenRef.current = raw;
+        const loaded = loadSave(raw, book);
+        if (loaded.kind === 'loaded') dispatch({ type: 'load', model: loaded.model });
+        else if (loaded.kind === 'aside' && raw !== null) {
+          try { storage?.setItem(ASIDE_KEY, asideText(storage.getItem(ASIDE_KEY), raw)); } catch { /* nothing more to do */ }
+        }
+        setSeat('mine');
+      }, balance.time.tickIntervalMs);
+    });
+  }, [locks, book, storage, watch]);
 
   // A save that could not be loaded is kept under the aside key before anything overwrites it.
   useEffect(() => {
@@ -275,6 +357,7 @@ export function useGame(book: Book, opts: { storage?: SaveStorage | null } = {})
     let last = performance.now();
     const id = setInterval(() => {
       const now = performance.now();
+      if (seatRef.current !== 'mine') { last = now; return; }   // a held or lost tab never catches up on that time
       const due = Math.floor((now - last) / interval);
       if (due <= 0) return;
       const n = due * speedRef.current;
@@ -286,16 +369,19 @@ export function useGame(book: Book, opts: { storage?: SaveStorage | null } = {})
 
   const load = useCallback(() => {
     let raw: string | null = null;
-    try { raw = storage?.getItem(SAVE_KEY) ?? null; } catch { return; }
+    try { raw = storage?.getItem(saveKey(book)) ?? null; } catch { return; }
     const loaded = loadSave(raw, book);
     if (loaded.kind === 'loaded') dispatch({ type: 'load', model: loaded.model });
   }, [storage, book]);
   const erase = useCallback(() => {
-    try { storage?.removeItem(SAVE_KEY); } catch { /* nothing more to do */ }
+    if (seatRef.current !== 'mine') return;
+    try { storage?.removeItem(saveKey(book)); } catch { /* nothing more to do */ }
+    lastSeenRef.current = null;
     dispatch({ type: 'reset' });
-  }, [storage]);
+  }, [storage, book]);
   // Dead until Begin: the screen behind the card shows the life that is about to begin.
   const view = useMemo(() => (model.state.dead ? rebirth(model.state) : model.state), [model.state]);
   const card = useMemo(() => (model.state.dead ? deathSummary(model.state, content) : null), [model.state, content]);
-  return { state: model.state, view, log: model.log, dispatch, card, speed, setSpeed, save, load, erase };
+  const elsewhere = seat === 'held' ? 'held' : seat === 'lost' ? 'lost' : 'none';
+  return { state: model.state, view, log: model.log, dispatch, card, speed, setSpeed, save, load, erase, elsewhere, playHere };
 }

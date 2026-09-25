@@ -17,7 +17,7 @@ import { ticksPerSecond } from './time';
 import type { GameState } from './types';
 
 export function hurts(action: ActionDefinition | undefined): boolean {
-  return (action?.hurts ?? 0) > 0;
+  return (action?.healthRate ?? 0) < 0;
 }
 
 function rowsHere(state: GameState, content: Content): readonly ActionDefinition[] {
@@ -59,7 +59,7 @@ export function fightWindow(state: GameState, content: Content, fight: ActionDef
  */
 export function wouldKill(state: GameState, content: Content, fight: ActionDefinition): boolean {
   if (!hurts(fight)) return false;
-  const hurtPerTick = fight.hurts! / ticksPerSecond();
+  const hurtPerTick = -fight.healthRate! / ticksPerSecond();
   let s = state;
   for (let i = fightWindow(state, content, fight); i > 0; i--) {
     s = applyDecay({ ...s, runTicks: s.runTicks + 1 });
@@ -114,14 +114,14 @@ function survives(state: GameState, content: Content, a: ActionDefinition): bool
  */
 export function delayFor(state: GameState, content: Content, tried: ReadonlySet<ActionId>, fight?: ActionDefinition): ActionId | null {
   const avoid = hurting(state, content);
-  const above = fight !== undefined && automated(state, fight) ? rankOf(modeOf(state, fight)) : null;
+  const above = fight !== undefined && automated(state, content, fight) ? rankOf(modeOf(state, content, fight)) : null;
   const event = pageOf(state, content).closes;
   const eligible = (a: ActionDefinition) => a.producedItem !== undefined && !a.isOneTime
-    || (above !== null && a.id !== event && rankOf(modeOf(state, a)) < above);
+    || (above !== null && a.id !== event && rankOf(modeOf(state, content, a)) < above);
   const ready = rowsHere(state, content).filter((a) =>
     // No shortfall: a delay that pulled in its own supply would run past what survives() counted (review of ed3bf88).
-    eligible(a) && modeOf(state, a) !== 'off' && !tried.has(a.id) && shortfall(state, a) === null && calm(state, content, a, avoid) && survives(state, content, a));
-  const order = [...ready].sort((a, b) => Number(makesFood(content, b)) - Number(makesFood(content, a)) || rankOf(modeOf(state, a)) - rankOf(modeOf(state, b)));
+    eligible(a) && modeOf(state, content, a) !== 'off' && !tried.has(a.id) && shortfall(state, a) === null && calm(state, content, a, avoid) && survives(state, content, a));
+  const order = [...ready].sort((a, b) => Number(makesFood(content, b)) - Number(makesFood(content, a)) || rankOf(modeOf(state, content, a)) - rankOf(modeOf(state, content, b)));
   return order[0]?.id ?? null;
 }
 
@@ -138,7 +138,7 @@ export function anyCalm(state: GameState, content: Content): boolean {
  * left), and an automated fight, which fights on.
  */
 export function stops(state: GameState, content: Content, fight: ActionDefinition): boolean {
-  return !automated(state, fight) && wouldKill(state, content, fight) && delayFor(state, content, new Set()) === null && anyCalm(state, content);
+  return !automated(state, content, fight) && wouldKill(state, content, fight) && delayFor(state, content, new Set()) === null && anyCalm(state, content);
 }
 
 /**
@@ -146,8 +146,8 @@ export function stops(state: GameState, content: Content, fight: ActionDefinitio
  * alive, but it should kill the player if there is no other action to run". It still waits behind a harvest that
  * buys time (case 1), but it never stops (case 2): with no harvest to run, it fights on.
  */
-export function automated(state: GameState, fight: ActionDefinition): boolean {
-  return modeOf(state, fight) !== 'off';
+export function automated(state: GameState, content: Content, fight: ActionDefinition): boolean {
+  return modeOf(state, content, fight) !== 'off';
 }
 
 /**

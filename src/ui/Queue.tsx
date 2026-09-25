@@ -7,14 +7,12 @@ import { lookAheadTarget, reachOf, shortfall, workOf } from '../engine/rows';
 import { tickExp } from '../engine/skills';
 import { ticksPerSecond } from '../engine/time';
 import type { GameState, QueueEntry } from '../engine/types';
-import { duration, fraction } from './format';
-import { MINUS, WARN } from './glyphs';
+import { duration, fraction, hpClass, hpRate } from './format';
+import { WARN } from './glyphs';
 import { ICONS } from './icons';
 import { Region } from './Region';
 import { itemName } from './words';
 
-/** A hurt reads to two decimals, as on the row. Display precision, not tuning. */
-const HURT_DECIMALS = 2;
 
 /**
  * The current completion's remaining time at the current, gear-aware rate
@@ -71,7 +69,7 @@ export function Queue({ state, content, working, live, dead = false, onRemove }:
               <div className="bar__value">{fraction(w.progress, a.expCost)}</div>
             </div>
             <div className="entry__sub">
-              <span><span className="tag">{e.mode}</span>{e.by === 'auto' && <span className="tag tag--auto">auto</span>}{e.forced === true && (content.actions[e.actionId]?.hurts ?? 0) > 0 && <span className="tag tag--forced">to the end</span>}</span>
+              <span><span className="tag">{e.mode}</span>{e.by === 'auto' && <span className="tag tag--auto">auto</span>}{e.forced === true && (content.actions[e.actionId]?.healthRate ?? 0) < 0 && <span className="tag tag--forced">to the end</span>}</span>
               {/* The top entry's countdown only, while its rate holds (spec 8.1): live and able to work. */}
               <span className="ink-2">{i === 0 && live && working === 0 ? duration(remainingSeconds(state, content, e)) : '\u00A0'}</span>
             </div>
@@ -80,9 +78,9 @@ export function Queue({ state, content, working, live, dead = false, onRemove }:
               {a.itemCosts.map((c) => (
                 <span key={c.item}>{owes === c.item && <span className="warn">{WARN} </span>}{itemName(content, c.item)} {consumedOf(a, w.costsConsumed, c.item)}/{c.amount}</span>
               ))}
-              {a.hurts !== undefined && <span className="hurt-text">{MINUS}{a.hurts.toFixed(HURT_DECIMALS)} hp/s</span>}
+              {a.healthRate !== undefined && <span className={hpClass(a.healthRate)}>{hpRate(a.healthRate)}</span>}
               {target !== null && item !== undefined && <span className="entry__target">{count(state.inventory, item)}/{target} {itemName(content, item, target)}</span>}
-              {a.itemCosts.length === 0 && a.hurts === undefined && target === null && '\u00A0'}
+              {a.itemCosts.length === 0 && a.healthRate === undefined && target === null && '\u00A0'}
             </div>
           </div>
         );

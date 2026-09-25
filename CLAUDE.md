@@ -26,6 +26,9 @@ npm run test:hooks  # the guards in .claude/hooks/ have their own suite
 npm run preview     # serve the built ./dist, to check a production build
 ```
 
+There is no formatter, deliberately (#35, measured: Prettier and oxfmt each
+rewrite 89 of 120 files at any width); `oxlint` is the only style gate.
+
 `npm run typecheck` runs `tsc` twice on purpose. The second pass compiles
 `src/engine/` under `tsconfig.engine.json`, which has no DOM library and no
 ambient types — see **The guard layer** below.
@@ -77,7 +80,11 @@ src/
               — a book is a value of the Book type in types.ts;
               src/data/validate.ts is the only check on it, and
               books.test.ts runs it over every shipped book; the one
-              shipped book is The Windward Run (windward-run.ts)
+              shipped book is The Windward Run (windward-run.ts); the
+              proving ground (proving-ground.ts, `?book=proving`, dev
+              builds only) is a book outside BOOKS with its numbers as
+              literals, one page per mechanic, tested from
+              src/engine/proving-ground.test.ts
   ui/         React components
   state/      reducer + context wiring engine to UI
   balance.ts  every tuning number, in one place
@@ -107,11 +114,13 @@ Two layers, both without booting a renderer where possible:
 - ✅ `npm run lint` green
 - ✅ `npm test` green, with tests for every rule touched
 - ✅ `npm run test:hooks` green
+- ✅ `version` in `package.json` bumped if `src/` changed since `main` (CI checks
+  it on a push to `main`; `/slice-ship` step 5 checks it before)
 - ✅ Verified in Chrome — the change actually visible doing the thing
 - ✅ Console clean, including cosmetic 404s
 
 CI runs everything on that list except the Chrome pass, on every push to `main`
-and every pull request. The Chrome pass is a person looking at the game and is
+and every pull request (the version check on pushes to `main` only). The Chrome pass is a person looking at the game and is
 deliberately not automated. `/slice-ship` walks the whole list in order.
 
 📌 **This list is canonical.** `.claude/skills/slice-ship`, `.github/workflows/ci.yml`
@@ -222,6 +231,11 @@ unsubscribed event) ship without asking.
 - Manual verification in Chrome before merge, always. "It compiles" is not
   verification and neither is "tests pass."
 - Delete both ends of a branch as the last step of its merge.
+- Every merge to `main` is a release: bump `version` in `package.json` in the
+  squash commit (patch by default, minor when a milestone closes); CI's
+  `verify` job fails on a push to `main` that changed `src/` since its previous
+  tip without a bump, and the site does not update until a bump lands. `measure()`'s callers pass it from `package.json`;
+  `src/version.test.ts` keeps it a semver.
 - **`main` is the build the user plays.** CI's `deploy` job publishes a push
   to `main` that passed CI's four machine gates to https://mattaltermatt.github.io/continuum/
   (only while it is still `main`'s tip; `vite.config.ts` builds with a relative
@@ -302,9 +316,30 @@ unsubscribed event) ship without asking.
   seconds and on hide; a save it cannot load is set aside under
   `continuum.save.aside` (the newest three) and a fresh run starts. Clear it
   from the gear (erase save), with `continuum.erase()`, or
-  `localStorage.removeItem('continuum.save')`. Two tabs of the game each
-  write the same key, so the last to write wins: a known limit, play in one. `src/test-setup.ts` clears
-  local storage after every test, so jsdom tests never load each other's runs.
+  `localStorage.removeItem('continuum.save')`. Saves are per book:
+  `saveKey(book)` in `src/state/save.ts`, the bare key for the Windward Run
+  and `continuum.save.<id>` for any other. **One tab plays** (#73): a Web
+  Lock per save key, requested queued with a one-tick abort (an
+  `ifAvailable` request in the same task as a release is refused, and React's
+  development remount is that task). A second tab gets a card in the death
+  card's place with Play here, which steals the lock, waits a tick and
+  re-reads the save (setting aside what it cannot load); the tab that lost
+  sees its request reject, writes once if nobody wrote since, and stops
+  ticking, saving and erasing. `useGame` takes `locks` as a parameter, null
+  for none; jsdom has none, so component tests play unlocked; the tab tests
+  use `src/test-utils/locks.ts`, which grants one request per microtask. The
+  dev handle can still step a held tab; nothing it steps is written unless
+  Play here finds no save to load, a dev-only corner.
+  `src/test-setup.ts` clears local storage after every test, so jsdom tests
+  never load each other's runs.
+- **A row's `healthRate` is signed** (#54): hp/s while on top and working,
+  negative drains, positive heals clamped at max, in the tick after decay.
+  `hurts()` in `fight.ts` reads the sign; `bookHurts` in `src/data/derived.ts`
+  reads the rows. Balance keeps magnitudes (`hurts: 0.3`); the book writes
+  the sign.
+- **Unlock counts resolve row, then book, then balance** (`unlockAt(content,
+  action)` in `automation.ts`); `modeOf`, `isUnlocked` and `automated` take
+  `content`.
 - **The page is derived, never stored** (spec 2026-09-24-pages). `pageOf` in
   `src/engine/rows.ts` is the chapter's first page whose closing row is not done,
   so nothing resets it and no save carries it. Two readers of "the event" differ:
@@ -353,7 +388,8 @@ unsubscribed event) ship without asking.
   reject its `node:fs`), writing its readings to a file (console output is
   swallowed). Delete it before committing. Read events only from a step that
   returned a new object: an idle step returns its input with the previous
-  tick's events.
+  tick's events. `measure(book, policies, version)` takes the version
+  imported from `package.json` (the probe is outside the layers).
 - **The Salt Road lives on as a test fixture** (`src/test-utils/salt-road.ts`),
   so component tests written against it did not have to move when the book
   changed; `testBook` in `src/test-utils/book.ts` is the two-port fixture for

@@ -5,7 +5,7 @@
  * decay, eat, work the top.
  */
 import type { Content } from '../data/types';
-import { applyDecay, applyHurts, eat } from './health';
+import { applyDecay, applyRowHealth, eat } from './health';
 import { work } from './queue';
 import { resolve } from './resolve';
 import type { GameState, PauseReason } from './types';
@@ -22,7 +22,7 @@ export function step(state: GameState, content: Content): GameState {
   let next: GameState = { ...r.state, runTicks: r.state.runTicks + 1, events: [] };
   next = applyDecay(next);
   if (next.dead) return { ...next, events: [...r.events, ...next.events] };
-  next = applyHurts(next, content);
+  next = applyRowHealth(next, content);
   if (next.dead) return { ...next, events: [...r.events, ...next.events] };
   next = eat(next, content);
   const worked = work(next, content);

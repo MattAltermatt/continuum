@@ -53,6 +53,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The version check below diffs from the push's previous tip, which a shallow clone does not hold.
+          fetch-depth: 0
       # Pinned from .nvmrc, which tracks the version actually developed against
       # rather than the current LTS line (26 is not LTS; 24 is). A CI that runs a
       # major nobody runs locally reports failures the developer cannot reproduce
@@ -83,6 +86,31 @@ jobs:
       # is worse than none -- it is a wall everyone believes in.
       - name: Test the hooks themselves
         run: npm run test:hooks
+
+      # Every push to main is a release (CLAUDE.md, Workflow). A release that changed the game carries a new
+      # version, so a headless-play stamp names one build. The base is the push's previous tip, not HEAD~1: a
+      # push may carry more than one commit. Read-only: the tag itself is a later step, #66.
+      - name: The version moved with the game
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base="$BEFORE"
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base=$(git rev-parse HEAD~1)
+          fi
+          if git diff --quiet "$base" HEAD -- src; then
+            echo "src/ unchanged since ${base:0:7}; no bump needed"
+            exit 0
+          fi
+          before=$(git show "$base:package.json" | jq -r .version)
+          after=$(jq -r .version package.json)
+          if [ "$before" = "$after" ]; then
+            echo "::error::src/ changed since ${base:0:7} but package.json is still $after; bump it in the squash commit"
+            exit 1
+          fi
+          echo "$before -> $after"
 
       - name: Build
         run: npm run build

@@ -84,8 +84,8 @@ describe('earnChips', () => {
     const s = result.current.state;
     for (const id of testBook.chapters[0]!.pages[0]!.order) {
       const a = testBook.actions[id]!;
-      expect(s.completionCounts[id]).toBe(unlockAt(a));
-      expect(isUnlocked(s, a)).toBe(true);
+      expect(s.completionCounts[id]).toBe(unlockAt(testBook, a));
+      expect(isUnlocked(s, testBook, a)).toBe(true);
     }
     // Earned, but no chip is set, so nothing queues by itself.
     expect(s.queue).toEqual([]);

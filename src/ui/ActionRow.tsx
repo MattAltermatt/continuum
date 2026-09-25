@@ -10,8 +10,8 @@ import { eventOf, stillOwed, workOf } from '../engine/rows';
 import { tickExp } from '../engine/skills';
 import { ticksPerSecond } from '../engine/time';
 import type { AutoMode, GameState } from '../engine/types';
-import { duration } from './format';
-import { ARROW, MINUS, PLAY, STOP, WARN } from './glyphs';
+import { duration, hpClass, hpRate } from './format';
+import { ARROW, PLAY, STOP, WARN } from './glyphs';
 import { ICONS } from './icons';
 import { itemName, needPhrase, rowName, words } from './words';
 
@@ -30,7 +30,7 @@ export const INSTRUCTION_MS = 3000;
  */
 export const FADE_MS = 400;
 
-/** Effects and hurts read to two decimals: a decay factor of 0.80, a hurt of 0.30 hp/s. Display precision, not tuning. */
+/** Effects read to two decimals: a decay factor of 0.80. Display precision, not tuning. */
 const FACTOR_DECIMALS = 2;
 
 /** The chip's word for a mode (spec section 3.1): tiny words, and JIT in capitals. */
@@ -126,8 +126,8 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
     fn(e.shiftKey);
   };
 
-  const unlocked = isUnlocked(state, action);
-  const mode = modeOf(state, action);
+  const unlocked = isUnlocked(state, content, action);
+  const mode = modeOf(state, content, action);
   const next = nextMode(content, action, mode);
   // Set, but its row cannot start and nothing along the chain would supply it (accepted risk 3): the chip says so, and so does the row.
   const waits = unlocked && mode !== 'off' && block?.kind === 'short' ? words(content, block, { counts, waiting: true }) : null;
@@ -135,7 +135,7 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
   const after = block?.kind === 'page' ? words(content, block) : null;
   const say = built ? null : instruction !== null ? instruction.text : running ? null : waits ?? after;
   const done = counts[action.id] ?? 0;
-  const needed = unlockAt(action);
+  const needed = unlockAt(content, action);
   const w = workOf(state, action.id);
 
   return (
@@ -146,7 +146,8 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
     >
       <div className="row__c1">
         <Icon aria-hidden="true" />
-        <span><b>{skill.name}</b>{' '}{action.noun}{running && <span className="visually-hidden">running</span>}</span>
+        {/* The column clips a long noun; the title carries the whole of it (the proving ground's rows are their expectations). */}
+        <span title={action.noun}><b>{skill.name}</b>{' '}{action.noun}{running && <span className="visually-hidden">running</span>}</span>
       </div>
       <div className="row__c2">
         {built ? (
@@ -176,7 +177,7 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
                   </span>
                 );
               })}
-              {action.hurts !== undefined && <span className="hurt-text">{MINUS}{action.hurts.toFixed(FACTOR_DECIMALS)} hp/s</span>}
+              {action.healthRate !== undefined && <span className={hpClass(action.healthRate)}>{hpRate(action.healthRate)}</span>}
             </div>
             <div className="row__arr" aria-hidden="true">{ARROW}</div>
             <div className="row__out">{outputsOf(content, action).map((o) => <span key={o}>{o}</span>)}</div>

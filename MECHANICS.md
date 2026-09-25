@@ -77,7 +77,8 @@ interface ActionDefinition {
   itemCosts: ItemCost[]             // consumed INCREMENTALLY; an item at most once
   needs?: ItemCost[]                // checked, never spent (a key the next row requires)
   isOneTime: boolean
-  hurts?: number                    // health lost per second while this row runs
+  healthRate?: number               // health per second while this row runs: negative takes, positive gives, never past max
+  unlockAt?: number                 // this row's own completions-to-chip, over its book's and balance's
   // effects of a one-time row, for the rest of the life:
   healthDecayMultiplier?: number    // the run's decay multiplier
   capacityBonus?: number            // + to the shared stack cap
@@ -214,7 +215,7 @@ In order:
    advance, nothing decays, nothing is eaten (decision #41).
 3. Advance the run clock.
 4. Apply this tick's health decay (section 4); at zero, die and stop.
-5. Apply the top row's `hurts`, if any; at zero, die and stop.
+5. Apply the top row's `healthRate`, if any: a drain at zero dies and stops; a heal stops at max.
 6. Eat (section 4).
 7. Work the top: pay the unit it owes, advance progress by the tick's XP
    (times its skill's gear), pay every unit whose threshold the new progress
@@ -368,11 +369,14 @@ shows too, which never changes):
 At most one unit per food type is eaten per tick. The cooldown exists to stop a
 full stack being swallowed in a single burst the instant health dips.
 
-### Hurts
+### Hurts and heals
 
-A row may carry `hurts`, health lost per second **while it runs** (the top
-entry, on a tick it works), applied after decay. A fight interrupted by a JIT
-food fill does not drain while the food runs, and keeps its progress.
+A row may carry `healthRate`, health per second **while it runs** (the top
+entry, on a tick it works), applied after decay and before eating: negative
+takes it (the row *hurts*), positive gives it, clamped at max like a bite. A
+fight interrupted by a JIT food fill does not drain while the food runs, and
+keeps its progress. "Hurts" everywhere below means `healthRate < 0`; a book
+*hurts* when any of its rows does (spec 2026-09-24-proving-ground section 1).
 
 **A fight stops before it kills** (#74). A hurting top **would kill** when
 fighting on for its window ends the life, played out tick by tick in the
@@ -402,7 +406,7 @@ kill.
 
 ### Death
 
-Checked once per tick, after decay and after hurts, before eating:
+Checked once per tick, after decay and after the row's rate, before eating:
 `health <= 0`.
 
 ---
@@ -478,6 +482,11 @@ and once earned it is permanent.
 repeatable rows  → 200 lifetime completions     🎚️
 one-time rows    →   5 lifetime completions     🎚️
 ```
+
+Those are `balance.automation`'s defaults. A book may set its own two counts
+(`automation.unlockRepeatable`, `automation.unlockOneTime`), and a row its own
+`unlockAt` over both; the first of row, book, balance applies (spec
+2026-09-24-proving-ground section 2.1).
 
 Keyed by row, counted across deaths, never lost. Until earned, a row's chip
 shows its progress (`37/200`) and cannot be pressed.
@@ -568,8 +577,8 @@ automation and counts kept and the life's max-health gain applied.
 | Run mastery base / multiplier | 25 / +1% 🎚️ | Per-run ledger |
 | XP curve exponent | 1.1 🎚️ | 10% harder per level |
 | Baseline tick XP | 0.1 🎚️ | Before mastery and tool multipliers |
-| Automation unlock (repeatable) | 200 🎚️ | Lifetime completions |
-| Automation unlock (one-time) | 5 🎚️ | Lifetime completions |
+| Automation unlock (repeatable) | 200 🎚️ | Lifetime completions, unless the book or the row sets its own |
+| Automation unlock (one-time) | 5 🎚️ | Lifetime completions, unless the book or the row sets its own |
 | Stack cap | 5 | Every item but a key; raised by capacity rows (#45) |
 | Catch-up per wake | 5 min 🎚️ | Game time a throttled or woken tab may run at once |
 

@@ -125,11 +125,13 @@ describe('validateBook', () => {
     const b = withActions({ ...good.actions, hut: { ...good.actions.hut!, needs: [{ item: 'map', amount: 1 }] } });
     expect(validateBook(b)).toContainEqual('row "hut" needs "map", which the book does not define');
   });
-  it('rejects a hurts that is not a positive number', () => {
-    for (const hurts of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
-      const b = withActions({ ...good.actions, hut: { ...good.actions.hut!, hurts } });
-      expect(validateBook(b)).toContainEqual(`row "hut" hurts by ${hurts}, which is not a positive number`);
-    }
+  it('a health rate must be a number other than zero', () => {
+    const zero = withActions({ ...good.actions, forage: { ...good.actions.forage!, healthRate: 0 } });
+    expect(validateBook(zero)).toContainEqual(expect.stringMatching(/forage.*health rate.*zero/));
+    const nan = withActions({ ...good.actions, forage: { ...good.actions.forage!, healthRate: Number.NaN } });
+    expect(validateBook(nan)).toContainEqual(expect.stringMatching(/forage.*health rate/));
+    expect(validateBook(withActions({ ...good.actions, forage: { ...good.actions.forage!, healthRate: -0.5 } }))).toEqual([]);
+    expect(validateBook(withActions({ ...good.actions, forage: { ...good.actions.forage!, healthRate: 0.5 } }))).toEqual([]);
   });
   it('rejects an effect on a repeatable row', () => {
     for (const effect of [{ healthDecayMultiplier: 0.8 }, { capacityBonus: 5 }, { gear: { skill: 'forage', multiplier: 1.25 } }]) {
@@ -230,6 +232,12 @@ describe('validateBook', () => {
     expect(validateBook({ ...good, length: { days: max + 1 } })).toContainEqual(expect.stringMatching(/cannot be loaded/));
     expect(validateBook({ ...good, length: { hours: (max + 1) * 24 } })).toContainEqual(expect.stringMatching(/cannot be loaded/));
     expect(validateBook({ ...good, length: { days: max } })).toEqual([]);
+  });
+  it('unlock counts are positive whole numbers', () => {
+    expect(validateBook({ ...good, automation: { unlockRepeatable: 0 } })).toContainEqual(expect.stringMatching(/unlockRepeatable.*0/));
+    expect(validateBook({ ...good, automation: { unlockOneTime: 1.5 } })).toContainEqual(expect.stringMatching(/unlockOneTime.*1\.5/));
+    expect(validateBook(withActions({ ...good.actions, forage: { ...good.actions.forage!, unlockAt: -1 } }))).toContainEqual(expect.stringMatching(/forage.*chip.*-1/));
+    expect(validateBook({ ...good, automation: { unlockRepeatable: 2, unlockOneTime: 1 } })).toEqual([]);
   });
 });
 

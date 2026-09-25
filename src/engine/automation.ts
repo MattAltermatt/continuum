@@ -22,18 +22,21 @@ export function rankOf(mode: AutoMode): number {
   return i === -1 ? Number.POSITIVE_INFINITY : i;
 }
 
-/** Lifetime completions that earn a row its chip (MECHANICS section 6). */
-export function unlockAt(action: ActionDefinition): number {
-  return action.isOneTime ? balance.automation.unlockOneTime : balance.automation.unlockRepeatable;
+/** Lifetime completions that earn a row its chip: the row's own, else its book's by kind, else balance's by kind (spec 2026-09-24-proving-ground section 2.1). */
+export function unlockAt(content: Content, action: ActionDefinition): number {
+  if (action.unlockAt !== undefined) return action.unlockAt;
+  return action.isOneTime
+    ? content.automation?.unlockOneTime ?? balance.automation.unlockOneTime
+    : content.automation?.unlockRepeatable ?? balance.automation.unlockRepeatable;
 }
 
-export function isUnlocked(state: GameState, action: ActionDefinition): boolean {
-  return (state.completionCounts[action.id] ?? 0) >= unlockAt(action);
+export function isUnlocked(state: GameState, content: Content, action: ActionDefinition): boolean {
+  return (state.completionCounts[action.id] ?? 0) >= unlockAt(content, action);
 }
 
 /** A row's mode as it acts: off until earned, whatever a save holds. */
-export function modeOf(state: GameState, action: ActionDefinition): AutoMode {
-  return isUnlocked(state, action) ? state.automation[action.id] ?? 'off' : 'off';
+export function modeOf(state: GameState, content: Content, action: ActionDefinition): AutoMode {
+  return isUnlocked(state, content, action) ? state.automation[action.id] ?? 'off' : 'off';
 }
 
 /**
@@ -66,7 +69,7 @@ export function nextMode(content: Content, action: ActionDefinition, mode: AutoM
 /** Sets a row's mode. The same state back for an unknown row, a dead run, a row not yet earned, or a mode outside its cycle. */
 export function setAutomation(state: GameState, content: Content, id: ActionId, mode: AutoMode): GameState {
   const action = content.actions[id];
-  if (action === undefined || state.dead || !isUnlocked(state, action) || !cycleOf(content, action).includes(mode)) return state;
+  if (action === undefined || state.dead || !isUnlocked(state, content, action) || !cycleOf(content, action).includes(mode)) return state;
   const was = state.automation[id] ?? 'off';
   if (was === mode) return state;
   const next = { ...state, automation: { ...state.automation, [id]: mode } };

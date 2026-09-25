@@ -71,7 +71,7 @@ describe('measure', { timeout: 30_000 }, () => {
     // Change one, and this fails until the other has been looked at: a bound
     // change is a rules change, and a reading must say which rules took it.
     expect({ PLAY_VERSION, bounds: balance.play, policy: balance.policy }).toEqual({
-      PLAY_VERSION: 4,
+      PLAY_VERSION: 5,
       bounds: { maxBookDays: 60, minBookHours: 24, maxLifeMinutes: 60, minLifeMinutes: 10, lengthTolerance: 0.25, hoursShownUpTo: 48 },
       policy: { checkEverySeconds: 30 },
     });

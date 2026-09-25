@@ -16,7 +16,7 @@ const c = pagedBook;
 const live = (s: GameState) => setPaused(s, 'none');
 const fresh = () => newState(c.roster);
 const earned = (content: Content, s: GameState, ...ids: string[]): GameState =>
-  ({ ...s, completionCounts: { ...s.completionCounts, ...Object.fromEntries(ids.map((id) => [id, unlockAt(content.actions[id]!)])) } });
+  ({ ...s, completionCounts: { ...s.completionCounts, ...Object.fromEntries(ids.map((id) => [id, unlockAt(content, content.actions[id]!)])) } });
 const withModes = (content: Content, s: GameState, modes: Record<string, AutoMode>): GameState =>
   ({ ...earned(content, s, ...Object.keys(modes)), automation: { ...s.automation, ...modes } });
 const holding = (s: GameState, items: Record<string, number>): GameState => ({ ...s, inventory: { ...s.inventory, ...items } });
@@ -150,7 +150,7 @@ describe('nothing waits forever at the top (section 4.2)', () => {
       ...fixture,
       actions: {
         ...fixture.actions,
-        brawl: { id: 'brawl', verb: 'fight', noun: 'a brawl', expCost: 30, itemCosts: [], isOneTime: true, hurts: 1 },
+        brawl: { id: 'brawl', verb: 'fight', noun: 'a brawl', expCost: 30, itemCosts: [], isOneTime: true, healthRate: -1 },
         exit: { id: 'exit', verb: 'rig', noun: 'the exit', expCost: 1, itemCosts: [], isOneTime: true },
       },
       chapters: [{ ...fixture.chapters[0]!, pages: [onePage(['fish', 'brawl', 'exit'], 'exit')] }, fixture.chapters[1]!],
@@ -256,7 +256,7 @@ describe('a press queues its whole chain (section 4.3)', () => {
       ...fixture,
       actions: {
         ...fixture.actions,
-        wardens: { id: 'wardens', verb: 'fight', noun: 'the wardens', expCost: 5, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: true, hurts: 1 },
+        wardens: { id: 'wardens', verb: 'fight', noun: 'the wardens', expCost: 5, itemCosts: [], needs: [{ item: 'pass', amount: 1 }], isOneTime: true, healthRate: -1 },
       },
       chapters: [{ ...fixture.chapters[0]!, pages: [onePage(['fish', 'salvage', 'hull', 'satchel', 'gate', 'wardens', 'raid'], 'raid')] }, fixture.chapters[1]!],
     };
@@ -301,13 +301,13 @@ describe('what the page rule leaves alone', () => {
     expect(q[0]).toMatchObject({ by: 'auto', for: q[1]!.id });
   });
   it('play on a fight closer is not refused as one that would stop while its page is unfinished; it is once the page is done', () => {
-    const f: Content = { ...fixture, actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, hurts: 1 } } };
+    const f: Content = { ...fixture, actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, healthRate: -1 } } };
     const low: GameState = { ...newState(f.roster), health: 1 };
     expect(playBlock(low, f, 'raid')).toBeNull();
     expect(playBlock(holding(built(low, 'hull', 'satchel', 'gate'), { pass: 1 }), f, 'raid')).toMatchObject({ kind: 'hurt' });
   });
   it('Shift on a closer forces the closer, not the prerequisites it pulls', () => {
-    const f: Content = { ...fixture, actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, hurts: 1 } } };
+    const f: Content = { ...fixture, actions: { ...fixture.actions, raid: { ...fixture.actions.raid!, healthRate: -1 } } };
     const s = live(enqueue(holding(newState(f.roster), { scrap: 8 }), f, 'raid', { front: true, once: true }));
     expect(s.queue[0]).toMatchObject({ actionId: 'raid', forced: true });
     const q = resolve(s, f).state.queue;

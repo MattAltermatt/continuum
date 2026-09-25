@@ -9,7 +9,7 @@ describe('test fixtures', () => {
   });
   it('testBook is a valid book, and carries what the screen needs: a hurt, a gear row, a second chapter-II row', () => {
     expect(validateBook(testBook)).toEqual([]);
-    expect(testBook.actions.raid!.hurts).toBe(1);
+    expect(testBook.actions.raid!.healthRate).toBe(-1);
     expect(Object.values(testBook.actions).some((a) => a.gear !== undefined)).toBe(true);
     expect(testBook.chapters[1]!.pages[0]!.order).toContain('salvage2');
   });

@@ -7,7 +7,7 @@ import { balance } from '../balance';
 import type { ActionDefinition, ActionId, Book, BookLength } from '../data/types';
 import { canJit, isPriority, isUnlocked, modeOf, setAutomation } from './automation';
 import { count } from './inventory';
-import { stops } from './fight';
+import { hurts, stops } from './fight';
 import { enqueue, newState, startBlock } from './queue';
 import { rebirth } from './rebirth';
 import { resolve } from './resolve';
@@ -21,8 +21,9 @@ import type { GameState } from './types';
  * Bumped by hand whenever the play's rules change: a policy, a check, a bound
  * (spec section 5). measure.test.ts locks it together with balance.play, so a
  * bound cannot change without this being looked at.
+ * 5: touches per life and hurt share in the run.
  */
-export const PLAY_VERSION = 4;
+export const PLAY_VERSION = 5;
 
 /** balance.play's shape with plain numbers, so a test or a caller can pass other bounds. */
 export type PlayBounds = { readonly [K in keyof typeof balance.play]: number };
@@ -57,6 +58,10 @@ export interface PlayRun {
   /** The furthest chapter index each life reached (spec 2026-09-23-the-windward-run section 11). */
   readonly chaptersPerLife: readonly number[];
   readonly totalTicks: number;
+  /** Asks of the policy that changed the state, per life: the reactions #70 counts as a person's touches. */
+  readonly touchesPerLife: readonly number[];
+  /** Of the run's ticks, the share the working row drained health on, the killing tick included (#54). 0 for a book that does not hurt. */
+  readonly hurtShare: number;
   /** Present exactly when the outcome is frozen. */
   readonly frozen?: FreezeCause;
 }
@@ -66,6 +71,9 @@ export function play(book: Book, policy: Policy, bounds: PlayBounds = balance.pl
   const giveUpAt = declaredTicks({ days: bounds.maxBookDays });
   const ticksPerLife: number[] = [];
   const chaptersPerLife: number[] = [];
+  const touchesPerLife: number[] = [];
+  let touches = 0;                  // asks that changed the state, this life
+  let hurtTicks = 0;                // ticks the working row drained on, over the run
   let reached = 0;                  // the furthest chapter this life
   let before = 0;                   // ticks in the lives already ended
   let s = setPaused(newState(book.roster), 'none');
@@ -73,19 +81,32 @@ export function play(book: Book, policy: Policy, bounds: PlayBounds = balance.pl
   let stalled = false;              // the previous step did not advance time
   const end = (outcome: PlayOutcome, last: GameState): PlayRun => {
     const lives = [...ticksPerLife, last.runTicks];
-    const run = { policy: policy.name, outcome, lives: lives.length, ticksPerLife: lives, chaptersPerLife: [...chaptersPerLife, Math.max(reached, last.chapter)], totalTicks: before + last.runTicks };
+    const total = before + last.runTicks;
+    const run = {
+      policy: policy.name, outcome, lives: lives.length, ticksPerLife: lives,
+      chaptersPerLife: [...chaptersPerLife, Math.max(reached, last.chapter)], totalTicks: total,
+      touchesPerLife: [...touchesPerLife, touches], hurtShare: total === 0 ? 0 : hurtTicks / total,
+    };
     return outcome === 'frozen' ? { ...run, frozen: freezeCause(last, book) } : run;
   };
   for (;;) {
     const decideNow = stalled || sinceDecide >= interval;
-    if (decideNow) { s = policy.decide(s, book); sinceDecide = 0; }
+    if (decideNow) { const decided = policy.decide(s, book); if (decided !== s) touches += 1; s = decided; sinceDecide = 0; }
     const next = step(s, book);
+    if (next.runTicks !== s.runTicks) {
+      // The row that worked: a completion pops its order, so its event names it; otherwise the top.
+      const done = next.events.find((e) => e.type === 'completed');
+      const worked = done !== undefined && done.type === 'completed' ? done.actionId : next.queue[0]?.actionId;
+      if (worked !== undefined && hurts(book.actions[worked])) hurtTicks += 1;
+    }
     reached = Math.max(reached, next.chapter);
     // A finished state is also dead: the finish is read first.
     if (next.finished) return end('finished', next);
     if (next.dead) {
       ticksPerLife.push(next.runTicks);
       chaptersPerLife.push(reached);
+      touchesPerLife.push(touches);
+      touches = 0;
       reached = 0;
       before += next.runTicks;
       s = setPaused(rebirth(next), 'none');
@@ -201,10 +222,10 @@ export const prioritized: Policy = {
     const page = pageOf(s, book);
     for (const id of page.order) {
       const a = book.actions[id]!;
-      if (!isUnlocked(s, a) || (s.automation[id] ?? 'off') !== 'off') continue;
+      if (!isUnlocked(s, book, a) || (s.automation[id] ?? 'off') !== 'off') continue;
       s = setAutomation(s, book, id, canJit(book, a) ? 'jit' : id === page.closes ? 'low' : a.isOneTime ? 'high' : 'mid');
     }
-    const t = byHand(s, book, (a) => modeOf(s, a) === 'off');
+    const t = byHand(s, book, (a) => modeOf(s, book, a) === 'off');
     // Automation with nothing it can start leaves the queue empty and the clock stopped. A person presses the
     // next thing then, chip or not, and the press pulls what it lacks (spec 2026-09-24-pages 4.3). Found at
     // #78 task 6: one-time chips earned before Salvage's left the port idle, and the policy froze.
@@ -222,7 +243,7 @@ function jitAsEarned(state: GameState, book: Book): GameState {
   let s = state;
   for (const id of pageOf(s, book).order) {
     const a = book.actions[id]!;
-    if (isUnlocked(s, a) && (s.automation[id] ?? 'off') === 'off' && canJit(book, a)) s = setAutomation(s, book, id, 'jit');
+    if (isUnlocked(s, book, a) && (s.automation[id] ?? 'off') === 'off' && canJit(book, a)) s = setAutomation(s, book, id, 'jit');
   }
   return s;
 }
@@ -232,7 +253,7 @@ function withMakers(state: GameState, book: Book, rows: readonly ActionDefinitio
   let s = state;
   for (const c of [...(a.needs ?? []), ...a.itemCosts]) {
     const maker = rows.find((m) => m.producedItem === c.item && !isDone(s, m));
-    if (maker === undefined || modeOf(s, maker) !== 'off') continue;
+    if (maker === undefined || modeOf(s, book, maker) !== 'off') continue;
     if (maker.isOneTime && s.queue.some((e) => e.actionId === maker.id)) continue;
     s = enqueue(s, book, maker.id);
   }
@@ -255,7 +276,7 @@ function byHand(state: GameState, book: Book, mine: (a: ActionDefinition) => boo
   const rows = page.order.map((id) => book.actions[id]!);
   const queued = (id: ActionId) => s.queue.some((e) => e.actionId === id);
   const food = rows.find((a) => makesFood(book, a));
-  if (food !== undefined && modeOf(s, food) !== 'jit' && count(s.inventory, food.producedItem!) === 0 && !queued(food.id)) {
+  if (food !== undefined && modeOf(s, book, food) !== 'jit' && count(s.inventory, food.producedItem!) === 0 && !queued(food.id)) {
     const block = startBlock(s, book, food.id);
     const press = block?.kind === 'short' && block.maker !== null ? block.maker : food.id;
     s = enqueue(s, book, press, { front: true });
@@ -275,10 +296,10 @@ function byHand(state: GameState, book: Book, mine: (a: ActionDefinition) => boo
     const forced = enqueue(s, book, fight.id, { front: true, once: true });
     if (forced !== s) return forced;
   }
-  if (food !== undefined && modeOf(s, food) !== 'jit') s = withMakers(s, book, rows, food);
+  if (food !== undefined && modeOf(s, book, food) !== 'jit') s = withMakers(s, book, rows, food);
   // Withhold the event only while the idle fill will take a one-time of this port; withholding it whenever
   // any one-time is unfinished froze a life, since JIT key makers are pulled only through the event's chain.
-  const waiting = rows.some((b) => b.isOneTime && b.id !== page.closes && !isDone(s, b) && isPriority(modeOf(s, b)) && startBlock(s, book, b.id) === null);
+  const waiting = rows.some((b) => b.isOneTime && b.id !== page.closes && !isDone(s, b) && isPriority(modeOf(s, book, b)) && startBlock(s, book, b.id) === null);
   const next = rows.find((a) => a.isOneTime && !isDone(s, a) && mine(a) && (a.id !== page.closes || !waiting));
   if (next !== undefined && !queued(next.id)) s = withMakers(s, book, rows, next);
   return s;

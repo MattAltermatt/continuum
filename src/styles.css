@@ -242,6 +242,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .pack__item--zero { color: var(--ink-2); }
 .pack__hp { color: var(--ink-2); margin-left: 4px; }
 .hurt-text { color: var(--hurt-text); }
+.heal-text { color: var(--good); }
 .pack__item--full { color: var(--warn); }
 .log__list { list-style: none; margin: 0; padding: 0; max-height: 9em; overflow-y: auto; }
 .log__line { display: grid; grid-template-columns: 3.4em 1fr; gap: 0 8px; padding: 2px 0; border-bottom: 1px solid var(--edge); font-size: 11px; }
