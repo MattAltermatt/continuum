@@ -167,6 +167,36 @@ describe('the save', () => {
   });
 });
 
+describe('the record of lives in a save (#90)', () => {
+  const withLives = (lives: unknown) => { const m = midRun(); return { ...m, state: { ...m.state, lives } }; };
+  const loadedLives = (lives: unknown) => {
+    const r = loadSave(file({ model: withLives(lives) }), book);
+    if (r.kind !== 'loaded') throw new Error(`not loaded: ${r.kind}`);
+    return r.model.state.lives;
+  };
+  it('a save from before #90, with no lives, loads with no history', () => {
+    const m = midRun();
+    const { lives: _gone, ...state } = m.state;
+    const r = loadSave(file({ model: { ...m, state } }), book);
+    expect(r.kind).toBe('loaded');
+    expect(r.kind === 'loaded' && r.model.state.lives).toEqual([]);
+  });
+  it('lives that are not a list, or a record without its numbers, read as no history', () => {
+    expect(loadedLives('nonsense')).toEqual([]);
+    expect(loadedLives([{ life: 1 }])).toEqual([]);
+    expect(loadedLives([{ life: 1, maxHealth: 101 }])).toEqual([]);
+    expect(loadedLives([{ life: 1, maxHealth: 101, core: { forage: 'x' } }])).toEqual([]);
+    // JSON writes NaN and Infinity as null: a good core does not carry a bad number through.
+    expect(loadedLives([{ life: 1, maxHealth: null, core: { forage: 1 } }])).toEqual([]);
+    expect(loadedLives([{ life: null, maxHealth: 101, core: { forage: 1 } }])).toEqual([]);
+  });
+  it('a record keeps only the roster skills, and good records round-trip in order', () => {
+    expect(loadedLives([{ life: 1, maxHealth: 101, core: { forage: 2, gone: 5 } }])).toEqual([{ life: 1, maxHealth: 101, core: { forage: 2 } }]);
+    const two = [{ life: 1, maxHealth: 100.4, core: { forage: 1, mine: 0, build: 0 } }, { life: 2, maxHealth: 101.3, core: { forage: 2, mine: 1, build: 0 } }];
+    expect(loadedLives(two)).toEqual(two);
+  });
+});
+
 describe('reconcile', () => {
   it('lastVerb: a verb the roster lacks reads null; one it has is kept', () => {
     const m = midRun();

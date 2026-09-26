@@ -9,16 +9,17 @@ export type TopLabel =
   | { kind: 'left'; seconds: number }
   | { kind: 'steady' }
   | { kind: 'idle' } | { kind: 'paused' } | { kind: 'elsewhere' }
-  | { kind: 'life'; life: number };
+  | { kind: 'dead'; life: number } | { kind: 'finished'; life: number };
 
 /** Display precision, not tuning: the countdown turns to hours where mm:ss would need three digits of minutes. */
 const SECONDS_PER_HOUR = 3600;
 const HOURS_FROM_SECONDS = 100 * 60;
 
 /** Which one word the health gauge carries (spec 2026-09-25 4.1), most urgent first. */
-export function topLabel(a: { elsewhere: 'none' | 'held' | 'lost'; card: boolean; paused: boolean; queued: number; fighting: boolean; health: number; net: number; life: number }): TopLabel {
+export function topLabel(a: { elsewhere: 'none' | 'held' | 'lost'; card: 'none' | 'dead' | 'finished'; paused: boolean; queued: number; fighting: boolean; health: number; net: number; life: number }): TopLabel {
   if (a.elsewhere !== 'none') return { kind: 'elsewhere' };
-  if (a.card) return { kind: 'life', life: a.life };
+  // Behind the death overlay the strip is the life that ended, and says so (#90).
+  if (a.card !== 'none') return { kind: a.card, life: a.life };
   if (a.paused) return { kind: 'paused' };
   if (a.queued === 0) return { kind: 'idle' };
   if (a.net < 0 && !a.fighting) return { kind: 'left', seconds: a.health / -a.net };
@@ -30,7 +31,9 @@ function labelNode(l: TopLabel): { node: ReactNode; tone?: 'warn' | 'dim' | 'hur
     // Past 99:59 the clock's minutes would overflow the column: hours, rounded down, are enough of a warning.
     case 'left': return { node: `\u2248 ${l.seconds >= HOURS_FROM_SECONDS ? `${Math.floor(l.seconds / SECONDS_PER_HOUR)}h+` : clock(l.seconds)} left`, tone: 'hurt' };
     case 'idle': case 'paused': case 'elsewhere': return { node: l.kind, tone: 'dim' };
-    case 'life': return { node: `life ${l.life}`, tone: 'dim' };
+    // One word each: the label column is 13ch, and the overlay's title already names the life.
+    case 'dead': return { node: 'dead', tone: 'hurt' };
+    case 'finished': return { node: 'finished', tone: 'dim' };
     // A blank line, not none: the label row keeps its height, so the bar under it never moves when the word comes and goes.
     case 'steady': return { node: '\u00a0' };
   }

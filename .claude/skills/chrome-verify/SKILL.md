@@ -52,9 +52,10 @@ sends any `GameAction`, `step(n)` advances exactly n ticks. `dispatch` and
 `step` commit synchronously, so a `state()` on the next line sees the result.
 `dispatch({ type: 'setHealth', health })` then one `step` is the fast path to
 death; life 1 of The Windward Run lasts about twelve minutes of play. Death puts
-up the **death card**. `state()` stays the dead life (`dead: true`) until
-`dispatch({ type: 'begin' })`, while the screen behind the card already shows
-the next life. If the handle is missing, say so rather than
+up the **death overlay** (#90). `state()` stays the dead life (`dead: true`) until
+`dispatch({ type: 'begin' })`, and the screen behind the overlay is that dead
+life, frozen: the kill screen. Read the rigidity script's six boxes while dead
+too; `see how it ended` hides the overlay so they can be seen. If the handle is missing, say so rather than
 falling back to eyeballing numbers off a screenshot.
 
 **Fast-forward rather than waiting.** A run is minutes and the decay curve is
@@ -66,7 +67,7 @@ To reach the later ports or the finish in one pass, seed a save: `save()`,
 edit `localStorage['continuum.save']` (raise `completionCounts` to earn chips,
 raise `skills[id].core.level` to shorten rows), then `load()`. Drive the rest
 with `dispatch({ type: 'queue' | 'automate', ... })` and `step(n)`. The seeded
-numbers make the finish card's before/after levels meaningless; that is the
+numbers make the overlay's before/after levels meaningless; that is the
 seed, not a bug.
 
 Assert the **outcome**, not the arithmetic. *Health decayed faster in the fourth

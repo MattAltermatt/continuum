@@ -131,14 +131,15 @@ describe('App', () => {
     for (const name of ['health', 'skill', 'roster', 'chapter', 'doing', 'rates', 'food', 'pack', 'log']) {
       expect(screen.getByLabelText(name).closest('[inert]'), name).not.toBeNull();
     }
-    // Every chunk renders the view, the life about to begin, not the dead one (spec 2.4).
-    expect(screen.getByRole('timer', { name: 'run clock' })).toHaveTextContent('00:00');
-    expect(container.querySelector('.health .gauge__value')).toHaveTextContent('100.0 / 100.0');
-    expect(screen.getByLabelText('doing')).toHaveTextContent('doing \u00B7 0');
-    expect(screen.getByLabelText('food').querySelectorAll('.food__slot--blank')).toHaveLength(3);   // the next life's pack is empty
+    // Every chunk renders the life that ended, frozen: the kill screen (spec 2026-09-25-death-overlay 2.2).
+    expect(screen.getByRole('timer', { name: 'run clock' })).not.toHaveTextContent('00:00');
+    expect(container.querySelector('.health .gauge__value')!.textContent).toMatch(/^0 \//);
+    expect(screen.getByLabelText('doing')).toHaveTextContent('doing \u00B7 1');
+    expect(screen.getByLabelText('health').querySelector('.gauge__label')).toHaveTextContent(/^dead$/);   // the kill screen says so
+    expect(screen.getByLabelText('food').querySelectorAll('.food__slot--blank')).toHaveLength(2);   // the dead life's fish is in its slot
     const foodCell = [...screen.getByLabelText('rates').querySelectorAll('.rates__cell')][1]!;
     expect(foodCell).toHaveTextContent('food');
-    expect(foodCell.querySelector('b')).toHaveClass('ink-3');   // no larder yet: the food cell is dim, not colour-judged
+    expect(foodCell.querySelector('b')).not.toHaveClass('ink-3');   // the dead life had a larder: the food cell is colour-judged
     expect(screen.queryByRole('button', { name: /^(pause|resume)$/ })).toBeNull();   // no corner control behind the card
     act(() => { screen.getByRole('button', { name: 'Begin life 2' }).click(); });
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -146,7 +147,65 @@ describe('App', () => {
     expect(handle.state().paused).toBe('none');
     expect(container.querySelector('[inert]')).toBeNull();
   });
-  it('the card sits in a veil over the body, above the bottom bar, its button full width', () => {
+  it('a death mid-fight: the kill screen lights the fight with its gauge, and its hurt is on the rates line', () => {
+    render(<App book={windwardRun} />);
+    const handle = window.continuum!;
+    const hurts = balance.content.windward.pirates.hurts;
+    act(() => { handle.dispatch({ type: 'load', model: { state: built(handle.state(), 'hull', 'net', 'satchel', 'sails'), log: [], nextSeq: 0 } }); });
+    act(() => { handle.dispatch({ type: 'queue', actionId: 'pirates', front: true }); handle.step(1); });
+    act(() => { handle.dispatch({ type: 'die' }); });
+    const first = screen.getByLabelText('doing').querySelector('.entry')!;
+    expect(first).toHaveClass('entry--on');
+    expect(first).toHaveTextContent(/pirates/);
+    expect(first.querySelector('.gauge')).not.toBeNull();
+    const rowCell = screen.getByLabelText('rates').querySelectorAll('.rates__cell')[2]!;
+    expect(rowCell).toHaveTextContent(new RegExp(`fight.*\u2212${hurts.toFixed(2)}`));
+  });
+  it('after a finish nothing behind the card is lit, whatever the queue holds', () => {
+    render(<App book={windwardRun} />);
+    const handle = window.continuum!;
+    act(() => { handle.dispatch({ type: 'queue', actionId: 'fish' }); handle.step(1); });
+    act(() => { handle.dispatch({ type: 'load', model: { state: { ...handle.state(), dead: true, finished: true, paused: 'system' }, log: [], nextSeq: 0 } }); });
+    expect(screen.getByLabelText('doing').querySelector('.entry--on')).toBeNull();
+    expect(screen.getByLabelText('health').querySelector('.gauge__label')).toHaveTextContent(/^finished$/);
+  });
+  it('a dead life with nothing queued says so behind the overlay, and asks for nothing', () => {
+    render(<App book={windwardRun} />);
+    act(() => { window.continuum!.dispatch({ type: 'die' }); });
+    expect(screen.getByLabelText('doing')).toHaveTextContent('nothing was queued');
+    expect(screen.getByLabelText('doing')).not.toHaveTextContent(/pick an action/);
+  });
+  it('the overlay charts every life so far: after a second death, two points', () => {
+    render(<App book={windwardRun} />);
+    act(() => { window.continuum!.dispatch({ type: 'die' }); });
+    act(() => { screen.getByRole('button', { name: 'Begin life 2' }).click(); });
+    act(() => { window.continuum!.dispatch({ type: 'die' }); });
+    expect(screen.getByRole('img').querySelectorAll('.chart__dot')).toHaveLength(2);
+    expect(screen.getByText('life 1 \u2192 2 \u00B7 the last point is this life')).toBeInTheDocument();
+  });
+  it('the overlay reads each skill from where this life began: core from and to', () => {
+    render(<App book={windwardRun} />);
+    const handle = window.continuum!;
+    const first = windwardRun.roster[0]!.id;
+    const s = handle.state();
+    const skills = { ...s.skills, [first]: { ...s.skills[first]!, core: { level: 3, exp: 0 } } };
+    act(() => { handle.dispatch({ type: 'load', model: { state: { ...s, skills, lifeStartCore: { ...s.lifeStartCore, [first]: 2 } }, log: [], nextSeq: 0 } }); });
+    act(() => { handle.dispatch({ type: 'die' }); });
+    expect(document.querySelectorAll('button.pick')[1]!.querySelector('.pick__lv')).toHaveTextContent('2 \u2192 3');
+  });
+  it('see how it ended leaves the body inert and the pill outside it, and Begin from the pill starts the next life', async () => {
+    render(<App book={windwardRun} />);
+    act(() => { window.continuum!.dispatch({ type: 'die' }); });
+    await act(() => realClick(screen.getByRole('button', { name: 'see how it ended' })));
+    const pill = screen.getByRole('group', { name: 'the life that ended' });
+    expect(pill.closest('[inert]')).toBeNull();
+    expect(pill.closest('.veil')).not.toBeNull();
+    expect(screen.getByLabelText('doing').closest('[inert]')).not.toBeNull();
+    await act(() => realClick(within(pill).getByRole('button', { name: 'Begin life 2' })));
+    expect(screen.queryByRole('group', { name: 'the life that ended' })).toBeNull();
+    expect(window.continuum!.state().life).toBe(2);
+  });
+  it('the card sits in a veil over the body, above the bottom bar, Begin in its foot', () => {
     render(<App book={windwardRun} />);
     act(() => { window.continuum!.dispatch({ type: 'die' }); });
     const dialog = screen.getByRole('dialog', { name: /Life 1 ends/ });
@@ -156,9 +215,9 @@ describe('App', () => {
     expect(dialog.closest('[inert]')).toBeNull();
     expect(screen.getByLabelText('doing').closest('[inert]')).not.toBeNull();
     expect(screen.getByLabelText('actions sheet').closest('[inert]')).not.toBeNull();
-    expect(screen.getByRole('button', { name: /Begin life 2/ })).toHaveClass('card__begin');
+    expect(screen.getByRole('button', { name: /Begin life 2/ })).toHaveClass('over__begin');
   });
-  it('the book finished: the finish card is up in the death card\'s place, and Read again starts the next life at port I', async () => {
+  it('the book finished: the overlay is up with the finish\'s words, and Read again starts the next life at port I', async () => {
     render(<App book={windwardRun} />);
     const handle = window.continuum!;
     const done = { ...newState(windwardRun.roster), dead: true, finished: true, paused: 'system' as const, chapter: 2, runTicks: 600, life: 7 };
@@ -167,7 +226,7 @@ describe('App', () => {
     expect(card.parentElement).toHaveClass('veil');
     expect(screen.queryByRole('dialog', { name: /ends$/ })).toBeNull();
     expect(card).toHaveTextContent(windwardRun.actions[windwardRun.finish]!.beat!);
-    expect(card).toHaveTextContent('finished 1\u00D7');
+    expect(card).toHaveTextContent('finish 1');
     await act(() => realClick(screen.getByRole('button', { name: 'Read again' })));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(handle.state()).toMatchObject({ life: 8, finishes: 1, chapter: 0, dead: false, finished: false, paused: 'none' });

@@ -9,7 +9,7 @@ import { cycleOf, withoutOrphans } from '../engine/automation';
 import { NO_STATS } from '../engine/queue';
 import { here } from '../engine/rows';
 import { newSkill } from '../engine/skills';
-import type { GameState } from '../engine/types';
+import type { GameState, LifeRecord } from '../engine/types';
 import type { Model } from './useGame';
 
 export const SAVE_KEY = 'continuum.save';
@@ -74,6 +74,11 @@ const isPageEvent = (e: Record<string, unknown>): boolean =>
 const isLine = (l: unknown): boolean =>
   isRecord(l) && typeof l.seq === 'number' && typeof l.at === 'number' && isRecord(l.event) && typeof l.event.type === 'string'
   && isPageEvent(l.event);
+
+/** A record the chart can draw: finite numbers, core levels keyed by skill. */
+const isRecordOfLife = (r: unknown): r is LifeRecord =>
+  isRecord(r) && typeof r.life === 'number' && Number.isFinite(r.life) && typeof r.maxHealth === 'number' && Number.isFinite(r.maxHealth)
+  && isRecord(r.core) && Object.values(r.core).every((v) => typeof v === 'number' && Number.isFinite(v));
 
 /** The model's own lists are checked item by item too: a hand-edited `queue: [null]` must read as corrupt, not throw later. */
 function wellFormed(m: Model): boolean {
@@ -164,6 +169,9 @@ export function reconcile(state: GameState, book: Book): GameState {
     chapter: Math.min(Math.max(0, Math.floor(state.chapter)), book.chapters.length - 1),
     // A save from before lastVerb has none, and a verb this book's roster lacks is nobody's: both read null.
     lastVerb: book.roster.some((r) => r.id === state.lastVerb) ? state.lastVerb : null,
+    // A save from before #90 has no history; a record the chart cannot draw goes, and a skill the roster lacks leaves its record.
+    lives: (Array.isArray(state.lives) ? state.lives : []).filter(isRecordOfLife)
+      .map((r) => ({ ...r, core: keep(r.core, (id) => book.roster.some((s) => s.id === id)) })),
     events: [],
   };
   // The page is derived from what is done, so it is read off the kept state. An order for a row the book no longer

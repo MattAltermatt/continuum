@@ -76,6 +76,15 @@ export type GameEvent =
   /** The book's finish completed; the life is over (section 9). */
   | { readonly type: 'finished'; readonly runTicks: number };
 
+/** One ended life, as it ended: what the death overlay charts (#90, spec 2026-09-25-death-overlay section 3). */
+export interface LifeRecord {
+  readonly life: number;
+  /** Max health after this life's gain. */
+  readonly maxHealth: number;
+  /** Core level of every roster skill as the life ended. */
+  readonly core: Readonly<Record<SkillId, number>>;
+}
+
 export interface GameState {
   readonly runTicks: number;
   readonly health: number;
@@ -121,6 +130,8 @@ export interface GameState {
   readonly lifeStartCore: Readonly<Record<SkillId, number>>;
   /** The verb of the last row that did work this run, so an idle screen can keep showing it (spec 2026-09-25-the-watched-screen 4.2); null on a fresh run. Kept across death. */
   readonly lastVerb: SkillId | null;
+  /** Every ended life, oldest first; appended by rebirth, kept across lives (#90). */
+  readonly lives: readonly LifeRecord[];
   /** This tick's events. Replaced every tick; never accumulates. */
   readonly events: readonly GameEvent[];
 }

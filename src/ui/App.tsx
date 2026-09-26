@@ -13,8 +13,7 @@ import { useGame } from '../state/useGame';
 import { BottomBar } from './BottomBar';
 import { ChapterPanel } from './ChapterPanel';
 import { Debug } from './Debug';
-import { DeathCard } from './DeathCard';
-import { FinishCard } from './FinishCard';
+import { DeathOverlay } from './DeathOverlay';
 import { Food } from './Food';
 import { duration } from './format';
 import { Log } from './Log';
@@ -32,7 +31,7 @@ import { useTier } from './useTier';
 const tickVars = { '--tick': `${balance.time.tickIntervalMs}ms` } as CSSProperties;
 
 export function App({ book }: { book: Book }) {
-  const { state, view, log, dispatch, card, speed, setSpeed, save, load, erase, elsewhere, playHere } = useGame(book);
+  const { state, log, dispatch, card, history, speed, setSpeed, save, load, erase, elsewhere, playHere } = useGame(book);
   // The dev handle reads the committed state. The handle wraps its writes in
   // flushSync, so a read on the line after a dispatch or step sees its result;
   // the layout effect updates the ref inside that same commit.
@@ -50,26 +49,31 @@ export function App({ book }: { book: Book }) {
     });
   }, [dispatch, setSpeed, save, load, erase]);
 
-  // Every chunk renders the view: while the card is up that is the next life, never a dead state.
-  // useGame keeps it settled while live (what the next tick's zero-time resolve would do is already
-  // done), so a producer that just filled has left the top and the screen never flashes a stopped game
+  // Every chunk renders the committed state; while a card is up that is the life that ended, frozen (spec
+  // 2026-09-25-death-overlay 2.2). useGame keeps it settled while live (what the next tick's zero-time resolve would
+  // do is already done), so a producer that just filled has left the top and the screen never flashes a stopped game
   // at a handoff. "Working" is topWorks: the top able to run as the state stands. Paused, that is where work
   // resumes, and a top that would pop or wait on a supply is not lit.
-  const screen = view;
+  const screen = state;
   // A held or lost tab (#73) shows the loaded save at rest: nothing ticks, so nothing reads as running.
-  const live = view.paused === 'none' && elsewhere === 'none';
-  const ready = useMemo(() => topWorks(view, book), [view, book]);
+  const live = screen.paused === 'none' && elsewhere === 'none';
+  // After a death the row the life died in is the lit row and its rate is on the rates line (spec 2026-09-25-death-overlay 2.2).
+  // Behind any card topWorks is not asked (resolve does not check `dead`): after a finish nothing is lit, whatever is queued.
+  const dying = card !== null && !card.finished;
+  const ready = useMemo(() => (card !== null ? dying && screen.queue.length > 0 : topWorks(screen, book)), [card, dying, screen, book]);
   const working = ready ? 0 : -1;
   // "Running" means working AND the clock is live: no sheen, no stop mark, no countdown on a stopped game.
   const runningActionId = live && working !== -1 ? screen.queue[working]!.actionId : null;
   const runningSkill = runningActionId ? book.actions[runningActionId]!.verb : null;
   // A row's health rate applies only while it runs (spec 2026-09-23-the-windward-run section 6.1, 2026-09-24-proving-ground section 1); the rates chunk says so, by its skill.
-  const row = runningActionId ? rowHealthPerSecond(screen, book) : 0;
-  const rowBy = runningSkill ? skillOf(book, runningSkill).name.toLowerCase() : undefined;
-  const stopped = !live || working === -1;   // idle, waiting, paused, or the card (the view is on a system pause)
+  // On the kill screen the row that was on top when the life ended is the rate's row, though nothing runs.
+  const rateId = runningActionId ?? (dying ? screen.queue[0]?.actionId ?? null : null);
+  const row = rateId ? rowHealthPerSecond(screen, book) : 0;
+  const rowBy = rateId ? skillOf(book, book.actions[rateId]!.verb).name.toLowerCase() : undefined;
+  const stopped = !live || working === -1;   // idle, waiting, paused, or the card (the dead state is on a system pause)
   const net = foodCeilingPerSecond(screen, book) + row - decayPerSecond(screen);
-  const label = topLabel({ elsewhere, card: card !== null, paused: view.paused !== 'none' && elsewhere === 'none' && card === null, queued: screen.queue.length, fighting: row < 0, health: screen.health, net, life: screen.life });
-  // Everything behind the death card, or the tab card (#73), takes no focus and no click. Wrappers carry it; no component gets a prop.
+  const label = topLabel({ elsewhere, card: card === null ? 'none' : card.finished ? 'finished' : 'dead', paused: screen.paused !== 'none' && elsewhere === 'none' && card === null, queued: screen.queue.length, fighting: row < 0, health: screen.health, net, life: screen.life });
+  // Everything behind the death overlay, or the tab card (#73), takes no focus and no click. Wrappers carry it; no component gets a prop.
   const carded = card !== null || elsewhere !== 'none';
   const page = pageOf(screen, book);
   const inert = carded ? true : undefined;
@@ -128,7 +132,7 @@ export function App({ book }: { book: Book }) {
         <div className="watch" inert={inert}>
           {skillNow}
           <Food state={screen} content={book} />
-          <Queue state={screen} content={book} working={working} live={live} onRemove={(entryId) => dispatch({ type: 'remove', entryId })} />
+          <Queue state={screen} content={book} working={working} live={live} dead={card !== null} onRemove={(entryId) => dispatch({ type: 'remove', entryId })} />
           <Log lines={log} content={book} />
         </div>
         <Sheet name="skills" open={sheet === 'skills'} docked={docked} inert={inert} onClose={close} head={skillsHead}>
@@ -153,9 +157,7 @@ export function App({ book }: { book: Book }) {
           <div className="veil">
             {elsewhere !== 'none'
               ? <TabCard kind={elsewhere} onPlayHere={playHere} />
-              : card && (card.finished
-                ? <FinishCard summary={card} content={book} book={book.name} onReadAgain={() => dispatch({ type: 'begin' })} />
-                : <DeathCard summary={card} content={book} onBegin={() => dispatch({ type: 'begin' })} />)}
+              : card && <DeathOverlay summary={card} content={book} book={book.name} history={history} from={state.lifeStartCore} onBegin={() => dispatch({ type: 'begin' })} />}
           </div>
         )}
       </div>

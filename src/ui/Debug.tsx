@@ -79,7 +79,7 @@ function NumberField({ label, value, fractions = false, onApply, inputRef }: {
  * The debug overlay (spec 2026-09-24-screen-pass section 5, #83): dev builds only, mounted by App under
  * import.meta.env.DEV and imported by nothing else, with no side-effect import, so production drops it.
  * The backquote toggles it and Escape closes it; it floats on document.body through a portal, drags by its
- * title bar, and reads the committed state (behind the death card, the dead life: every write is refused).
+ * title bar, and reads the committed state (behind the death overlay, the dead life: every write is refused).
  */
 export function Debug({ content, state, stopped, speed, onSpeed, dispatch }: {
   content: Content; state: GameState; stopped: boolean; speed: number; onSpeed: (n: number) => void; dispatch: (a: GameAction) => void;

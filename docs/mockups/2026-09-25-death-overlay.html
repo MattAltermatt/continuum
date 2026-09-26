@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Death overlay: the life's gains and progress across lives</title>
+<style>
+:root { color-scheme: dark;
+  --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --item: oklch(22% 0.012 260); --cell-on: oklch(30% 0.02 260);
+  --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --track: oklch(17% 0.012 260); --track-edge: oklch(55% 0.012 260);
+  --ink: oklch(90% 0.01 80); --ink-2: oklch(80% 0.01 80); --ink-3: oklch(62% 0.01 80); --core: oklch(84% 0.02 80); --run: oklch(70% 0.16 45);
+  --hurt: oklch(66% 0.18 25); --hurt-text: oklch(70% 0.18 25); --good: oklch(78% 0.12 150);
+  --mono: ui-monospace, Menlo, monospace; --serif: Georgia, "Times New Roman", serif; --control: 34px; }
+* { box-sizing: border-box; }
+body { margin: 0; background: oklch(12% 0.01 260); color: var(--ink); font-family: var(--mono); font-size: 12px; padding: 24px; }
+h1 { font-size: 13px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 6px; }
+p.note { max-width: 80ch; color: var(--ink-2); line-height: 1.5; margin: 0 0 18px; }
+.frames { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+.frame > h2 { font-size: 12px; font-weight: 700; margin: 0 0 6px; }
+.frame > h2 small { display: block; font-weight: 400; color: var(--ink-2); margin-top: 3px; line-height: 1.4; max-width: 70ch; }
+.screen { background: var(--bg); border: 1px solid var(--edge); border-radius: 10px; overflow: hidden; position: relative; }
+.screen--desk { width: 1280px; height: 760px; }
+.screen--phone { width: 390px; height: 800px; border-radius: 18px; }
+
+/* The frozen dead world, roughed in: health at zero, the queue as it stood, the log's last lines. */
+.world { position: absolute; inset: 0; padding: 14px; display: grid; grid-template-rows: auto 1fr; gap: 10px; }
+.world__top { display: grid; gap: 6px; }
+.bar { height: 8px; border: 1px solid var(--track-edge); border-radius: 3px; background: var(--track); position: relative; overflow: hidden; }
+.bar--hp { height: 16px; }
+.hp-line { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.hp-line b { color: var(--hurt-text); }
+.world__cols { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; align-content: start; }
+.screen--phone .world__cols { grid-template-columns: 1fr; }
+.region { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; display: grid; gap: 5px; align-content: start; }
+.region__head { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.entry { border: 1px solid var(--edge); background: var(--item); border-radius: 4px; padding: 5px 8px; display: flex; justify-content: space-between; }
+.entry--top { border-color: var(--hurt); }
+.log { font-size: 11px; color: var(--ink-2); display: grid; gap: 3px; }
+.log .hurt { color: var(--hurt-text); }
+
+/* The overlay. */
+.veil { position: absolute; inset: 0; background: color-mix(in oklch, oklch(8% 0.01 260) 86%, transparent); display: grid; place-items: center; padding: 16px; }
+.over { background: var(--bg); border: 1px solid var(--edge-on); border-radius: 8px; display: grid; grid-template-rows: auto 1fr auto; width: 100%; height: 100%; overflow: hidden; }
+.screen--desk .over { width: 1040px; height: 620px; }
+.over__head { padding: 14px 18px 12px; border-bottom: 1px solid var(--edge); display: grid; gap: 4px; }
+.over__title { font-family: var(--serif); font-size: 22px; }
+.over__sub { color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 0 14px; }
+.over__sub .hurt { color: var(--hurt-text); }
+.over__body { display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
+.screen--phone .over__body { grid-template-columns: 1fr; grid-template-rows: 250px 1fr; }
+.over__foot { padding: 10px 18px; border-top: 1px solid var(--edge); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.screen--phone .over__foot { padding: 10px 12px; }
+
+/* Left: health, then the roster in book order. Every skill, moved or not. */
+.list { border-right: 1px solid var(--edge); overflow-y: auto; padding: 8px 0; }
+.screen--phone .list { border-right: 0; border-top: 1px solid var(--edge); order: 2; }
+.pick { display: grid; grid-template-columns: 1.6em 1fr auto 3.2em; align-items: center; gap: 0 8px; padding: 7px 16px; cursor: pointer; border-left: 2px solid transparent; font-variant-numeric: tabular-nums; }
+.pick:hover { background: var(--item); }
+.pick[aria-selected="true"] { background: var(--cell-on); border-left-color: var(--edge-on); }
+.pick__name b { font-weight: 700; }
+.pick__lv { text-align: right; color: var(--ink-2); white-space: nowrap; }
+.pick__lv b { color: var(--ink); }
+.pick__d { text-align: right; color: var(--good); }
+.pick--still .pick__name, .pick--still .pick__lv { color: var(--ink-3); }
+.pick--still .pick__lv b { color: var(--ink-3); font-weight: 400; }
+.pick--rule { border-bottom: 1px solid var(--edge); margin-bottom: 4px; padding-bottom: 9px; }
+.pick svg { width: 15px; height: 15px; }
+
+/* Right: the chosen line, by life. */
+.chart { padding: 14px 18px; display: grid; grid-template-rows: auto 1fr auto; gap: 6px; min-height: 0; }
+.screen--phone .chart { padding: 10px 12px 6px; }
+.chart__head { display: flex; justify-content: space-between; color: var(--ink-2); }
+.chart__head b { color: var(--ink); }
+.chart svg { width: 100%; height: 100%; overflow: visible; }
+.chart__foot { color: var(--ink-3); font-size: 11px; }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+.btn { background: var(--item); border: 1px solid var(--edge); border-radius: 4px; padding: 8px 12px; }
+.btn--go { background: var(--cell-on); border-color: var(--edge-on); font-weight: 700; }
+.quiet { color: var(--ink-3); font-size: 11px; }
+
+/* The pill, pinned over the dead world while the overlay is hidden. */
+.pill { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; border: 1px solid var(--edge-on); border-radius: 999px; background: var(--bg); box-shadow: 0 6px 24px oklch(5% 0 0 / .6); white-space: nowrap; }
+.pill .btn { border-radius: 999px; padding: 7px 12px; }
+.hidden { display: none; }
+</style></head>
+<body>
+<h1>Death overlay (#90)</h1>
+<p class="note">Life 8 of the Windward Run ends in Pirates. The left column is health and then every skill in book order, each showing its core level from and to; skills that did not move are dimmed. Click any row to chart it on the right, across every life so far. <b>see how it ended</b> hides the overlay over the frozen dead world, and the pill brings it back or begins. Both frames are live. The numbers are made up.</p>
+<div class="frames" id="frames"></div>
+
+<template id="tpl">
+  <div class="world">
+    <div class="world__top">
+      <div class="hp-line"><span>Windward Run · II The Hollow Isle · life 8</span><span><b>0.0</b> / 142.9</span></div>
+      <div class="bar bar--hp"></div>
+    </div>
+    <div class="world__cols">
+      <div class="region"><div class="region__head">doing · 3</div>
+        <div class="entry entry--top"><span>⚔ Fight <b>pirates</b></span><span class="quiet">41% · 0:18 left</span></div>
+        <div class="entry"><span>🎣 Fish <b>shallows</b></span><span class="quiet">×2</span></div>
+        <div class="entry"><span>🔧 Tinker <b>hull</b></span><span class="quiet">once</span></div>
+      </div>
+      <div class="region"><div class="region__head">log</div>
+        <div class="log">
+          <div class="hurt">5:58 health 0 in Fight pirates</div>
+          <div>5:41 ate dried fish · +12</div>
+          <div>5:40 food: none left</div>
+          <div>5:22 Fight pirates begins</div>
+          <div>5:21 Rig sails ×1 done</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="veil">
+    <div class="over" role="dialog" aria-label="Life 8 ends">
+      <div class="over__head">
+        <div class="over__title">Life 8 ends</div>
+        <div class="over__sub"><span>6:05 alive</span><span>reached II · The Hollow Isle</span><span class="hurt">fell during Fight pirates</span></div>
+      </div>
+      <div class="over__body">
+        <div class="list" role="listbox" aria-label="what the life kept"></div>
+        <div class="chart">
+          <div class="chart__head"><span class="c-title"></span><span class="c-now"></span></div>
+          <svg class="c-svg" viewBox="0 0 600 300" preserveAspectRatio="none"></svg>
+          <div class="chart__foot">life 1 → 8 · the last point is this life</div>
+        </div>
+      </div>
+      <div class="over__foot">
+        <button class="btn b-look" type="button">see how it ended</button>
+        <button class="btn btn--go b-go" type="button">Begin life 9</button>
+      </div>
+    </div>
+  </div>
+  <div class="pill hidden">
+    <button class="btn b-back" type="button">▲ back to life 8</button>
+    <button class="btn btn--go" type="button">Begin life 9</button>
+  </div>
+</template>
+
+<script>
+const ICON = { health: '♥', fish: '🎣', salvage: '♻', tinker: '🔧', rig: '⛵', fight: '⚔', search: '👁', talk: '💬' };
+// One record per life, as it ended: max health after the life's gain, core levels.
+const LIVES = [
+  { hp: 100.4, fish: 1, salvage: 1, tinker: 0, rig: 0, fight: 0, search: 0, talk: 0 },
+  { hp: 101.3, fish: 2, salvage: 1, tinker: 1, rig: 0, fight: 0, search: 0, talk: 0 },
+  { hp: 103.0, fish: 2, salvage: 2, tinker: 1, rig: 1, fight: 0, search: 0, talk: 0 },
+  { hp: 106.1, fish: 3, salvage: 2, tinker: 2, rig: 1, fight: 1, search: 0, talk: 0 },
+  { hp: 110.8, fish: 3, salvage: 3, tinker: 2, rig: 2, fight: 1, search: 0, talk: 0 },
+  { hp: 118.2, fish: 4, salvage: 3, tinker: 3, rig: 2, fight: 1, search: 0, talk: 0 },
+  { hp: 129.6, fish: 4, salvage: 4, tinker: 3, rig: 3, fight: 2, search: 1, talk: 0 },
+  { hp: 142.9, fish: 5, salvage: 4, tinker: 4, rig: 3, fight: 3, search: 1, talk: 0 },
+];
+const ROWS = [
+  { id: 'health', name: 'Health', unit: 'max health', fmt: (v) => v.toFixed(1) },
+  { id: 'fish', name: 'Fish' }, { id: 'salvage', name: 'Salvage' }, { id: 'tinker', name: 'Tinker' }, { id: 'rig', name: 'Rig' },
+  { id: 'fight', name: 'Fight' }, { id: 'search', name: 'Search' }, { id: 'talk', name: 'Talk' },
+];
+const key = (r) => (r.id === 'health' ? 'hp' : r.id);
+const fmt = (r, v) => (r.fmt ? r.fmt(v) : String(v));
+
+function mount(host, kind) {
+  const frame = document.createElement('div'); frame.className = 'frame';
+  const titles = {
+    desk: ['Desktop 1280 · overlay', 'The list on the left, the chart on the right. Health is picked first.'],
+    phone: ['Phone 390 · overlay', 'The same, stacked: the chart on top, the list under it, scrolling. Tap a row to chart it.'],
+  };
+  frame.innerHTML = `<h2>${titles[kind][0]}<small>${titles[kind][1]}</small></h2>`;
+  const screen = document.createElement('div'); screen.className = `screen screen--${kind}`;
+  screen.append(document.getElementById('tpl').content.cloneNode(true));
+  frame.append(screen); host.append(frame);
+
+  const list = screen.querySelector('.list');
+  const last = LIVES[LIVES.length - 1], prev = LIVES[LIVES.length - 2];
+  let picked = 'health';
+  const picks = ROWS.map((r, i) => {
+    const k = key(r), from = prev[k], to = last[k], moved = to > from;
+    const el = document.createElement('div');
+    el.className = `pick${moved ? '' : ' pick--still'}${i === 0 ? ' pick--rule' : ''}`;
+    el.setAttribute('role', 'option');
+    el.innerHTML = `<span>${ICON[r.id]}</span><span class="pick__name"><b>${r.name}</b></span>`
+      + `<span class="pick__lv">${fmt(r, from)} → <b>${fmt(r, to)}</b></span>`
+      + `<span class="pick__d">${moved ? '+' + fmt(r, to - from) : ''}</span>`;
+    el.onclick = () => { picked = r.id; draw(); };
+    list.append(el); return [r.id, el];
+  });
+
+  function draw() {
+    picks.forEach(([id, el]) => el.setAttribute('aria-selected', String(id === picked)));
+    const r = ROWS.find((x) => x.id === picked), k = key(r);
+    const ys = LIVES.map((l) => l[k]);
+    screen.querySelector('.c-title').innerHTML = `<b>${r.name}</b> · ${r.unit ?? 'core level'} by life`;
+    screen.querySelector('.c-now').textContent = `now ${fmt(r, ys[ys.length - 1])}`;
+    const W = 600, H = 300, pad = 28;
+    const lo = r.id === 'health' ? Math.floor(Math.min(...ys) / 10) * 10 : 0;
+    const hi = Math.max(lo + 1, r.id === 'health' ? Math.ceil(Math.max(...ys) / 10) * 10 : Math.max(...ys) + 1);
+    const x = (i) => pad + (i * (W - pad * 2)) / (ys.length - 1);
+    const y = (v) => H - pad - ((v - lo) * (H - pad * 2)) / (hi - lo);
+    const pts = ys.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+    let g = '';
+    const steps = r.id === 'health' ? 4 : hi - lo;
+    for (let s = 0; s <= steps; s++) {
+      const v = lo + ((hi - lo) * s) / steps;
+      g += `<line x1="${pad}" x2="${W - pad}" y1="${y(v)}" y2="${y(v)}" stroke="var(--edge)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+      g += `<text x="${pad - 6}" y="${y(v) + 4}" fill="var(--ink-3)" font-size="11" text-anchor="end">${r.id === 'health' ? v.toFixed(0) : v}</text>`;
+    }
+    ys.forEach((_, i) => { g += `<text x="${x(i)}" y="${H - 8}" fill="var(--ink-3)" font-size="11" text-anchor="middle">${i + 1}</text>`; });
+    const color = r.id === 'health' ? 'var(--hurt)' : 'var(--core)';
+    g += `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+    ys.forEach((v, i) => {
+      const lastPt = i === ys.length - 1;
+      g += `<circle cx="${x(i)}" cy="${y(v)}" r="${lastPt ? 5 : 3}" fill="${lastPt ? 'var(--run)' : color}"/>`;
+    });
+    screen.querySelector('.c-svg').innerHTML = g;
+  }
+  draw();
+
+  const veil = screen.querySelector('.veil'), pill = screen.querySelector('.pill');
+  screen.querySelector('.b-look').onclick = () => { veil.classList.add('hidden'); pill.classList.remove('hidden'); };
+  screen.querySelector('.b-back').onclick = () => { veil.classList.remove('hidden'); pill.classList.add('hidden'); };
+}
+const host = document.getElementById('frames');
+mount(host, 'desk');
+mount(host, 'phone');
+</script>
+</body></html>

@@ -40,7 +40,7 @@ time, such as dropping a full producer, still happens). A stopped game renders
 nothing.
 
 Pause distinguishes **paused by the player** from **paused by the system**
-(death, which holds the dead state behind the death card until Begin; the first run and every new life open live, because under decision #41 an empty queue costs nothing). The distinction matters because passive automation is
+(death, which holds the dead state behind the death overlay until Begin; the first run and every new life open live, because under decision #41 an empty queue costs nothing). The distinction matters because passive automation is
 suppressed while the player has deliberately paused — a paused game is a
 planning surface, and having the queue refill itself underneath the player
 while they think defeats the point.
@@ -430,8 +430,9 @@ Death is a normal, expected, frequent event. It is the loop, not the fail state.
 - Every skill's **run mastery** → level 0.
 - The next life begins with a plan rather than with lost seconds. Under
   decision #41 a new life costs nothing until something is queued. The dead
-  state is held behind a death card until the player presses **Begin**, and
-  the screen behind the card already shows the next life.
+  state is held behind the death overlay until the player presses **Begin**,
+  and the screen behind the overlay is that dead life, frozen, so the player
+  can see how it ended (#90).
 
 ### What persists
 
@@ -441,6 +442,8 @@ Death is a normal, expected, frequent event. It is the loop, not the fail state.
 - Automation settings, keyed by row.
 - Accumulated rebirth health bonus.
 - The life number, counting up from 1, and the times the book was finished.
+- The record of lives: one entry per ended life (its max health and every
+  core level), which the death overlay charts (#90).
 
 Finishing the book ends a life the same way (section 7).
 
@@ -556,8 +559,8 @@ Completing it **casts off**: the next port's first page is the page, every
 non-food item is dumped (provisions ride along), and the queue keeps only
 orders the new page has. The
 effects completed rows applied stay for the life. The last port's event is the
-book's **finish**: the life ends there, a finish card shows the book's last
-line, and the next life starts again at the first port with core ledgers,
+book's **finish**: the life ends there, the death overlay shows the book's last
+line with the finish's words, and the next life starts again at the first port with core ledgers,
 automation and counts kept and the life's max-health gain applied.
 
 ---

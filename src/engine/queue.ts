@@ -46,6 +46,7 @@ export function blankRun(skills: Readonly<Record<SkillId, SkillState>>, lifeStar
     rebirthBonus: 0,
     lifeStartCore,
     lastVerb: null,
+    lives: [],
     events: [],
   };
 }

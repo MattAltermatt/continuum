@@ -9,10 +9,11 @@ const strip = (label: ReturnType<typeof topLabel>, over: Partial<Parameters<type
   render(<TopStrip book={book.name} head={head} page="Fitting out" health={97} max={100} life={1} label={label} decay={0.11} ceiling={0} row={0} rowBy={null} {...over} />);
 
 describe('topLabel', () => {
-  const base = { elsewhere: 'none' as const, card: false, paused: false, queued: 2, fighting: false, health: 97, net: -0.11, life: 4 };
-  it('orders the states: elsewhere, life, paused, idle, left, steady; a fight is never counted down', () => {
+  const base = { elsewhere: 'none' as const, card: 'none' as const, paused: false, queued: 2, fighting: false, health: 97, net: -0.11, life: 4 };
+  it('orders the states: elsewhere, dead or finished, paused, idle, left, steady; a fight is never counted down', () => {
     expect(topLabel({ ...base, elsewhere: 'held' }).kind).toBe('elsewhere');
-    expect(topLabel({ ...base, card: true })).toEqual({ kind: 'life', life: 4 });
+    expect(topLabel({ ...base, card: 'dead' })).toEqual({ kind: 'dead', life: 4 });
+    expect(topLabel({ ...base, card: 'finished' })).toEqual({ kind: 'finished', life: 4 });
     expect(topLabel({ ...base, paused: true }).kind).toBe('paused');
     expect(topLabel({ ...base, queued: 0 }).kind).toBe('idle');
     expect(topLabel(base)).toEqual({ kind: 'left', seconds: 97 / 0.11 });
@@ -21,8 +22,8 @@ describe('topLabel', () => {
     expect(topLabel({ ...base, net: 0.2 }).kind).toBe('steady');
     // The order holds when two apply at once.
     expect(topLabel({ ...base, paused: true, queued: 0 }).kind).toBe('paused');
-    expect(topLabel({ ...base, card: true, paused: true }).kind).toBe('life');
-    expect(topLabel({ ...base, elsewhere: 'lost', card: true }).kind).toBe('elsewhere');
+    expect(topLabel({ ...base, card: 'dead', paused: true }).kind).toBe('dead');
+    expect(topLabel({ ...base, elsewhere: 'lost', card: 'dead' }).kind).toBe('elsewhere');
   });
 });
 
@@ -53,10 +54,11 @@ describe('TopStrip', () => {
     strip({ kind: 'left', seconds: 1616 * 60 + 40 });
     expect(screen.getByLabelText('health').querySelector('.gauge__label')).toHaveTextContent('\u2248 26h+ left');
   });
-  it('idle, paused, elsewhere and life read as words; steady is blank', () => {
-    for (const [label, word] of [[{ kind: 'idle' }, 'idle'], [{ kind: 'paused' }, 'paused'], [{ kind: 'elsewhere' }, 'elsewhere'], [{ kind: 'life', life: 4 }, 'life 4']] as const) {
+  it('idle, paused, elsewhere, dead and finished read as words; steady is blank', () => {
+    for (const [label, word] of [[{ kind: 'idle' }, 'idle'], [{ kind: 'paused' }, 'paused'], [{ kind: 'elsewhere' }, 'elsewhere'], [{ kind: 'dead', life: 4 }, 'dead'], [{ kind: 'finished', life: 4 }, 'finished']] as const) {
       const { unmount } = strip(label as ReturnType<typeof topLabel>);
       expect(screen.getByLabelText('health').querySelector('.gauge__label')).toHaveTextContent(word);
+      if (label.kind === 'dead') expect(screen.getByLabelText('health').querySelector('.gauge__label')).toHaveClass('gauge__label--hurt');
       unmount();
     }
     strip({ kind: 'steady' });

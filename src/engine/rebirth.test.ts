@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { balance } from '../balance';
 import { fixture } from './fixture';
 import { newState } from './queue';
-import { deathSummary, rebirth, rebirthGain } from './rebirth';
+import { deathSummary, lifeRecord, rebirth, rebirthGain } from './rebirth';
 import type { GameState } from './types';
 
 const minute = balance.time.ticksPerMinute;
@@ -39,6 +39,7 @@ function deadLife(): GameState {
     rebirthBonus: 1,
     lifeStartCore: { ...fresh.lifeStartCore, forage: 1, mine: 1 },
     lastVerb: 'forage',
+    lives: [{ life: 1, maxHealth: 100.5, core: { forage: 1, mine: 0, build: 0 } }],
   };
 }
 
@@ -147,7 +148,7 @@ describe('rebirth: guard and accrual', () => {
 describe('rebirth: every field is classified', () => {
   const RESETS = ['runTicks', 'paused', 'dead', 'finished', 'inventory', 'acquired', 'foodCooldowns', 'queue', 'nextEntryId', 'work', 'provisioned', 'idleFed', 'chapter', 'completedOneTime', 'decayMultiplier', 'events'];
   const PERSISTS = ['completionCounts', 'automation', 'skillStats', 'lastVerb'];
-  const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'finishes', 'rebirthBonus', 'lifeStartCore'];
+  const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'finishes', 'rebirthBonus', 'lifeStartCore', 'lives'];
   it('the three lists cover newState(roster) exactly, with no overlap', () => {
     const all = [...RESETS, ...PERSISTS, ...DERIVED];
     expect(new Set(all).size).toBe(all.length);
@@ -170,7 +171,7 @@ describe('rebirth: every field is classified', () => {
 });
 
 describe('deathSummary', () => {
-  it('reports the life, its clock, the gain, max health from and to, and only the skills whose core moved', () => {
+  it('reports the life, its clock, the gain, and max health from and to', () => {
     const dead = deadLife();
     const s = deathSummary(dead, fixture);
     expect(s.life).toBe(2);
@@ -178,16 +179,36 @@ describe('deathSummary', () => {
     expect(s.gain).toBeCloseTo(rebirthGain(10 * minute), 12);
     expect(s.maxHealthFrom).toBe(balance.health.base + dead.rebirthBonus);
     expect(s.maxHealthTo).toBe(rebirth(dead).maxHealth);
-    expect(s.coreGains.map((g) => [g.skill, g.from, g.to])).toEqual([['forage', 1, 3]]);
   });
-  it('carries the core ledger progress toward the next level, as a fraction', () => {
-    const g = deathSummary(deadLife(), fixture).coreGains[0]!;
-    const need = balance.skills.coreMastery.baseExp * balance.skills.expCurveExponent ** 3;
-    expect(g.progress).toBeCloseTo(2.5 / need, 12);
-  });
-  it('a death on the first tick: a tiny positive gain and no skill lines', () => {
+  it('a death on the first tick: a tiny positive gain', () => {
     const s = deathSummary({ ...newState(roster), runTicks: 1, dead: true, health: 0 }, fixture);
     expect(s.gain).toBeGreaterThan(0);
-    expect(s.coreGains).toEqual([]);
+    expect(s.gain).toBeCloseTo(rebirthGain(1), 12);
+  });
+});
+
+describe('the record of lives (#90)', () => {
+  it('lifeRecord is the life as it ended: its number, every core level, and the max health the card shows as "to"', () => {
+    const dead = deadLife();
+    const r = lifeRecord(dead);
+    expect(r.life).toBe(2);
+    expect(r.core).toEqual({ forage: 3, mine: 1, build: 0 });
+    expect(r.maxHealth).toBe(deathSummary(dead, fixture).maxHealthTo);
+  });
+  it('rebirth appends the dead life after the history it had, and the next life starts at the max health the record names', () => {
+    const next = rebirth(deadLife());
+    expect(next.lives).toEqual([...deadLife().lives, lifeRecord(deadLife())]);
+    expect(next.maxHealth).toBe(next.lives.at(-1)!.maxHealth);
+  });
+  it('a second death appends a second record, oldest first', () => {
+    const second = { ...rebirth(deadLife()), dead: true, runTicks: 3 * minute };
+    expect(rebirth(second).lives.map((r) => r.life)).toEqual([1, 2, 3]);
+  });
+  it('a state that is not dead is returned as it is', () => {
+    const alive = { ...deadLife(), dead: false };
+    expect(rebirth(alive)).toBe(alive);
+  });
+  it('a fresh game has no history', () => {
+    expect(newState(roster).lives).toEqual([]);
   });
 });

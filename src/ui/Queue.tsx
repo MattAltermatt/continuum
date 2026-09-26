@@ -117,7 +117,9 @@ export function Queue({ state, content, working, live, dead = false, onRemove }:
   const why = reason !== null ? <small>{narrate(reason, content).text}</small> : null;
   return (
     <Region name="doing" className="queue" title={`doing \u00b7 ${state.queue.length}`} note={note}>
-      {state.queue.length === 0 && <div className="queue__empty">nothing queued {'\u2014'} pick an action{why}</div>}
+      {state.queue.length === 0 && (dead
+        ? <div className="queue__empty">nothing was queued</div>
+        : <div className="queue__empty">nothing queued {'\u2014'} pick an action{why}</div>)}
       <div ref={list} className="queue__list">
         {state.queue.map((e, i) => {
           const a = content.actions[e.actionId]!;

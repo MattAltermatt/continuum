@@ -235,7 +235,8 @@ body inert, as today), the card centred in it **above the bottom bar** so
 Begin is never under a sticky bar; the card's button full width. The words
 and contents are today's cards', unchanged. The top strip keeps showing the
 screen behind, which is already the next life (health full, `life 4` as the
-label, rates at zero). #90's richer death screen grows inside this veil.
+label, rates at zero). #90's richer death screen grows inside this veil. *(Amended by spec
+2026-09-25-death-overlay: the screen behind is now the life that ended.)*
 
 ## 5. The gauge
 

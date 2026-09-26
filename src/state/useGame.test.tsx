@@ -6,6 +6,7 @@ import { testBook } from '../test-utils/book';
 import { saltRoadFixture } from '../test-utils/salt-road';
 import { withOrder } from '../engine/fixture';
 import type { Book } from '../data/types';
+import type { GameState } from '../engine/types';
 import { LOG_LINES, useGame } from './useGame';
 
 /** The raid's page with only the gate before it, so these fight tests reach the fight once the gate is done (spec 2026-09-24-pages). */
@@ -265,29 +266,45 @@ describe('useGame', () => {
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
   }
 
-  it('alive, the view is the state itself and there is no card', () => {
+  it('alive, there is no card and no history', () => {
     const { result } = renderHook(() => useGame(saltRoadFixture));
-    expect(result.current.view).toBe(result.current.state);
+    expect(result.current.history).toEqual([]);
     expect(result.current.card).toBeNull();
   });
 
-  it('a death keeps the dead state; the card and the reborn view are derived from it', () => {
+  it('a death keeps the dead state as the screen; the card and the history are derived from it, and Begin appends the life', () => {
     const { result } = renderHook(() => useGame(saltRoadFixture));
     die(result, 50);
-    const { state, view, card, log } = result.current;
+    const { state, card, history, log } = result.current;
     expect(state.dead).toBe(true);
     expect(card?.life).toBe(1);
     expect(card?.runTicks).toBe(51);
-    expect(view.dead).toBe(false);
-    expect(view.life).toBe(2);
-    expect(view.queue).toEqual([]);
-    expect(view.inventory).toEqual({});
-    expect(view.health).toBe(view.maxHealth);
-    expect(view.maxHealth).toBeGreaterThan(balance.health.base);
-    expect(view.paused).toBe('system');
+    expect(history).toHaveLength(1);
+    expect(history[0]!.life).toBe(1);
+    expect(history[0]!.maxHealth).toBe(card!.maxHealthTo);
     expect(log[0]!.event).toEqual({ type: 'died', runTicks: 51 });
+    act(() => result.current.dispatch({ type: 'begin' }));
+    expect(result.current.state.life).toBe(2);
+    expect(result.current.state.lives).toEqual(history);
+    expect(result.current.history).toEqual([]);
   });
 
+  it('two deaths: the second overlay charts both lives, oldest first', () => {
+    const { result } = renderHook(() => useGame(saltRoadFixture));
+    die(result, 50);
+    act(() => result.current.dispatch({ type: 'begin' }));
+    die(result, 50);
+    expect(result.current.history.map((r) => r.life)).toEqual([1, 2]);
+  });
+  it('a hand-built state without a history loads with an empty one, so a death and Begin still work', () => {
+    const { result } = renderHook(() => useGame(saltRoadFixture));
+    const { lives: _none, ...bare } = result.current.state;
+    act(() => result.current.dispatch({ type: 'load', model: { state: bare as GameState, log: [], nextSeq: 0 } }));
+    expect(result.current.state.lives).toEqual([]);
+    die(result, 5);
+    act(() => result.current.dispatch({ type: 'begin' }));
+    expect(result.current.state.lives.map((r) => r.life)).toEqual([1]);
+  });
   it('while dead, orders, pause/resume and setHealth change nothing, and no time passes', () => {
     const { result } = renderHook(() => useGame(saltRoadFixture));
     die(result, 5);

@@ -310,6 +310,14 @@ unsubscribed event) ship without asking.
   opens the debug overlay** (`src/ui/Debug.tsx`, dev builds only, a portal on
   `document.body`) with the same actions as buttons and inputs; `setHealth`
   to 0 is not a death (death is the tick's decay), `die` is.
+- **While dead the screen is the dead state** (#90, spec 2026-09-25-death-overlay).
+  There is no reborn view: `App` renders `useGame().state` whether dead or not,
+  and `rebirth` runs only on Begin. The death overlay (`src/ui/DeathOverlay.tsx`)
+  charts `useGame().history`, which is `GameState.lives` (one `LifeRecord` per
+  rebirth, appended in `rebirth`) plus the dead life's own record. After a death
+  the lit row is the queue's top without asking `topWorks` (resolve does not check
+  `dead`); after a finish nothing is lit. The reducer's `load` gives a hand-built
+  state without `lives` an empty one, so the engine never guards it.
 - **Every bar glides one tick and a reset jumps.** `.bar__fill` transitions
   its width over `--tick` (set on `<main>` from `balance.time.tickIntervalMs`);
   a fill that resets to zero is keyed on the counter whose change is the

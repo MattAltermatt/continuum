@@ -12,11 +12,11 @@ import type { ActionId, Book, Content, ItemId, SkillId } from '../data/types';
 import { setAutomation, unlockAt } from '../engine/automation';
 import { applyDecay } from '../engine/health';
 import { enqueue, newState, removeEntry } from '../engine/queue';
-import { deathSummary, rebirth, type DeathSummary } from '../engine/rebirth';
+import { deathSummary, lifeRecord, rebirth, type DeathSummary } from '../engine/rebirth';
 import { resolve } from '../engine/resolve';
 import { pageOf } from '../engine/rows';
 import { setPaused, step } from '../engine/tick';
-import type { AutoMode, GameEvent, GameState } from '../engine/types';
+import type { AutoMode, GameEvent, GameState, LifeRecord } from '../engine/types';
 import { ASIDE_KEY, asideText, AUTOSAVE_MS, loadSave, saveKey, saveText } from './save';
 import { acquire, defaultLocks, lockName, type Held, type LockManagerLike } from './tabs';
 
@@ -36,7 +36,7 @@ export type GameAction =
   | { type: 'reset' }
   /** Dev handle only: replaces the model with one read back from the save. */
   | { type: 'load'; model: Model }
-  /** Lifts the death card and starts the next life (spec 2026-09-23 section 2.4). */
+  /** Lifts the death overlay and starts the next life (spec 2026-09-25-death-overlay 2.3). */
   | { type: 'begin' }
   /** Dev only: sets health, clamped to [0, max]. Health at zero is not death (that is the tick's decay); `die` is. */
   | { type: 'setHealth'; health: number }
@@ -180,7 +180,8 @@ function reduce(content: Content) {
         return m;
       }
       case 'reset': return fresh(content);
-      case 'load': return action.model;
+      // A hand-built state (the dev handle) may have no history (#90); it gets an empty one here, so the engine never guards it.
+      case 'load': return { ...action.model, state: { ...action.model.state, lives: action.model.state.lives ?? [] } };
       // An unknown action (the dev handle takes any object) leaves the game as it is, rather than blanking the page (#67).
       default: return model;
     }
@@ -219,11 +220,16 @@ function open(book: Book, storage: SaveStorage | null): Opened {
   return { model: { ...start, log: [line, ...start.log], nextSeq: start.nextSeq + 1 }, aside: raw, raw };
 }
 
+/** A stable empty history, so an idle render does not make a new one. */
+const NO_LIVES: readonly LifeRecord[] = [];
+
 /** Dev builds' speed control (section 10): ticks per tick. Tooling, never in a production build. */
 export const DEV_SPEEDS = [1, 10, 100] as const;
 
 export interface GameHandle {
-  state: GameState; view: GameState; log: readonly LogLine[]; dispatch: (a: GameAction) => void; card: DeathSummary | null;
+  state: GameState; log: readonly LogLine[]; dispatch: (a: GameAction) => void; card: DeathSummary | null;
+  /** While dead, every ended life and then the one on the screen: the death overlay's chart (#90). Empty while alive. */
+  history: readonly LifeRecord[];
   speed: number; setSpeed: (n: number) => void;
   /** Writes the save now. */
   save: () => void;
@@ -379,9 +385,10 @@ export function useGame(book: Book, opts: { storage?: SaveStorage | null; locks?
     lastSeenRef.current = null;
     dispatch({ type: 'reset' });
   }, [storage, book]);
-  // Dead until Begin: the screen behind the card shows the life that is about to begin.
-  const view = useMemo(() => (model.state.dead ? rebirth(model.state) : model.state), [model.state]);
+  // Dead until Begin, and the screen shows it so: the kill screen is the dead state itself (spec 2026-09-25-death-overlay 2.2).
+  // The chart's points are the history and then the life on the screen, derived, never stored twice.
+  const history = useMemo(() => (model.state.dead ? [...model.state.lives, lifeRecord(model.state)] : NO_LIVES), [model.state]);
   const card = useMemo(() => (model.state.dead ? deathSummary(model.state, content) : null), [model.state, content]);
   const elsewhere = seat === 'held' ? 'held' : seat === 'lost' ? 'lost' : 'none';
-  return { state: model.state, view, log: model.log, dispatch, card, speed, setSpeed, save, load, erase, elsewhere, playHere };
+  return { state: model.state, log: model.log, dispatch, card, history, speed, setSpeed, save, load, erase, elsewhere, playHere };
 }

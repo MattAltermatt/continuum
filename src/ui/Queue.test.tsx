@@ -46,6 +46,11 @@ describe('Queue', () => {
     expect(document.querySelector('.entry--on')).toBeNull();
     expect(document.querySelectorAll('.entry--line')).toHaveLength(1);
   });
+  it('empty on a dead life: the box says nothing was queued, and asks for nothing', () => {
+    render(<Queue state={fresh()} content={book} working={-1} live={false} dead onRemove={noop} />);
+    expect(screen.getByText('nothing was queued')).toBeInTheDocument();
+    expect(screen.queryByText(/pick an action/)).toBeNull();
+  });
   it('empty: the box stays with its words, the heading says idle, and the pop in the state\'s events says why; events with no pop do not', () => {
     const popped = { type: 'popped' as const, actionId: 'raid', reason: 'hurt' as const };
     const s = { ...fresh(), runTicks: 30, events: [popped] };
