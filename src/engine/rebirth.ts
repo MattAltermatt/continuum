@@ -68,6 +68,8 @@ export function rebirth(dead: GameState): GameState {
   return {
     ...blankRun(skills, lifeStartCore), paused: 'system', life: dead.life + 1, rebirthBonus, maxHealth, health: maxHealth,
     lives: [...dead.lives, lifeRecord(dead)],
+    // A row this life did not reach keeps the older life's time (spec 2026-09-25-log-delta section 3).
+    lastFinish: { ...dead.lastFinish, ...dead.finishedAt },
     completionCounts: dead.completionCounts, automation: dead.automation, skillStats: dead.skillStats, lastVerb: dead.lastVerb,
     finishes: dead.finishes + (dead.finished ? 1 : 0),
   };

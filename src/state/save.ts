@@ -73,7 +73,9 @@ const isPageEvent = (e: Record<string, unknown>): boolean =>
   && (e.type !== 'popped' || e.reason !== 'page' || (Array.isArray(e.waits) && e.waits.every((w) => typeof w === 'string')));
 const isLine = (l: unknown): boolean =>
   isRecord(l) && typeof l.seq === 'number' && typeof l.at === 'number' && isRecord(l.event) && typeof l.event.type === 'string'
-  && isPageEvent(l.event);
+  && isPageEvent(l.event)
+  // A split's last time (#75) is printed as a clock: a hand-edited one that is not a finite number would read NaN:NaN.
+  && (l.event.lastAt === undefined || (typeof l.event.lastAt === 'number' && Number.isFinite(l.event.lastAt)));
 
 /** A record the chart can draw: finite numbers, core levels keyed by skill. */
 const isRecordOfLife = (r: unknown): r is LifeRecord =>
@@ -100,10 +102,14 @@ export function loadSave(text: string | null, book: Book): LoadResult {
   }
 }
 
-/** Log lines naming a row or a skill the book no longer has would throw when narrated; they go. */
+/**
+ * Log lines naming a row or a skill the book no longer has would throw when narrated; they go. So do a save's
+ * level-up lines, which the log no longer writes (the user, 2026-09-25).
+ */
 function keepLines(log: Model['log'], book: Book): Model['log'] {
   return log.filter((l) => {
     const e = l.event as { readonly type?: unknown; readonly actionId?: unknown; readonly skill?: unknown; readonly chapter?: unknown; readonly item?: unknown; readonly maker?: unknown };
+    if (e.type === 'coreLevel') return false;
     if (typeof e.actionId === 'string' && !Object.hasOwn(book.actions, e.actionId)) return false;
     if (typeof e.item === 'string' && !Object.hasOwn(book.items, e.item)) return false;
     if (typeof e.maker === 'string' && !Object.hasOwn(book.actions, e.maker)) return false;
@@ -139,6 +145,12 @@ function keep<V>(record: Readonly<Record<string, V>>, ok: (key: string) => boole
   return Object.fromEntries(Object.entries(record).filter(([k]) => ok(k)));
 }
 
+/** A map of ticks by one-time row (#75): a save from before it has none, and a value that is not a tick (finite, at least 0) goes. */
+function ticksByRow(v: unknown, oneTime: (id: string) => boolean): Record<string, number> {
+  if (!isRecord(v)) return {};
+  return keep(Object.fromEntries(Object.entries(v).filter((e): e is [string, number] => typeof e[1] === 'number' && Number.isFinite(e[1]) && e[1] >= 0)), oneTime);
+}
+
 /**
  * A save for this book from an older version of it: rows and items the book
  * no longer has are dropped, skills the roster gained start fresh, skills it
@@ -148,6 +160,7 @@ function keep<V>(record: Readonly<Record<string, V>>, ok: (key: string) => boole
  */
 export function reconcile(state: GameState, book: Book): GameState {
   const row = (id: string) => Object.hasOwn(book.actions, id);
+  const oneTime = (id: string) => row(id) && book.actions[id]!.isOneTime;
   const item = (id: string) => Object.hasOwn(book.items, id);
   const skills = Object.fromEntries(book.roster.map((r) => [r.id, state.skills[r.id] ?? newSkill()]));
   const kept: GameState = {
@@ -172,6 +185,9 @@ export function reconcile(state: GameState, book: Book): GameState {
     // A save from before #90 has no history; a record the chart cannot draw goes, and a skill the roster lacks leaves its record.
     lives: (Array.isArray(state.lives) ? state.lives : []).filter(isRecordOfLife)
       .map((r) => ({ ...r, core: keep(r.core, (id) => book.roster.some((s) => s.id === id)) })),
+    // A row a newer book made repeatable leaves both maps, so a split is only ever a one-time row's.
+    finishedAt: ticksByRow(state.finishedAt, oneTime),
+    lastFinish: ticksByRow(state.lastFinish, oneTime),
     events: [],
   };
   // The page is derived from what is done, so it is read off the kept state. An order for a row the book no longer

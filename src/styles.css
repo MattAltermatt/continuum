@@ -286,9 +286,14 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .heal-text { color: var(--good); }
 .pack__item--full { color: var(--warn); }
 .log__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; scrollbar-width: thin; }   /* its height is the box's: the log scrolls inside, never the page */
-.log__line { display: grid; grid-template-columns: 3.4em 1fr; gap: 0 8px; padding: 2px 0; border-bottom: 1px solid var(--edge); font-size: 11px; }
+/* The time and the delta against last life (spec 2026-09-25-log-delta section 2), in px: a story line is 12px serif and a note 11px mono, so em would shift the text column between them. */
+.log__line { display: grid; grid-template-columns: 42px 48px 1fr; gap: 0 8px; padding: 2px 0; border-bottom: 1px solid var(--edge); font-size: 11px; }
 .log__line:last-child { border-bottom: 0; }
-.log__at { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.log__at, .log__dt { font-family: var(--mono); font-style: normal; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.log__at { color: var(--ink-2); }
+.log__dt--sooner { color: var(--good); }
+.log__dt--later { color: var(--hurt-text); }
+.log__dt--same { color: var(--ink-3); }
 .log__line--story { font-family: var(--serif); font-style: italic; font-size: 12px; }
 .log__line--note { color: var(--ink-2); }
 /* A control that does nothing right now says so: a built row, a dead run. Not below 70% (spec 8.1). */

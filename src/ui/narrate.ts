@@ -38,6 +38,7 @@ export function narrate(e: LogEvent, content: Content): Narration {
       const beat = content.actions[e.actionId]?.beat;
       return e.oneTime && beat ? { kind: 'story', text: beat } : { kind: 'note', text: `${rowName(content, e.actionId)} is done` };
     }
+    // Never logged since 2026-09-25 (the news filter in useGame); kept so every event still narrates.
     case 'coreLevel': return { kind: 'note', text: `${skillOf(content, e.skill).name} reaches Lv ${e.level}` };
     case 'died': return { kind: 'note', text: `Dead at ${clock(ticksToSeconds(e.runTicks))}` };
     // A fight that backed off (#74) and a closer that left waiting on its page (spec 2026-09-24-pages 4.2) are the pops logged:

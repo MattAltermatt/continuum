@@ -43,8 +43,7 @@ describe('useGame', () => {
 
   it('keeps at most LOG_LINES, newest first, and seq stays unique past the cap (a length-based seq would repeat)', () => {
     const { result } = renderHook(() => useGame(unmined));
-    // Stall chatter is gone, and coreLevel lines cannot reach the cap in a test's time (the
-    // hundredth core level costs about 1.4M XP). A + on a cabin with no stone, which nothing on the
+    // Stall and level-up chatter are not logged, so something else must fill the log. A + on a cabin with no stone, which nothing on the
     // page makes, pops on the next tick with one short line: 101 of them, plus lifeBegins, pass the cap.
     for (let i = 0; i < LOG_LINES + 1; i++) {
       act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
@@ -58,16 +57,24 @@ describe('useGame', () => {
     expect(log.every((l, i) => i === 0 || l.seq < log[i - 1]!.seq)).toBe(true);
   });
   it('gives every log line a distinct seq that does not change when newer lines are prepended', () => {
-    const { result } = renderHook(() => useGame(saltRoadFixture));
+    const { result } = renderHook(() => useGame(unmined));
     act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
     act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
     const before = result.current.log.map((l) => [l.seq, l.event.type]);
-    act(() => result.current.dispatch({ type: 'queue', actionId: 'mine' }));
-    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 250));   // two Mine core levels
+    // Another + on the cabin with no stone: one more short line, prepended.
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'cabin' }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs));
     const after = result.current.log;
     expect(after.length).toBeGreaterThan(before.length);
     expect(after.slice(after.length - before.length).map((l) => [l.seq, l.event.type])).toEqual(before);
     expect(new Set(after.map((l) => l.seq)).size).toBe(after.length);
+  });
+  it('a skill reaching a level writes no log line (the user, 2026-09-25)', () => {
+    const { result } = renderHook(() => useGame(saltRoadFixture));
+    act(() => result.current.dispatch({ type: 'queue', actionId: 'mine' }));
+    act(() => vi.advanceTimersByTime(balance.time.tickIntervalMs * 250));   // two Mine core levels
+    expect(result.current.state.skills.mine!.core.level).toBeGreaterThan(0);
+    expect(result.current.log.map((l) => l.event.type)).not.toContain('coreLevel');
   });
 
   it('a fight backing off is logged once per life, however often it backs off (#74 section 3.4)', () => {
@@ -304,6 +311,13 @@ describe('useGame', () => {
     die(result, 5);
     act(() => result.current.dispatch({ type: 'begin' }));
     expect(result.current.state.lives.map((r) => r.life)).toEqual([1]);
+  });
+  it('a hand-built state without split times loads with empty ones (#75)', () => {
+    const { result } = renderHook(() => useGame(saltRoadFixture));
+    const { finishedAt: _f, lastFinish: _l, ...bare } = result.current.state;
+    act(() => result.current.dispatch({ type: 'load', model: { state: bare as GameState, log: [], nextSeq: 0 } }));
+    expect(result.current.state.finishedAt).toEqual({});
+    expect(result.current.state.lastFinish).toEqual({});
   });
   it('while dead, orders, pause/resume and setHealth change nothing, and no time passes', () => {
     const { result } = renderHook(() => useGame(saltRoadFixture));

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Log delta (#75)</title>
+<style>
+:root { color-scheme: dark;
+  --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260);
+  --ink: oklch(90% 0.01 80); --ink-2: oklch(80% 0.01 80); --ink-3: oklch(62% 0.01 80); --run: oklch(70% 0.16 45);
+  --hurt-text: oklch(70% 0.18 25); --good: oklch(78% 0.12 150);
+  --mono: ui-monospace, Menlo, monospace; --serif: Georgia, "Times New Roman", serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: oklch(12% 0.01 260); color: var(--ink); font-family: var(--mono); font-size: 12px; padding: 24px 16px; }
+h1 { font-size: 13px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 6px; }
+p.note { max-width: 80ch; color: var(--ink-2); line-height: 1.5; margin: 0 0 18px; }
+p.note b { color: var(--ink); }
+.frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 22px; max-width: 1240px; }
+.frame > h2 { font-size: 12px; font-weight: 700; margin: 0 0 6px; }
+.frame > h2 small { display: block; font-weight: 400; color: var(--ink-2); margin-top: 3px; line-height: 1.45; }
+/* The log region, copied from src/styles.css. */
+.region { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 10px; }
+.region__head { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 4px; }
+.log__list { list-style: none; margin: 0; padding: 0; }
+.log__line { display: grid; grid-template-columns: 3.4em 1fr; gap: 0 8px; padding: 2px 0; border-bottom: 1px solid var(--edge); font-size: 11px; }
+.log__line:last-child { border-bottom: 0; }
+.log__at { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.log__line--story { font-family: var(--serif); font-style: italic; font-size: 12px; }
+.log__line--note { color: var(--ink-2); }
+/* The delta, per variant. Mono and upright even on a story line. */
+.d { font-family: var(--mono); font-style: normal; font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.plain .d { color: var(--ink-2); }
+.tint .d--sooner { color: var(--good); } .tint .d--later { color: var(--hurt-text); } .tint .d--same { color: var(--ink-3); }
+.dim .d { color: var(--ink-3); }
+.w390 { max-width: 390px; }
+</style></head><body>
+<h1>#75 · how much sooner than last life</h1>
+<p class="note">Every log line <b>already starts with the run clock</b>, so "the hull was finished at 2:15" is on screen today. What #75 adds is the <b>comparison with the last life that finished the same row</b>. Only one-time rows get it (the hull, the net, the satchel, the pirates, the sails), and a row finished for the first time ever gets nothing. The same five lines are shown in each variant: the hull 0:15 sooner, the net 0:40 later, the satchel at exactly the same time, the pirates beaten for the first time, and one ordinary note line for contrast. The last frame is variant B at the 390px phone width, where a long line wraps.</p>
+<div class="frames">
+<script>
+const V = [
+  ['plain', 'A · in words, no colour', 'Reads as a sentence. The longest option, and it wraps first on a phone.',
+    { s: '0:15 sooner than last life', l: '0:40 later than last life', e: 'same as last life' }],
+  ['tint', 'B · signed, green and red', 'Compact. Green when sooner, red when later. Colour carries good or bad news, which today the screen does only for health.',
+    { s: '−0:15', l: '+0:40', e: '±0:00' }],
+  ['dim', 'C · signed, dimmed, "vs last"', 'Compact and quiet. No colour judgement; the sign and "vs last" say it.',
+    { s: '−0:15 vs last', l: '+0:40 vs last', e: '±0:00 vs last' }],
+  ['tint', 'D · arrow and colour', 'Faster points down, like a time that went down. Green and red as in B.',
+    { s: '▼0:15', l: '▲0:40', e: '=' }],
+  ['tint w390', 'B at 390px', 'The phone column: a story line plus its delta wraps to a second line.',
+    { s: '−0:15', l: '+0:40', e: '±0:00' }],
+];
+const lines = (d) => [
+  ['04:52', 'story', 'The sails go up, patched and proud. She is ready to fly.', null],
+  ['03:40', 'story', 'The harbor pirates scatter. The dock is ours again.', null],
+  ['03:05', 'story', 'A canvas satchel. Room for more of everything.', ['same', d.e]],
+  ['02:50', 'note', 'Out of scrap', null],
+  ['02:31', 'story', 'A trawl net, fine as smoke. The shallows give up more.', ['later', d.l]],
+  ['02:15', 'story', 'The hull holds. Let the wind try harder.', ['sooner', d.s]],
+];
+for (const [cls, t, s, d] of V) document.currentScript.insertAdjacentHTML('beforebegin', `
+<div class="frame ${cls}"><h2>${t}<small>${s}</small></h2>
+<div class="region"><div class="region__head">Log</div><ul class="log__list">
+${lines(d).map(([at, kind, text, delta]) => `<li class="log__line log__line--${kind}"><span class="log__at">${at}</span><span>${text}${delta ? ` <span class="d d--${delta[0]}">${delta[1]}</span>` : ''}</span></li>`).join('')}
+</ul></div></div>`);
+</script>
+</div>
+<h1 style="margin-top:34px">Round two · the delta beside the time</h1>
+<p class="note">The user's ask: <b>the time and the delta should be close.</b> In each of these the delta moves out of the sentence and into the time column, so the two numbers read together. The story text keeps its place in every row, whether a row has a delta or not.</p>
+<div class="frames">
+<script>
+const V2 = [
+  ['tint', 'E · side by side, coloured', 'A second fixed column right after the time. Rows without a delta leave it blank, so every sentence starts at the same edge.', 'col'],
+  ['plain', 'F · side by side, grey', 'The same as E with no colour. The sign alone says sooner or later.', 'col'],
+  ['tint', 'G · under the time', 'The delta sits small under the clock in the same column. The sentence column keeps its full width, which matters on a phone.', 'stack'],
+  ['tint', 'H · in brackets after the time', '"02:15 (−0:15)" as one unit. Reads like a lap split.', 'paren'],
+  ['tint w390', 'E at 390px', 'The phone column. The fixed delta column costs about 6 characters of sentence width on every row.', 'col'],
+  ['tint w390', 'G at 390px', 'The phone column. No width lost; a row with a delta is a little taller.', 'stack'],
+];
+const rows2 = [
+  ['04:52', 'story', 'The sails go up, patched and proud. She is ready to fly.', null],
+  ['03:40', 'story', 'The harbor pirates scatter. The dock is ours again.', null],
+  ['03:05', 'story', 'A canvas satchel. Room for more of everything.', ['same', '±0:00']],
+  ['02:50', 'note', 'Out of scrap', null],
+  ['02:31', 'story', 'A trawl net, fine as smoke. The shallows give up more.', ['later', '+0:40']],
+  ['02:15', 'story', 'The hull holds. Let the wind try harder.', ['sooner', '−0:15']],
+];
+const cell = (at, d, how) => {
+  const dd = d ? `<span class="d d--${d[0]}">${d[1]}</span>` : '';
+  if (how === 'col') return `<span class="log__at">${at}</span><span class="log__dt">${dd}</span>`;
+  if (how === 'stack') return `<span class="log__at log__at--stack">${at}${d ? `<br>${dd}` : ''}</span>`;
+  return `<span class="log__at">${at}${d ? ` <span class="d d--${d[0]}">(${d[1]})</span>` : ''}</span>`;
+};
+for (const [cls, t, s, how] of V2) document.currentScript.insertAdjacentHTML('beforebegin', `
+<div class="frame ${cls} how-${how}"><h2>${t}<small>${s}</small></h2>
+<div class="region"><div class="region__head">Log</div><ul class="log__list">
+${rows2.map(([at, kind, text, d]) => `<li class="log__line log__line--${kind}">${cell(at, d, how)}<span>${text}</span></li>`).join('')}
+</ul></div></div>`);
+</script>
+</div>
+<style>
+.how-col .log__line { grid-template-columns: 38px 42px 1fr; }   /* px, not em: a story line is 12px and a note 11px, so em columns would not line up */
+.how-col .log__dt { font-family: var(--mono); font-style: normal; font-size: 11px; }
+.how-stack .log__at--stack { line-height: 1.25; }
+.how-stack .log__at--stack .d { font-size: 10px; }
+.how-paren .log__line { grid-template-columns: 88px 1fr; }
+.how-stack .log__line { grid-template-columns: 38px 1fr; }
+.how-paren .log__at .d { font-size: 10px; }
+[class*="how-"] .log__at, [class*="how-"] .log__dt { font-style: normal; font-family: var(--mono); font-size: 11px; }
+</style>
+<p class="note" style="margin-top:18px">The sails line has no delta here because the sails are the chapter's event and this pretend life reaches them for the first time. The pirates line has none because it is their first win.</p>
+</body></html>

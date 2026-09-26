@@ -152,6 +152,7 @@ describe('the save', () => {
       { seq: 7, at: 0, event: { type: 'coreLevel', skill: 'gone', level: 3 } },
       { seq: 8, at: 0, event: { type: 'short', actionId: 'cabin', item: 'stone', amount: 1, maker: 'gone', gap: 'off' } },
       { seq: 9, at: 0, event: { type: 'short', actionId: 'cabin', item: 'stone', amount: 1, maker: 'mine', gap: 'blocked', cause: { item: 'nothing', maker: 'mine', gap: 'off' } } },
+      { seq: 10, at: 0, event: { type: 'coreLevel', skill: 'mine', level: 2 } },
       { seq: 0, at: 0, event: { type: 'lifeBegins', life: 1 } },
     ];
     const loaded = loadSave(JSON.stringify({ format: SAVE_FORMAT, bookId: book.id, bookVersion: 1, model: { ...m, log } }), book);
@@ -194,6 +195,68 @@ describe('the record of lives in a save (#90)', () => {
     expect(loadedLives([{ life: 1, maxHealth: 101, core: { forage: 2, gone: 5 } }])).toEqual([{ life: 1, maxHealth: 101, core: { forage: 2 } }]);
     const two = [{ life: 1, maxHealth: 100.4, core: { forage: 1, mine: 0, build: 0 } }, { life: 2, maxHealth: 101.3, core: { forage: 2, mine: 1, build: 0 } }];
     expect(loadedLives(two)).toEqual(two);
+  });
+});
+
+describe('split times in a save (#75)', () => {
+  const loaded = (state: Record<string, unknown>) => {
+    const m = midRun();
+    const r = loadSave(file({ model: { ...m, state: { ...m.state, ...state } } }), book);
+    if (r.kind !== 'loaded') throw new Error(`not loaded: ${r.kind}`);
+    return r.model.state;
+  };
+  it('a save from before #75, with neither map, loads with both empty', () => {
+    const m = midRun();
+    const { finishedAt: _f, lastFinish: _l, ...state } = m.state;
+    const r = loadSave(file({ model: { ...m, state } }), book);
+    expect(r.kind === 'loaded' && r.model.state.finishedAt).toEqual({});
+    expect(r.kind === 'loaded' && r.model.state.lastFinish).toEqual({});
+  });
+  it('a map that is not a record reads as empty, even an array carrying a row\'s key', () => {
+    const s = loaded({ finishedAt: 'x', lastFinish: [1] });
+    expect(s.finishedAt).toEqual({});
+    expect(s.lastFinish).toEqual({});
+    // Directly: JSON would drop an array's named key, and the key is what only the record check stops.
+    const m = midRun();
+    const r = reconcile({ ...m.state, lastFinish: Object.assign([1], { cabin: 1350 }) as unknown as Record<string, number> }, book);
+    expect(r.lastFinish).toEqual({});
+  });
+  it('a row the book no longer has is dropped from both', () => {
+    const s = loaded({ finishedAt: { cabin: 1350, gone: 7 }, lastFinish: { cabin: 1200, gone: 7 } });
+    expect(s.finishedAt).toEqual({ cabin: 1350 });
+    expect(s.lastFinish).toEqual({ cabin: 1200 });
+  });
+  it('a value that is not a finite number is dropped (JSON writes NaN as null)', () => {
+    const s = loaded({ finishedAt: { cabin: 'x', hall: NaN }, lastFinish: { cabin: null, hall: 'x' } });
+    expect(s.finishedAt).toEqual({});
+    expect(s.lastFinish).toEqual({});
+    // Directly, where NaN survives as NaN.
+    const m = midRun();
+    const r = reconcile({ ...m.state, finishedAt: { cabin: NaN, hall: 900 }, lastFinish: { cabin: Infinity, hall: 'x' as unknown as number } }, book);
+    expect(r.finishedAt).toEqual({ hall: 900 });
+    expect(r.lastFinish).toEqual({});
+  });
+  it('a round-trip keeps both maps', () => {
+    const m = midRun();
+    const r = loadSave(saveText({ ...m, state: { ...m.state, finishedAt: { cabin: 1350 }, lastFinish: { cabin: 1350 } } }, book), book);
+    expect(r.kind === 'loaded' && r.model.state.finishedAt).toEqual({ cabin: 1350 });
+    expect(r.kind === 'loaded' && r.model.state.lastFinish).toEqual({ cabin: 1350 });
+  });
+  it('a log line whose lastAt is not a finite number sets the save aside as corrupt', () => {
+    const m = midRun();
+    const withLine = (event: Record<string, unknown>) => file({ model: { ...m, log: [{ seq: 0, at: 1400, event }], nextSeq: 1 } });
+    const line = { type: 'completed', actionId: 'cabin', oneTime: true };
+    expect(loadSave(withLine(line), book).kind).toBe('loaded');
+    expect(loadSave(withLine({ ...line, lastAt: 1350 }), book).kind).toBe('loaded');
+    expect(loadSave(withLine({ ...line, lastAt: 'x' }), book)).toEqual({ kind: 'aside', why: 'corrupt' });
+    expect(loadSave(withLine({ ...line, lastAt: null }), book)).toEqual({ kind: 'aside', why: 'corrupt' });
+    // JSON.parse reads 1e999 as Infinity, a number that is not finite; JSON.stringify would write it as null, so it goes in as text.
+    expect(loadSave(withLine({ ...line, lastAt: 1350 }).replace('"lastAt":1350', '"lastAt":1e999'), book)).toEqual({ kind: 'aside', why: 'corrupt' });
+  });
+  it('a negative tick, or a row that is not one-time, leaves both maps', () => {
+    const s = loaded({ finishedAt: { cabin: -5, forage: 40 }, lastFinish: { cabin: 1200, forage: 40 } });
+    expect(s.finishedAt).toEqual({});
+    expect(s.lastFinish).toEqual({ cabin: 1200 });
   });
 });
 

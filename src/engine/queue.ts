@@ -38,6 +38,8 @@ export function blankRun(skills: Readonly<Record<SkillId, SkillState>>, lifeStar
     idleFed: false,
     chapter: 0,
     completedOneTime: [],
+    finishedAt: {},
+    lastFinish: {},
     completionCounts: {},
     automation: {},
     decayMultiplier: 1,
@@ -248,9 +250,10 @@ function complete(state: GameState, content: Content, action: ActionDefinition, 
   if (action.healthDecayMultiplier !== undefined) s = { ...s, decayMultiplier: s.decayMultiplier * action.healthDecayMultiplier };
   const done = (s.completionCounts[action.id] ?? 0) + 1;
   s = { ...s, completionCounts: { ...s.completionCounts, [action.id]: done }, work: { ...s.work, [action.id]: NO_WORK } };
-  events.push({ type: 'completed', actionId: action.id, oneTime: action.isOneTime });
+  const lastAt = action.isOneTime ? s.lastFinish[action.id] : undefined;
+  events.push({ type: 'completed', actionId: action.id, oneTime: action.isOneTime, ...(lastAt === undefined ? {} : { lastAt }) });
   if (done === unlockAt(content, action)) events.push({ type: 'unlocked', actionId: action.id });
-  if (action.isOneTime) s = { ...s, completedOneTime: [...s.completedOneTime, action.id] };
+  if (action.isOneTime) s = { ...s, completedOneTime: [...s.completedOneTime, action.id], finishedAt: { ...s.finishedAt, [action.id]: s.runTicks } };
   const top = s.queue[0];
   if (action.isOneTime || top?.mode === 'once' || (top?.left !== undefined && top.left <= 1)) s = { ...s, queue: s.queue.slice(1) };
   else if (top?.left !== undefined) s = { ...s, queue: [{ ...top, left: top.left - 1 }, ...s.queue.slice(1)] };

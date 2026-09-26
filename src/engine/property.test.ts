@@ -179,6 +179,16 @@ function play(content: Content, seed: number, actions: number, chapter = 0, page
       const i = s.queue.findIndex((e) => e.actionId === id);
       expect(i >= 0 && !s.queue.slice(0, i).some((e) => e.by === 'player'), `${at}: ${id} out and not on its way: ${shown}`).toBe(true);
     }
+    // Split times (spec 2026-09-25-log-delta section 6): this life's are for rows done this life, never ahead of the clock;
+    // the kept ones are one-time rows of the book, at real ticks.
+    for (const [id, t] of Object.entries(s.finishedAt)) {
+      expect(s.completedOneTime.includes(id), `${at}: ${id} has a split but is not done`).toBe(true);
+      expect(t, `${at}: ${id} split after the clock`).toBeLessThanOrEqual(s.runTicks);
+    }
+    for (const [id, t] of Object.entries(s.lastFinish)) {
+      expect(content.actions[id]?.isOneTime, `${at}: ${id} kept but not a one-time row`).toBe(true);
+      expect(Number.isFinite(t) && t >= 0, `${at}: ${id} kept at ${t}`).toBe(true);
+    }
     for (const [item, have] of Object.entries(s.inventory)) {
       expect(have, `${at}: ${item}`).toBeGreaterThanOrEqual(0);
       expect(have, `${at}: ${item} over its cap`).toBeLessThanOrEqual(capOf(s, content, item));

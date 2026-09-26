@@ -102,7 +102,8 @@ function withLog(model: Model, state: GameState): Model {
     return true;
   };
   // A closer leaving because its page's chain failed is news: it names what it waits on (spec 2026-09-24-pages section 4.2).
-  const news = (e: GameEvent) => hurt(e) || (e.type === 'popped' && e.reason === 'page') || (!(e.type === 'completed' && !e.oneTime) && e.type !== 'popped' && e.type !== 'automated'
+  // A skill reaching a level is not: the skill cell shows the level, and the user asked for the chatter gone (2026-09-25).
+  const news = (e: GameEvent) => hurt(e) || (e.type === 'popped' && e.reason === 'page') || (!(e.type === 'completed' && !e.oneTime) && e.type !== 'popped' && e.type !== 'automated' && e.type !== 'coreLevel'
     && !(e.type === 'short' && state.queue.some((q) => q.actionId === e.actionId)));
   const later = (k: number, id: ActionId) => state.events.slice(k + 1).some((f) => f.type === 'short' && f.actionId === id);
   const worth = state.events.filter((e, k) => news(e) && !(e.type === 'short' && later(k, e.actionId)));
@@ -180,8 +181,12 @@ function reduce(content: Content) {
         return m;
       }
       case 'reset': return fresh(content);
-      // A hand-built state (the dev handle) may have no history (#90); it gets an empty one here, so the engine never guards it.
-      case 'load': return { ...action.model, state: { ...action.model.state, lives: action.model.state.lives ?? [] } };
+      // A hand-built state (the dev handle) may have no history (#90) and no split times (#75); each gets an empty one
+      // here, so the engine never guards them.
+      case 'load': {
+        const given = action.model.state;
+        return { ...action.model, state: { ...given, lives: given.lives ?? [], finishedAt: given.finishedAt ?? {}, lastFinish: given.lastFinish ?? {} } };
+      }
       // An unknown action (the dev handle takes any object) leaves the game as it is, rather than blanking the page (#67).
       default: return model;
     }

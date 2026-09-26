@@ -1,4 +1,5 @@
-import { MINUS } from './glyphs';
+import { ticksToSeconds } from '../engine/time';
+import { MINUS, PLUS_MINUS } from './glyphs';
 
 /** Display formatting only. Spec section 8.1: fractions are a/b, no spaces. */
 export function fraction(a: number, b: number): string {
@@ -37,6 +38,19 @@ export function clock(s: number): string {
   const m = Math.floor(whole / SECONDS_PER_MINUTE);
   const r = whole % SECONDS_PER_MINUTE;
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+}
+
+/**
+ * A split against last life's (spec 2026-09-25-log-delta section 2): whole
+ * seconds as the two clocks print them, so the delta always equals the
+ * difference of the printed times. Sooner is a minus, later a plus, the same
+ * second a plus-minus zero.
+ */
+export function splitDelta(atTicks: number, lastTicks: number): { text: string; tone: 'sooner' | 'later' | 'same' } {
+  const d = Math.floor(ticksToSeconds(atTicks)) - Math.floor(ticksToSeconds(lastTicks));
+  if (d < 0) return { text: MINUS + minutes(-d), tone: 'sooner' };
+  if (d > 0) return { text: '+' + minutes(d), tone: 'later' };
+  return { text: PLUS_MINUS + minutes(0), tone: 'same' };
 }
 
 /**

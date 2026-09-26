@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { clock, countdown, duration, floored, fraction, healthPair, rate, tenths } from './format';
+import { ticksPerSecond } from '../engine/time';
+import { clock, countdown, duration, floored, fraction, healthPair, rate, splitDelta, tenths } from './format';
+import { MINUS, PLUS_MINUS } from './glyphs';
 
 describe('format', () => {
   it('fraction is a/b with one decimal and no spaces', () => {
@@ -46,5 +48,25 @@ describe('health in the bar', () => {
     expect(floored(101.996, 2)).toBe('101.99');   // never rounds up, at any precision
     expect(tenths(100)).toBe('100.0');
     expect(tenths(101.5198)).toBe('101.5');
+  });
+});
+
+describe('splitDelta: this life\'s split against the last life\'s, in whole seconds (spec 2026-09-25-log-delta section 2)', () => {
+  const t = (seconds: number) => seconds * ticksPerSecond();
+  it('sooner is a minus and m:ss', () => {
+    expect(splitDelta(t(45), t(60))).toEqual({ text: `${MINUS}0:15`, tone: 'sooner' });
+  });
+  it('later is a plus and m:ss', () => {
+    expect(splitDelta(t(100), t(60))).toEqual({ text: '+0:40', tone: 'later' });
+  });
+  it('the same second is plus-minus zero', () => {
+    expect(splitDelta(t(60), t(60))).toEqual({ text: `${PLUS_MINUS}0:00`, tone: 'same' });
+  });
+  it('compares the clocks as printed: floored seconds', () => {
+    expect(splitDelta(t(10.9), t(10.1))).toEqual({ text: `${PLUS_MINUS}0:00`, tone: 'same' });
+    expect(splitDelta(t(11.1), t(10.9))).toEqual({ text: '+0:01', tone: 'later' });
+  });
+  it('minutes are unpadded', () => {
+    expect(splitDelta(t(810), t(60))).toEqual({ text: '+12:30', tone: 'later' });
   });
 });

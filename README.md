@@ -48,6 +48,11 @@ over the frozen kill screen (the row you died in, still lit), and Begin starts
 the next life (spec
 [`docs/specs/2026-09-25-death-overlay.md`](./docs/specs/2026-09-25-death-overlay.md)).
 
+**The log keeps your splits.** When a one-time row finishes, its log line
+shows beside the clock how much sooner (green `−`) or later (red `+`) it came
+than in the last life that finished it; the first finish ever shows none (spec
+[`docs/specs/2026-09-25-log-delta.md`](./docs/specs/2026-09-25-log-delta.md)).
+
 ## Run it
 
 ```sh

@@ -10,3 +10,5 @@ export const PAUSE = '\u275A\u275A';
 export const RISING = '\u25B2';
 export const ARROW = '\u2192';
 export const MINUS = '\u2212';
+/** A split that matched last life's to the second (spec 2026-09-25-log-delta section 2). */
+export const PLUS_MINUS = '\u00B1';

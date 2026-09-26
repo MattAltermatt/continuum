@@ -64,7 +64,8 @@ export type GameEvent =
   | { readonly type: 'short'; readonly actionId: ActionId; readonly item: ItemId; readonly amount: number; readonly maker: ActionId | null; readonly gap: SupplyGap; readonly cause?: SupplyCause }
   /** Automation queued a row: to supply the top, food at zero, provisions before casting off, or an empty queue. */
   | { readonly type: 'automated'; readonly actionId: ActionId; readonly why: 'supply' | 'food' | 'provision' | 'idle' | 'delay' }
-  | { readonly type: 'completed'; readonly actionId: ActionId; readonly oneTime: boolean }
+  /** `lastAt`: a one-time row's tick in the last life that finished it, absent when none has (spec 2026-09-25-log-delta section 3). */
+  | { readonly type: 'completed'; readonly actionId: ActionId; readonly oneTime: boolean; readonly lastAt?: number }
   | { readonly type: 'coreLevel'; readonly skill: SkillId; readonly level: number }
   /** A row earned its automation chip (section 3.4). */
   | { readonly type: 'unlocked'; readonly actionId: ActionId }
@@ -115,6 +116,10 @@ export interface GameState {
   /** Index into content.chapters: the port this life is in (section 4). */
   readonly chapter: number;
   readonly completedOneTime: readonly ActionId[];
+  /** The run tick at which each one-time row completed this life (spec 2026-09-25-log-delta section 3). Resets with the life. */
+  readonly finishedAt: Readonly<Record<ActionId, number>>;
+  /** Each one-time row's tick in the last life that finished it; rebirth merges the life's finishedAt in. Kept across lives. */
+  readonly lastFinish: Readonly<Record<ActionId, number>>;
   /** Lifetime completions by action id. Drives automation (section 3.4). */
   readonly completionCounts: Readonly<Record<string, number>>;
   /** Each row's mode, once set. Kept across lives (MECHANICS section 5). */

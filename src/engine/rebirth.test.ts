@@ -32,6 +32,8 @@ function deadLife(): GameState {
     automation: { forage: 'jit' },
     skillStats: { ...fresh.skillStats, forage: { ticks: 40, bestRun: 3 } },
     completedOneTime: ['cabin'],
+    finishedAt: { cabin: 1200 },
+    lastFinish: { hall: 900 },
     completionCounts: { forage: 7, cabin: 1 },
     decayMultiplier: 0.8,
     events: [{ type: 'died', runTicks: 10 * minute }],
@@ -146,9 +148,9 @@ describe('rebirth: guard and accrual', () => {
  * rebirth derives it. A field added later fails here until someone decides.
  */
 describe('rebirth: every field is classified', () => {
-  const RESETS = ['runTicks', 'paused', 'dead', 'finished', 'inventory', 'acquired', 'foodCooldowns', 'queue', 'nextEntryId', 'work', 'provisioned', 'idleFed', 'chapter', 'completedOneTime', 'decayMultiplier', 'events'];
+  const RESETS = ['runTicks', 'paused', 'dead', 'finished', 'inventory', 'acquired', 'foodCooldowns', 'queue', 'nextEntryId', 'work', 'provisioned', 'idleFed', 'chapter', 'completedOneTime', 'finishedAt', 'decayMultiplier', 'events'];
   const PERSISTS = ['completionCounts', 'automation', 'skillStats', 'lastVerb'];
-  const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'finishes', 'rebirthBonus', 'lifeStartCore', 'lives'];
+  const DERIVED = ['health', 'maxHealth', 'skills', 'life', 'finishes', 'rebirthBonus', 'lifeStartCore', 'lives', 'lastFinish'];
   it('the three lists cover newState(roster) exactly, with no overlap', () => {
     const all = [...RESETS, ...PERSISTS, ...DERIVED];
     expect(new Set(all).size).toBe(all.length);
@@ -167,6 +169,16 @@ describe('rebirth: every field is classified', () => {
       expect(dead[k], k).not.toEqual(fresh[k]);
       expect(next[k], k).toEqual(dead[k]);
     }
+  });
+});
+
+describe('rebirth: the last time each one-time row was finished (spec 2026-09-25-log-delta section 3)', () => {
+  it('merges the life\'s split times into lastFinish, keeping a row the life did not reach', () => {
+    expect(rebirth(deadLife()).lastFinish).toEqual({ hall: 900, cabin: 1200 });
+  });
+  it('a newer life replaces an older one even when it was slower', () => {
+    const dead = { ...deadLife(), lastFinish: { cabin: 900 }, finishedAt: { cabin: 1200 } };
+    expect(rebirth(dead).lastFinish).toEqual({ cabin: 1200 });
   });
 });
 
