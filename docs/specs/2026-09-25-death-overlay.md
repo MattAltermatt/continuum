@@ -5,8 +5,10 @@ the mockup `docs/mockups/2026-09-25-death-overlay.html` (and its `.png`),
 approved as drawn. Every player-facing choice below is the user's, picked on
 that mockup or stated outright.*
 
-**Status:** built on `feature/death-overlay` as 0.3.1, awaiting the user's look;
-plan `docs/plans/2026-09-25-death-overlay.md`. Amends spec 2026-09-23-v0-2-a-run-you-can-lose section 2.4
+**Status:** shipped 2026-09-25 as 0.3.1, the squash e1357c7, live on GitHub
+Pages; plan `docs/plans/2026-09-25-death-overlay.md`. Amended during the build
+by the user: round axes, the kill screen reads `dead`, Health dims when it did
+not rise, the pill stays at the bottom (#96). Amends spec 2026-09-23-v0-2-a-run-you-can-lose section 2.4
 ("the screen behind it already shows the next life"): after this, the screen
 behind shows the life that ended.
 

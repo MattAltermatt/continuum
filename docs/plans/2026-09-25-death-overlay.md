@@ -21,7 +21,7 @@ lucide-react. No new dependency.
 **Spec:** `docs/specs/2026-09-25-death-overlay.md` (#90). Mockup:
 `docs/mockups/2026-09-25-death-overlay.html`. Branch `feature/death-overlay`.
 
-**Status (2026-09-25): built on `feature/death-overlay`, code panel round 1 fixed (9998a3f and after); awaiting the user's look before the merge.**
+**Status (2026-09-25): shipped to main as e1357c7 (0.3.1, squashed), live on GitHub Pages. Three plan panel rounds (the user's standing rule sent round 3 to execution), two code panel rounds plus a fresh reviewer on each look change the user asked for after the handoff (round axes, `dead`, Health dimming); 824 tests. #90 closed; #96 filed (the pill over the log).**
 
 ## Revisions
 
