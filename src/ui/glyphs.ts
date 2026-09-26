@@ -5,7 +5,6 @@
  */
 export const WARN = '\u26A0';
 export const PLAY = '\u25B6';
-export const STOP = '\u25A0';
 export const PAUSE = '\u275A\u275A';
 /** Decay accelerates (spec 8.6). None of these three carries the Emoji property; escapes for the file's convention. */
 export const RISING = '\u25B2';

@@ -11,7 +11,7 @@ import { pagedTestBook as paged, testBook as book } from '../test-utils/book';
 import { realClick } from '../test-utils/realClick';
 import { ActionRow, outputsOf } from './ActionRow';
 import { hpRate } from './format';
-import { STOP } from './glyphs';
+import { PLAY } from './glyphs';
 import { rowName } from './words';
 
 const N = balance.automation.unlockRepeatable;
@@ -110,7 +110,7 @@ describe('ActionRow: what the row reads', () => {
     row('fish', { completedOneTime: ['net'] });
     expect(screen.getByText('0.8s')).toBeInTheDocument();
   });
-  it('the running row shows a stop square that does nothing, on the same button, so focus survives', () => {
+  it('the running row keeps its play button, which does nothing and keeps focus (#43)', () => {
     const r = row('fish');
     const button = play();
     button.focus();
@@ -119,9 +119,18 @@ describe('ActionRow: what the row reads', () => {
     expect(mark).toBe(button);
     expect(document.activeElement).toBe(mark);
     expect(mark).toHaveAttribute('aria-disabled', 'true');
-    expect(mark).toHaveTextContent(STOP);
+    expect(mark).toHaveTextContent(PLAY);
+    expect(mark).toHaveClass('btn--play', 'btn--running');
     act(() => { mark.click(); });
     expect(r.onNow).not.toHaveBeenCalled();
+  });
+  it('while dead the lit row\'s play button dims with the rest: btn--running is a live run\'s alone', () => {
+    const r = row('fish', { dead: true }, book, true);
+    const lit = screen.getByRole('button', { name: /^running/ });
+    expect(lit).toHaveAttribute('aria-disabled', 'true');
+    expect(lit).not.toHaveClass('btn--running');
+    r.rerenderWith({ dead: true }, false);
+    expect(play()).not.toHaveClass('btn--running');
   });
 });
 

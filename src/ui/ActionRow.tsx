@@ -12,7 +12,7 @@ import { tickExp } from '../engine/skills';
 import { ticksPerSecond } from '../engine/time';
 import type { AutoMode, GameState } from '../engine/types';
 import { duration, hpClass, hpRate } from './format';
-import { PLAY, STOP } from './glyphs';
+import { PLAY } from './glyphs';
 import { ICONS } from './icons';
 import { itemName, needPhrase, rowName, words } from './words';
 
@@ -169,15 +169,15 @@ export function ActionRow({ action, content, state, running, onNow, onQueue, onA
       <span className="row__name"><b>{skill.name}</b> {action.noun}{running && <span className="visually-hidden">running</span>}</span>
       <span className="row__tx">{built ? 'built' : duration(action.expCost / perSecond)}</span>
       <div className="row__ctl">
-        {/* One element in both states, so focus survives the swap; while running it does nothing. */}
+        {/* Always the play button (#43): on the running row "do it now" is already true, so a press does nothing, and it keeps its look. */}
         <button
           type="button"
-          className={`btn ${running ? 'btn--stop' : 'btn--play'}`}
+          className={`btn btn--play${running && !state.dead ? ' btn--running' : ''}`}
           aria-label={`${running ? 'running' : 'do it now'}: ${name}`}
           aria-disabled={inert ? 'true' : undefined}
           onClick={inert ? undefined : (e) => now(e.shiftKey)}
           onKeyDown={inert ? undefined : enter(now)}
-        >{running ? STOP : PLAY}</button>
+        >{PLAY}</button>
         <button
           type="button"
           className="btn"
