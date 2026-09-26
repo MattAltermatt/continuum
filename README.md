@@ -41,6 +41,13 @@ docked); the boxes never move, the page never scrolls, and every bar reads the
 same way (spec
 [`docs/specs/2026-09-25-the-watched-screen.md`](./docs/specs/2026-09-25-the-watched-screen.md)).
 
+**Every death shows what the life kept, and every life so far.** The death
+overlay lists health and each skill's core level from and to, and charts the
+row you pick across every life you have lived; **see how it ended** hides it
+over the frozen kill screen (the row you died in, still lit), and Begin starts
+the next life (spec
+[`docs/specs/2026-09-25-death-overlay.md`](./docs/specs/2026-09-25-death-overlay.md)).
+
 ## Run it
 
 ```sh
