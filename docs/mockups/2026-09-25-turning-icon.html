@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Turning icon (#43)</title>
+<style>
+:root { color-scheme: dark;
+  --bg: oklch(20% 0.012 260); --cell: oklch(24% 0.012 260); --item: oklch(22% 0.012 260); --cell-on: oklch(30% 0.02 260);
+  --edge: oklch(34% 0.012 260); --edge-on: oklch(62% 0.06 260); --track: oklch(17% 0.012 260); --track-edge: oklch(55% 0.012 260);
+  --ink: oklch(90% 0.01 80); --ink-2: oklch(80% 0.01 80); --ink-3: oklch(62% 0.01 80); --run: oklch(70% 0.16 45); --warn: oklch(80% 0.15 85); --auto: oklch(72% 0.10 235);
+  --mono: ui-monospace, Menlo, monospace; --tick: 100ms; }
+* { box-sizing: border-box; }
+body { margin: 0; background: oklch(12% 0.01 260); color: var(--ink); font-family: var(--mono); font-size: 12px; padding: 24px 16px; }
+h1 { font-size: 13px; font-weight: 400; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 6px; }
+p.note { max-width: 80ch; color: var(--ink-2); line-height: 1.5; margin: 0 0 18px; }
+p.note b { color: var(--ink); }
+.frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 22px; max-width: 1200px; }
+.frame > h2 { font-size: 12px; font-weight: 700; margin: 0 0 6px; }
+.frame > h2 small { display: block; font-weight: 400; color: var(--ink-2); margin-top: 3px; line-height: 1.45; }
+/* The chapter region and the row, from src/styles.css. */
+.region { border: 1px solid var(--edge); background: var(--cell); border-radius: 5px; padding: 8px 0; display: grid; gap: 5px; }
+.region__head { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); padding: 0 10px; }
+.item { border: 1px solid var(--edge); background: var(--item); }
+.row { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto auto; gap: 2px 8px; align-items: start; padding: 7px 8px; border-inline: 0; }
+.row--on { background: var(--cell-on); }
+.item.working { position: relative; overflow: clip; border-color: var(--run); box-shadow: inset 1px 0 0 var(--run), inset -1px 0 0 var(--run); }
+@keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.item.working::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--run) 12%, transparent), transparent); animation: sheen 6s linear infinite; }
+.row > svg { width: 15px; height: 15px; }
+.row__name b { font-weight: 700; }
+.row__tx { font-size: 11px; font-variant-numeric: tabular-nums; }
+.row__ctl { display: flex; gap: 4px; --control: 30px; }
+.row__list { grid-column: 2 / -1; font-size: 11px; line-height: 1.35; color: var(--ink-2); }
+.btn { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; display: grid; place-items: center; padding: 0; }
+.btn--play { color: var(--run); }
+.auto { width: calc(7ch + 8px); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); font-size: 11px; }
+/* The running button: the row's own icon, turned by the row's progress. */
+.btn--run { border-color: var(--run); color: var(--run); cursor: default; }
+.btn--run { position: relative; overflow: hidden; }
+/* The turning layer: the icon and its up marker turn together, so the marker says where the icon's top is. */
+.spin { position: absolute; inset: 0; display: grid; place-items: center; transition: transform var(--tick) linear; }
+.spin.snap { transition: none; }
+.spin svg { width: 16px; height: 16px; color: var(--ic, var(--run)); }
+.col-a { --ic: var(--run); --mk: var(--ink); }
+.col-b { --ic: var(--ink); --mk: var(--run); }
+.col-c { --ic: var(--run); --mk: var(--warn); }
+.col-d { --ic: var(--run); --mk: var(--auto); }
+.mk-dot .spin::before { content: ""; position: absolute; top: 2px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--run); }
+.mk-line .spin::before { content: ""; position: absolute; top: 1px; left: 50%; width: 2px; height: 6px; margin-left: -1px; border-radius: 1px; background: var(--mk, var(--run)); }
+.mk-glow .spin::before { content: ""; position: absolute; top: -6px; left: 50%; width: 16px; height: 12px; margin-left: -8px; border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--run) 70%, transparent), transparent); }
+.bar { height: 6px; border: 1px solid var(--track-edge); border-radius: 3px; background: var(--track); position: relative; overflow: hidden; margin-top: 3px; }
+.bar i { position: absolute; inset: 0 auto 0 0; background: var(--run); transition: width var(--tick) linear; }
+.bar i.snap { transition: none; }
+@media (prefers-reduced-motion: reduce) { .item.working::after { animation: none; } }
+</style></head><body>
+<h1>#43 · the row's icon turns in the running button, with a mark for its top</h1>
+<p class="note">The user's rule: the running row's button cannot be pressed, so it shows the <b>row's own icon, turning one full turn per completion</b> (answer A). The angle is the row's progress to its next completion, so it glides a little every tick, like the bars do, and jumps back to upright when a completion lands. Each frame here runs live. Fish completes every 4 s. The hull is one completion over about a minute, so it turns slowly, once. The thin bar under each running row shows the same progress for comparison; it is not part of the design. The icon at the row's left edge is unchanged. <b>Round two</b> (the user: "have some marking to show which way it is up … even a simple line or glow"): each variant puts a mark on the icon's top that turns with it, so the angle reads on any icon. <b>Round three</b> (the user: the mark and the icon in different colours): the last eight frames, all with the line mark, try the four colour pairs.</p>
+<div class="frames" id="frames"></div>
+<script>
+const ICON = {
+  fish: '<path d="M4 11h1"/><path d="M8 15a2 2 0 0 1-4 0V3a1 1 0 0 1 1-1h.5C14 2 20 9 20 18v4"/><circle cx="18" cy="18" r="2"/>',
+  rig: '<path d="M10 2v15"/><path d="M7 22a4 4 0 0 1-4-4 1 1 0 0 1 1-1h16a1 1 0 0 1 1 1 4 4 0 0 1-4 4z"/><path d="M9.159 2.46a1 1 0 0 1 1.521-.193l9.977 8.98A1 1 0 0 1 20 13H4a1 1 0 0 1-.824-1.567z"/>',
+};
+const svg = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
+const fish = { verb: 'Fish', noun: 'the cloud shallows', t: '4.0s', icon: 'fish', secs: 4, list: 'gives: +1 cloud-fish', idle: { verb: 'Rig', noun: 'the hull', t: '1:00', icon: 'rig' } };
+const hull = { verb: 'Rig', noun: 'the hull', t: '1:00', icon: 'rig', secs: 6, list: 'needs: scrap 16/16', idle: { verb: 'Fish', noun: 'the cloud shallows', t: '4.0s', icon: 'fish' } };
+const ROWS = [
+  { ...fish, id: 'f-dot', mk: 'mk-dot', title: 'A · a dot at the top', note: 'A small ember dot rides the icon\'s top edge and turns with it.' },
+  { ...fish, id: 'f-line', mk: 'mk-line', title: 'B · a short line at the top', note: 'A short ember tick, like a clock hand\'s tip, at the icon\'s top.' },
+  { ...fish, id: 'f-glow', mk: 'mk-glow', title: 'C · a glow at the top', note: 'A soft ember glow on the icon\'s top edge; the quietest of the three.' },
+  { ...hull, id: 'h-dot', mk: 'mk-dot', title: 'A on the hull, at ×10', note: 'The sailboat with the dot: its top is easy to lose without a mark.' },
+  { ...hull, id: 'h-line', mk: 'mk-line', title: 'B on the hull, at ×10', note: 'The same with the line.' },
+  { ...hull, id: 'h-glow', mk: 'mk-glow', title: 'C on the hull, at ×10', note: 'The same with the glow.' },
+  { ...fish, id: 'c-a', mk: 'mk-line col-a', title: 'Colour A · ember icon, bone mark', note: 'The strongest contrast: a near-white hand on the ember icon. Bone is plain text colour, no meaning of its own.' },
+  { ...fish, id: 'c-b', mk: 'mk-line col-b', title: 'Colour B · bone icon, ember mark', note: 'The icon matches the row\'s left icon; the one ember thing moving is the hand.' },
+  { ...fish, id: 'c-c', mk: 'mk-line col-c', title: 'Colour C · ember icon, amber mark', note: 'Warm and pretty; but amber already means "needs attention" (waiting chip, warn labels).' },
+  { ...fish, id: 'c-d', mk: 'mk-line col-d', title: 'Colour D · ember icon, blue mark', note: 'Very distinct; but blue is the automation colour, so it hints the row is automated.' },
+  { ...hull, id: 'ch-a', mk: 'mk-line col-a', title: 'Colour A on the hull, ×10', note: 'Ember sailboat, bone hand.' },
+  { ...hull, id: 'ch-b', mk: 'mk-line col-b', title: 'Colour B on the hull, ×10', note: 'Bone sailboat, ember hand.' },
+  { ...hull, id: 'ch-c', mk: 'mk-line col-c', title: 'Colour C on the hull, ×10', note: 'Ember sailboat, amber hand.' },
+  { ...hull, id: 'ch-d', mk: 'mk-line col-d', title: 'Colour D on the hull, ×10', note: 'Ember sailboat, blue hand.' },
+];
+const host = document.getElementById('frames');
+for (const r of ROWS) host.insertAdjacentHTML('beforeend', `
+<div class="frame ${r.mk}"><h2>${r.title}<small>${r.note}</small></h2>
+<div class="region"><div class="region__head">I · Port Cinder</div>
+<div class="item row">${svg(r.idle.icon)}<span class="row__name"><b>${r.idle.verb}</b> ${r.idle.noun}</span><span class="row__tx">${r.idle.t}</span>
+<div class="row__ctl"><button class="btn btn--play">&#x25B6;&#xFE0E;</button><button class="btn">+</button><span class="auto">off</span></div></div>
+<div class="item row row--on working">${svg(r.icon)}<span class="row__name"><b>${r.verb}</b> ${r.noun}</span><span class="row__tx">${r.t}</span>
+<div class="row__ctl"><button class="btn btn--run" id="b-${r.id}" aria-label="running"><span class="spin">${svg(r.icon)}</span></button><button class="btn">+</button><span class="auto">0/2</span></div>
+<div class="row__list">${r.list}<div class="bar"><i id="p-${r.id}"></i></div></div></div>
+</div></div>`);
+const TICK = 100;
+const state = Object.fromEntries(ROWS.map((r) => [r.id, 0]));
+setInterval(() => {
+  for (const r of ROWS) {
+    const per = TICK / (r.secs * 1000);
+    let p = state[r.id] + per;
+    const icon = document.querySelector(`#b-${r.id} .spin`), bar = document.getElementById(`p-${r.id}`);
+    if (p >= 1 - 1e-9) {   // a completion: back to upright without sliding backwards
+      p = 0;
+      icon.classList.add('snap'); bar.classList.add('snap');
+      icon.style.transform = 'rotate(0deg)'; bar.style.width = '0%';
+      void icon.offsetWidth;
+      icon.classList.remove('snap'); bar.classList.remove('snap');
+    } else {
+      icon.style.transform = `rotate(${p * 360}deg)`; bar.style.width = `${p * 100}%`;
+    }
+    state[r.id] = p;
+  }
+}, TICK);
+</script>
+</body></html>

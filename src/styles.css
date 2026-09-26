@@ -151,7 +151,9 @@ body { background: var(--bg); color: var(--ink); font-family: var(--mono); font-
 .row--auto .row__done { font-size: 10px; color: var(--ink-3); }
 .btn { width: var(--control); height: var(--control); border: 1px solid var(--edge-on); border-radius: 4px; background: transparent; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
 .btn--play { color: var(--run); }
-.btn--running { cursor: default; }   /* the running row's play button: inert, but it keeps the play button's look (#43) */
+/* The running row's play button (#43, the user's pick B from mockup 2026-09-25-stop-glyph): the same play glyph, held in, dark on
+   ember with a pressed-in shadow: "this one is playing". Inert while the row runs. */
+.btn--running { cursor: default; background: var(--run); color: var(--bg); box-shadow: inset 0 2px 3px #0006; }
 /* The refusal (#43, spec 2.5): one red flash on the row and its play button; its short cost line goes with it
    (spec 2026-09-25-the-watched-screen section 7): .li--flash's own keyframe runs the same 700ms, the class comes and goes
    with the row's. The class comes off on animationend. */
